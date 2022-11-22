@@ -1,0 +1,26 @@
+﻿<UserControl x:Class="TestApp.View.AppView.CreateTestView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:TestApp.View.AppView"
+             xmlns:vm="clr-namespace:TestApp.ViewModel.AppViewModel"
+             mc:Ignorable="d" d:DataContext="{d:DesignInstance Type=vm:CreateTestViewModel}"
+             d:DesignHeight="250" d:DesignWidth="600">
+
+    <Border BorderThickness="3" BorderBrush="Teal" Height="250" Width="600" CornerRadius="0,150,0,150">
+        <StackPanel Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center" Width="450">
+            <GroupBox Header="Введите название теста" BorderBrush="Teal">
+                <TextBox Style="{DynamicResource InputStyle}" Text="{Binding TitleTest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, NotifyOnValidationError=True}"
+                         Validation.ErrorTemplate="{DynamicResource ResourceKey=ErrorTemplate}" VerticalAlignment="Center" VerticalContentAlignment="Center"
+                         Height="25" Margin="0,5,0,5" />
+            </GroupBox>
+            <Grid Height="50" Margin="0,50,0,0">
+                <Button Style="{DynamicResource ActionStyle}" Content="Принять" Height="35" Width="95" VerticalAlignment="Center" HorizontalAlignment="Left"
+                        Command="{Binding OkDialogResultCommand}" />
+                <Button Style="{DynamicResource ActionStyle}" Content="Отмена" Height="35" Width="95" VerticalAlignment="Center" HorizontalAlignment="Right"
+                        Command="{Binding CancelDialogResultCommand}" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

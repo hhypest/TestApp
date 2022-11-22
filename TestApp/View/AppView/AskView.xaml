@@ -1,0 +1,122 @@
+﻿<UserControl x:Class="TestApp.View.AppView.AskView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:TestApp.View.AppView"
+             xmlns:vm="clr-namespace:TestApp.ViewModel.AppViewModel"
+             xmlns:selector="clr-namespace:TestApp.ViewModel.ItemStyle"
+             mc:Ignorable="d" d:DataContext="{d:DesignInstance Type=vm:AskViewModel}"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <Style x:Key="SingleAnswer" TargetType="{x:Type ListViewItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListViewItem}">
+                        <Border x:Name="bd" BorderBrush="Transparent" Background="Transparent" BorderThickness="1" Margin="0,10,0,10">
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                                <RadioButton Style="{DynamicResource RadioStyle}" IsChecked="{Binding IsAnswered, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             VerticalAlignment="Center" GroupName="AnswerItem" />
+                                <TextBox Style="{DynamicResource InputStyle}" Text="{Binding Option, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged,
+                                         NotifyOnValidationError=True}" Validation.ErrorTemplate="{DynamicResource ResourceKey=ErrorTemplate}"
+                                         VerticalAlignment="Center" VerticalContentAlignment="Center" Width="250" Height="25" Margin="5,0,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" TargetName="bd" Value="Teal" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="BorderBrush" TargetName="bd" Value="Indigo" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="MultipleAnswer" TargetType="{x:Type ListViewItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListViewItem}">
+                        <Border x:Name="bd" BorderBrush="Transparent" Background="Transparent" BorderThickness="1" Margin="0,10,0,10">
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                                <CheckBox Style="{DynamicResource CheckStyle}" IsChecked="{Binding IsAnswered, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          VerticalAlignment="Center" />
+                                <TextBox Style="{DynamicResource InputStyle}" Text="{Binding Option, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged,
+                                         NotifyOnValidationError=True}" Validation.ErrorTemplate="{DynamicResource ResourceKey=ErrorTemplate}"
+                                         VerticalAlignment="Center" VerticalContentAlignment="Center" Width="250" Height="25" Margin="5,0,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" TargetName="bd" Value="Teal" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="BorderBrush" TargetName="bd" Value="Indigo" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="50" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0" Margin="0,0,5,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="150" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Orientation="Vertical">
+                    <GroupBox Header="Введите вопрос" BorderBrush="Teal">
+                        <TextBox Style="{DynamicResource InputStyle}" Text="{Binding Question, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, NotifyOnValidationError=True}"
+                                 Validation.ErrorTemplate="{DynamicResource ResourceKey=ErrorTemplate}" VerticalAlignment="Center" VerticalContentAlignment="Center" Height="25"
+                                 Margin="0,5,0,5" />
+                    </GroupBox>
+                    <GroupBox Header="Тип вопроса" BorderBrush="Teal" Margin="0,25,0,0">
+                        <CheckBox Style="{DynamicResource CheckStyle}" Content="Один правильный вариант ответа в вопросе?"
+                                  IsChecked="{Binding IsSingleAnswers, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,5" Click="OnStyleChanged" />
+                    </GroupBox>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Orientation="Vertical">
+                    <Button Style="{DynamicResource ActionStyle}" Content="Добавить новый вариант ответа" Height="35" Command="{Binding AddNewAnswerCommand}"
+                            Margin="0,15,0,15" />
+                    <Button Style="{DynamicResource ActionStyle}" Content="Удалить выбранный вариант ответа" Height="35" Command="{Binding RemoveSelectedAnswerCommand}"
+                            CommandParameter="{Binding SelectedAnswer}" Margin="0,15,0,15" />
+                    <Button Style="{DynamicResource ActionStyle}" Content="Удалить все варианты ответа" Height="35" Command="{Binding RemoveAllAnswerCommand}"
+                            Margin="0,15,0,15" />
+                </StackPanel>
+            </Grid>
+            <GridSplitter Grid.Column="1" Width="3" Background="Teal" VerticalAlignment="Stretch" HorizontalAlignment="Center" ShowsPreview="False" />
+            <Grid Grid.Column="2" Margin="5,0,0,0">
+                <GroupBox Header="Варианты ответа" BorderBrush="Teal">
+                    <ListView ItemsSource="{Binding Answers, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}" SelectionMode="Single"
+                              SelectedItem="{Binding SelectedAnswer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              Tag="{Binding IsSingleAnswers, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                              Background="Transparent" BorderBrush="Transparent" x:Name="AnswerListView">
+                        <ListView.ItemContainerStyleSelector>
+                            <selector:AnswerSelector SingleAnswerStyle="{StaticResource ResourceKey=SingleAnswer}"
+                                                     MultipleAnswerStyle="{StaticResource ResourceKey=MultipleAnswer}" />
+                        </ListView.ItemContainerStyleSelector>
+                    </ListView>
+                </GroupBox>
+            </Grid>
+        </Grid>
+        <Grid Grid.Row="1">
+            <Button Style="{DynamicResource ActionStyle}" Content="Принять" Height="35" Width="95" VerticalAlignment="Center" HorizontalAlignment="Left"
+                    Command="{Binding OkDialogResultCommand}" Margin="10,0,0,0" />
+            <Button Style="{DynamicResource ActionStyle}" Content="Отменить" Height="35" Width="95" VerticalAlignment="Center" HorizontalAlignment="Right"
+                    Command="{Binding CancelDialogResultCommand}" Margin="0,0,10,0" />
+        </Grid>
+    </Grid>
+</UserControl>

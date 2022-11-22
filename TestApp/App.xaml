@@ -1,0 +1,17 @@
+﻿<Application x:Class="TestApp.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/View/DataTemplate/ErrorsTemplate.xaml" />
+                <ResourceDictionary Source="/View/Styles/ActionButtonStyle.xaml" />
+                <ResourceDictionary Source="/View/Styles/InputDataStyle.xaml" />
+                <ResourceDictionary Source="/View/Styles/CheckButtonStyle.xaml" />
+                <ResourceDictionary Source="/View/Styles/MenuItemStyle.xaml" />
+                <ResourceDictionary Source="/View/Styles/RadioButtonStyle.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
