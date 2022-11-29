@@ -77,6 +77,9 @@ public class AskViewModel : RelayViewModel, IAskViewModel
         Answers.Remove(selectedAnswer);
     }
 
+    private void OnRemoveAllAnswerExecute()
+        => Answers.Clear();
+
     private void OnOkDialogResultExecute()
     {
         var test = _service.GetRequiredService<ITestViewModel>();
@@ -163,7 +166,7 @@ public class AskViewModel : RelayViewModel, IAskViewModel
 
         AddNewAnswerCommand = new RelayCommand(OnAddNewAnswerExecute);
         RemoveSelectedAnswerCommand = new RelayCommand<IAnswerViewModel>(OnRemoveSelectedAnswerExecute, answer => answer is not null);
-        RemoveAllAnswerCommand = new RelayCommand(Answers.Clear, () => Answers.Count > 0);
+        RemoveAllAnswerCommand = new RelayCommand(OnRemoveAllAnswerExecute, () => Answers.Count > 0);
         OkDialogResultCommand = new RelayCommand(OnOkDialogResultExecute, OnCanOkDialogResultExecute);
         CancelDialogResultCommand = new RelayCommand(OnCancelDialogResultExecute);
     }
