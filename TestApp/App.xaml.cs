@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Windows;
-using TestApp.Extansions;
+using TestApp.Extensions;
 using TestApp.View;
 
 namespace TestApp;

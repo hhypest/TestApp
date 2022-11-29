@@ -10,7 +10,7 @@ using NightModel.ViewModel;
 using System;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using TestApp.Extansions;
+using TestApp.Extensions;
 using TestApp.ViewModel.AppViewModel.Interfaces;
 
 namespace TestApp.ViewModel.AppViewModel;
@@ -39,7 +39,7 @@ public class StartUpViewModel : RelayViewModel, IStartUpViewModel
 
         try
         {
-            var result = await DataExtansion<TestModel>.OpenTestAsync(fileInfo.FullName);
+            var result = await DataExtension<TestModel>.OpenTestAsync(fileInfo.FullName);
             if (result.Asks is null)
                 throw new InvalidOperationException($"Открываемый файл <{fileInfo.Name}> - не является тестом!");
 

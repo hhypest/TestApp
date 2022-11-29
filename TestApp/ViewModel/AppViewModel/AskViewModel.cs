@@ -7,7 +7,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
-using TestApp.Extansions;
+using TestApp.Extensions;
 using TestApp.Service.ErrorsMessage;
 using TestApp.ViewModel.AppViewModel.Interfaces;
 using TestApp.ViewModel.AppViewModel.Structure;

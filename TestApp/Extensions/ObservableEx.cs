@@ -2,7 +2,7 @@
 using System.Linq;
 using TestApp.ViewModel.AppViewModel.Interfaces;
 
-namespace TestApp.Extansions;
+namespace TestApp.Extensions;
 
 internal static class ObservableEx
 {

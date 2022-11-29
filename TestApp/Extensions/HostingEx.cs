@@ -7,7 +7,7 @@ using TestApp.View;
 using TestApp.ViewModel.AppViewModel;
 using TestApp.ViewModel.AppViewModel.Interfaces;
 
-namespace TestApp.Extansions;
+namespace TestApp.Extensions;
 
 internal static class HostingEx
 {

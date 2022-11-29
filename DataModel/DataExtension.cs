@@ -3,9 +3,9 @@ using System.Text.Json;
 
 namespace DataModel;
 
-public static class DataExtansion<T> where T : struct
+public static class DataExtension<T> where T : struct
 {
-    public static async Task SaveTestAsync(T test, string pathSave)
+    public static Task SaveTestAsync(T test, string pathSave)
     {
         var optionStream = new FileStreamOptions()
         {
@@ -24,7 +24,7 @@ public static class DataExtansion<T> where T : struct
         try
         {
             using var stream = new FileStream(pathSave, optionStream);
-            await JsonSerializer.SerializeAsync(stream, test, optionJson);
+            return JsonSerializer.SerializeAsync(stream, test, optionJson);
         }
         catch
         {
@@ -32,7 +32,7 @@ public static class DataExtansion<T> where T : struct
         }
     }
 
-    public static async Task<T> OpenTestAsync(string pathOpen)
+    public static ValueTask<T> OpenTestAsync(string pathOpen)
     {
         var optionStream = new FileStreamOptions()
         {
@@ -50,7 +50,7 @@ public static class DataExtansion<T> where T : struct
         try
         {
             using var stream = new FileStream(pathOpen, optionStream);
-            return await JsonSerializer.DeserializeAsync<T>(stream, optionJson);
+            return JsonSerializer.DeserializeAsync<T>(stream, optionJson);
         }
         catch
         {

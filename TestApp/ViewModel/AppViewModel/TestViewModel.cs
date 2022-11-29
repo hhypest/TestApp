@@ -12,7 +12,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using TestApp.Extansions;
+using TestApp.Extensions;
 using TestApp.Service.ErrorsMessage;
 using TestApp.ViewModel.AppViewModel.Interfaces;
 
@@ -109,7 +109,7 @@ public class TestViewModel : RelayViewModel, ITestViewModel
         try
         {
             PathTest = fileInfo.FullName;
-            var result = await DataExtansion<TestModel>.OpenTestAsync(PathTest);
+            var result = await DataExtension<TestModel>.OpenTestAsync(PathTest);
             if (result.Asks is null)
                 throw new InvalidOperationException($"Открываемый файл <{fileInfo.Name}> - не является тестом!");
 
@@ -130,7 +130,7 @@ public class TestViewModel : RelayViewModel, ITestViewModel
     {
         try
         {
-            await DataExtansion<TestModel>.SaveTestAsync(this.ViewModelMap(), path!);
+            await DataExtension<TestModel>.SaveTestAsync(this.ViewModelMap(), path!);
             IsSaveTest = true;
         }
         catch (Exception ex)
@@ -150,7 +150,7 @@ public class TestViewModel : RelayViewModel, ITestViewModel
 
         try
         {
-            await DataExtansion<TestModel>.SaveTestAsync(this.ViewModelMap(), PathTest);
+            await DataExtension<TestModel>.SaveTestAsync(this.ViewModelMap(), PathTest);
             IsSaveTest = true;
         }
         catch (Exception ex)
@@ -188,7 +188,7 @@ public class TestViewModel : RelayViewModel, ITestViewModel
         CountAsk--;
     }
 
-    private void OnDeleteAllAskExecute()
+    private void OnDeleteAllAskExecute(int? count)
     {
         Asks.Clear();
         IsSaveTest = false;
@@ -227,7 +227,7 @@ public class TestViewModel : RelayViewModel, ITestViewModel
         AddNewAskCommand = new RelayCommand(OnAddNewAskExecute);
         EditSelectedAskCommand = new RelayCommand<IAskViewModel>(OnEditSelectedAskExecute, ask => ask is not null);
         DeleteSelectedAskCommand = new RelayCommand<IAskViewModel>(OnDeleteSelectedAskExecute, ask => ask is not null);
-        DeleteAllAskCommand = new RelayCommand(OnDeleteAllAskExecute, () => CountAsk > 0);
+        DeleteAllAskCommand = new RelayCommand<int?>(OnDeleteAllAskExecute, count => count > 0);
 
         #endregion Команды "Правка"
     }

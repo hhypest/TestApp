@@ -8,7 +8,7 @@ using TestApp.Service.ErrorsMessage;
 using TestApp.ViewModel.AppViewModel;
 using TestApp.ViewModel.AppViewModel.Interfaces;
 
-namespace TestApp.Extansions;
+namespace TestApp.Extensions;
 
 internal static class DataMapping
 {
