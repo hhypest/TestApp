@@ -16,7 +16,7 @@
     <PackageReference Include="FontAwesome6.Fonts" Version="2.5.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
-    <PackageReference Include="NightModel" Version="0.1.9" />
+    <PackageReference Include="NightModel" Version="0.2.0" />
   </ItemGroup>
 
   <ItemGroup>
