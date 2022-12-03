@@ -20,16 +20,8 @@ public static class DataExtension<T> where T : struct
             WriteIndented = true,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
-
-        try
-        {
-            using var stream = new FileStream(pathSave, optionStream);
-            return JsonSerializer.SerializeAsync(stream, test, optionJson);
-        }
-        catch
-        {
-            throw;
-        }
+        using var stream = new FileStream(pathSave, optionStream);
+        return JsonSerializer.SerializeAsync(stream, test, optionJson);
     }
 
     public static ValueTask<T> OpenTestAsync(string pathOpen)
@@ -46,15 +38,7 @@ public static class DataExtension<T> where T : struct
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
-
-        try
-        {
-            using var stream = new FileStream(pathOpen, optionStream);
-            return JsonSerializer.DeserializeAsync<T>(stream, optionJson);
-        }
-        catch
-        {
-            throw;
-        }
+        using var stream = new FileStream(pathOpen, optionStream);
+        return JsonSerializer.DeserializeAsync<T>(stream, optionJson);
     }
 }
