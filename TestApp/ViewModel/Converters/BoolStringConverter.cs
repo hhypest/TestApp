@@ -21,17 +21,4 @@ internal class BoolStringConverter : BaseConverter
             false => "Нет"
         };
     }
-
-    protected override object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (value is not string state)
-            return false;
-
-        return state switch
-        {
-            "Да" => true,
-            "Нет" => false,
-            _ => throw new NotSupportedException($"Значение {nameof(state)} не поддерживается встроенным конвертером значений!")
-        };
-    }
 }

@@ -26,14 +26,12 @@ public class AnswerSelector : StyleSelector
     private static T? FindParent<T>(DependencyObject container) where T : FrameworkElement
     {
         var parent = VisualTreeHelper.GetParent(container);
-        while (parent is not null)
-        {
-            if (parent is T finded)
-                return finded;
+        if (parent is T finded)
+            return finded;
 
-            return FindParent<T>(parent);
-        }
+        if (parent is null)
+            return null;
 
-        return null;
+        return FindParent<T>(parent);
     }
 }

@@ -5,7 +5,7 @@ namespace DataModel;
 
 public static class DataExtension<T> where T : struct
 {
-    public static Task SaveTestAsync(T test, string pathSave)
+    public static async Task SaveTestAsync(T test, string pathSave)
     {
         var optionStream = new FileStreamOptions()
         {
@@ -21,10 +21,10 @@ public static class DataExtension<T> where T : struct
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
         using var stream = new FileStream(pathSave, optionStream);
-        return JsonSerializer.SerializeAsync(stream, test, optionJson);
+        await JsonSerializer.SerializeAsync(stream, test, optionJson);
     }
 
-    public static ValueTask<T> OpenTestAsync(string pathOpen)
+    public static async ValueTask<T> OpenTestAsync(string pathOpen)
     {
         var optionStream = new FileStreamOptions()
         {
@@ -39,6 +39,6 @@ public static class DataExtension<T> where T : struct
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
         using var stream = new FileStream(pathOpen, optionStream);
-        return JsonSerializer.DeserializeAsync<T>(stream, optionJson);
+        return await JsonSerializer.DeserializeAsync<T>(stream, optionJson);
     }
 }
