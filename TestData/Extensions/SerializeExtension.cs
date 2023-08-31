@@ -6,7 +6,7 @@ namespace TestData.Extensions;
 
 public static class SerializeExtension
 {
-    public async static ValueTask SaveJson(this TestModel test, string path)
+    public static async ValueTask SaveJson(this TestModel test, string path)
     {
         var jsonOption = GetJsonOptions(true);
         var streamOption = GetFileStreamOptions(true);
@@ -15,7 +15,7 @@ public static class SerializeExtension
         await JsonSerializer.SerializeAsync(stream, test, jsonOption);
     }
 
-    public async static ValueTask<TestModel> LoadJson(string path)
+    public static async ValueTask<TestModel> LoadJson(string path)
     {
         var jsonOption = GetJsonOptions(false);
         var streamOption = GetFileStreamOptions(false);

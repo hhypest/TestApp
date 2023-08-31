@@ -11,7 +11,7 @@ public partial class App : Application
     public App()
     {
         AppHost = Host.CreateDefaultBuilder()
-            .ConfigureServices((hostContext,  services) =>
+            .ConfigureServices((_, services) =>
             {
                 services.AddService();
                 services.AddViewModels();

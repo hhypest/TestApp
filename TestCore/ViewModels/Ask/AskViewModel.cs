@@ -13,10 +13,13 @@ namespace TestCore.ViewModels.Ask;
 public partial class AskViewModel : ObservableValidator, IAskViewModel
 {
     #region Зависимости
+
     private readonly IDialogViewService _dialogService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(OkAskViewCommand))]
     [NotifyDataErrorInfo]
@@ -45,18 +48,22 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel
     private EditAnswer? _editItem;
 
     public bool IsEditItem { get; set; }
-    #endregion
+
+    #endregion Свойства модели представления
 
     #region Конструктор
+
     public AskViewModel(IDialogViewService dialogService)
     {
         _questionAsk = "Новый вопрос";
         _answersList = new();
         _dialogService = dialogService;
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Команды
+
     [RelayCommand]
     private void OnAddNewAnswer()
     {
@@ -129,6 +136,7 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel
                 IsEditItem = false;
                 WeakReferenceMessenger.Default.Send(new EditItemMessage(true));
                 break;
+
             case false:
                 WeakReferenceMessenger.Default.Send(new AddItemMessage(this));
                 break;
@@ -144,14 +152,17 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel
                 IsEditItem = false;
                 WeakReferenceMessenger.Default.Send(new EditItemMessage(false));
                 break;
+
             case false:
                 WeakReferenceMessenger.Default.Send(new CancelAddItemMessage(false));
                 break;
         }
     }
-    #endregion
+
+    #endregion Команды
 
     #region Предикаты
+
     private bool OnCanExecuteActionAnswer(IAnswerViewModel? answer)
     {
         return answer is not null;
@@ -186,5 +197,6 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel
 
         return true;
     }
-    #endregion
+
+    #endregion Предикаты
 }

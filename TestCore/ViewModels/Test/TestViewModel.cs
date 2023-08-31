@@ -9,18 +9,20 @@ using TestCore.Services.Navigation;
 using TestCore.ViewModels.Ask;
 using TestCore.ViewModels.StartUp;
 using TestData.Extensions;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace TestCore.ViewModels.Test;
 
 public partial class TestViewModel : ObservableValidator, ITestViewModel, IRecipient<TitleTestMessage>, IRecipient<AddItemMessage>, IRecipient<CancelAddItemMessage>, IRecipient<EditItemMessage>
 {
     #region Зависимости
+
     private readonly IDialogViewService _dialogService;
     private readonly INavigationService _navigationService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
+
     [ObservableProperty]
     private string _titleTest;
 
@@ -40,9 +42,11 @@ public partial class TestViewModel : ObservableValidator, ITestViewModel, IRecip
     private IAskViewModel? _selectedAsk;
 
     private EditAsk? _editItem;
-    #endregion
+
+    #endregion Свойства модели представления
 
     #region Конструктор
+
     public TestViewModel(IDialogViewService dialogService, INavigationService navigationService)
     {
         _titleTest = string.Empty;
@@ -53,9 +57,11 @@ public partial class TestViewModel : ObservableValidator, ITestViewModel, IRecip
 
         WeakReferenceMessenger.Default.RegisterAll(this);
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Получение сообщений
+
     public void Receive(TitleTestMessage message)
     {
         TitleTest = message.Value;
@@ -97,9 +103,11 @@ public partial class TestViewModel : ObservableValidator, ITestViewModel, IRecip
 
         _navigationService.NavigationTo(typeof(ITestViewModel));
     }
-    #endregion
+
+    #endregion Получение сообщений
 
     #region Команды
+
     [RelayCommand]
     private void OnCreateNewTest()
     {
@@ -211,9 +219,11 @@ public partial class TestViewModel : ObservableValidator, ITestViewModel, IRecip
         CountAsk = 0;
         IsSaveTest = false;
     }
-    #endregion
+
+    #endregion Команды
 
     #region Предикаты
+
     private bool OnCanExecuteSaveTest(string? path)
     {
         return !string.IsNullOrWhiteSpace(path);
@@ -228,5 +238,6 @@ public partial class TestViewModel : ObservableValidator, ITestViewModel, IRecip
     {
         return count > 0;
     }
-    #endregion
+
+    #endregion Предикаты
 }

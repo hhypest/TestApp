@@ -10,18 +10,23 @@ namespace TestUI.Views.Launcher;
 public partial class MainView : Window, IMainView
 {
     #region Закрытые свойства
-    private bool IsMaximizeWindow {  get; set; }
-    #endregion
+
+    private bool IsMaximizeWindow { get; set; }
+
+    #endregion Закрытые свойства
 
     #region Конструктор
+
     public MainView()
     {
         InitializeComponent();
         MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void ShowView()
     {
         Show();
@@ -36,14 +41,18 @@ public partial class MainView : Window, IMainView
     {
         PresenterPages.NavigationService.Navigate(view);
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 
     #region Системные вызовы
+
     [LibraryImport("user32.dll", EntryPoint = "SendMessageA")]
     private static partial IntPtr SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
-    #endregion
+
+    #endregion Системные вызовы
 
     #region Реализация поведения окна
+
     private void OnDragMoveClicked(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton is not MouseButtonState.Pressed)
@@ -78,6 +87,7 @@ public partial class MainView : Window, IMainView
                 IsMaximizeWindow = true;
                 ReMaximizeIcon.Kind = PackIconKind.WindowRestore;
                 break;
+
             case true:
                 WindowState = WindowState.Normal;
                 IsMaximizeWindow = false;
@@ -90,5 +100,6 @@ public partial class MainView : Window, IMainView
     {
         WindowState = WindowState.Minimized;
     }
-    #endregion
+
+    #endregion Реализация поведения окна
 }

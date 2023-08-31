@@ -6,6 +6,7 @@ namespace TestCore.ViewModels.Answer;
 public partial class AnswerViewModel : ObservableValidator, IAnswerViewModel
 {
     #region Свойства модели представления
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Required(ErrorMessage = "Поле обязательно для заполнения!")]
@@ -16,12 +17,15 @@ public partial class AnswerViewModel : ObservableValidator, IAnswerViewModel
     private bool _isAnswered;
 
     public bool IsEditItem { get; set; }
-    #endregion
+
+    #endregion Свойства модели представления
 
     #region Конструктор
+
     public AnswerViewModel()
     {
         _optionAnswer = "Новый вариант ответа";
     }
-    #endregion
+
+    #endregion Конструктор
 }

@@ -1,5 +1,5 @@
-﻿using System.Runtime.InteropServices;
-using System;
+﻿using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -9,17 +9,22 @@ namespace TestUI.Views.Dialogs.Questions;
 public partial class QuestionsWindow : Window, IQuestionsWindow
 {
     #region Публичное свойство
+
     public bool ResultShowView => DialogResult == true;
-    #endregion
+
+    #endregion Публичное свойство
 
     #region Конструктор
+
     public QuestionsWindow()
     {
         InitializeComponent();
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void ShowView(string title, string message)
     {
         TitleTb.Text = title;
@@ -31,14 +36,18 @@ public partial class QuestionsWindow : Window, IQuestionsWindow
     {
         Owner = owner;
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 
     #region Системные вызовы
+
     [LibraryImport("user32.dll", EntryPoint = "SendMessageA")]
     private static partial IntPtr SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
-    #endregion
+
+    #endregion Системные вызовы
 
     #region Реализация поведения окна
+
     private void OnDragMoveClicked(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton is not MouseButtonState.Pressed)
@@ -57,5 +66,6 @@ public partial class QuestionsWindow : Window, IQuestionsWindow
     {
         DialogResult = false;
     }
-    #endregion
+
+    #endregion Реализация поведения окна
 }

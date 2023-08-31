@@ -14,11 +14,14 @@ namespace TestCore.ViewModels.StartUp;
 public partial class StartUpViewModel : ObservableValidator, IStartUpViewModel
 {
     #region Зависимости
+
     private readonly IDialogViewService _dialogService;
     private readonly INavigationService _navigationService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Required(ErrorMessage = "Поле обязательно для заполнения!")]
@@ -27,18 +30,22 @@ public partial class StartUpViewModel : ObservableValidator, IStartUpViewModel
 
     [ObservableProperty]
     private bool _isOpenStartUpDialog;
-    #endregion
+
+    #endregion Свойства модели представления
 
     #region Конструктор
+
     public StartUpViewModel(IDialogViewService dialogService, INavigationService navigationService)
     {
         _titleTest = "Новый тест";
         _dialogService = dialogService;
         _navigationService = navigationService;
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Команды
+
     [RelayCommand]
     private void OnCreateNewTest()
     {
@@ -82,12 +89,15 @@ public partial class StartUpViewModel : ObservableValidator, IStartUpViewModel
         IsOpenStartUpDialog = false;
         TitleTest = "Новый тест";
     }
-    #endregion
+
+    #endregion Команды
 
     #region Предикаты
+
     private bool OnCanExecuteTitle(string? title)
     {
         return !string.IsNullOrWhiteSpace(title) && title.Length >= 5;
     }
-    #endregion
+
+    #endregion Предикаты
 }

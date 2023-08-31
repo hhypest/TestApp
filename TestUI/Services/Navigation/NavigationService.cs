@@ -18,16 +18,21 @@ namespace TestUI.Services.Navigation;
 public sealed class NavigationService : INavigationService
 {
     #region Зависимости
+
     private readonly IMainView _mainView;
     private readonly IServiceProvider _services;
-    #endregion
+
+    #endregion Зависимости
 
     #region Закрытые поля
+
     private readonly Dictionary<Type, Func<IServiceProvider, ObservableValidator>> _viewModelsStack;
     private readonly Dictionary<Type, Func<IServiceProvider, IView>> _viewsStack;
-    #endregion
+
+    #endregion Закрытые поля
 
     #region Конструктор
+
     public NavigationService(IMainView mainView, IServiceProvider services)
     {
         _mainView = mainView;
@@ -48,9 +53,11 @@ public sealed class NavigationService : INavigationService
             [typeof(IAskViewModel)] = ActivatorUtilities.GetServiceOrCreateInstance<IAskView>
         };
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void NavigationTo(Type viewModelType)
     {
         if (!_viewModelsStack.TryGetValue(viewModelType, out var viewModel))
@@ -89,5 +96,6 @@ public sealed class NavigationService : INavigationService
     {
         return ActivatorUtilities.GetServiceOrCreateInstance<ITestViewModel>(_services);
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }
