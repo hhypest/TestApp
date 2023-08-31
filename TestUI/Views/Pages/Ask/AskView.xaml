@@ -1,0 +1,149 @@
+﻿<Page x:Class="TestUI.Views.Pages.Ask.AskView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:TestUI.Views.Pages.Ask"
+      xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+      xmlns:ask="clr-namespace:TestCore.ViewModels.Ask;assembly=TestCore"
+      xmlns:conv="clr-namespace:TestUI.Converters"
+      d:DataContext="{d:DesignInstance Type=ask:AskViewModel}"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800">
+    <Page.Resources>
+        <conv:BoolToEnableConverter x:Key="BoolConverter" />
+    </Page.Resources>
+
+    <Grid Margin="0,0,0,25">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="50" />
+        </Grid.RowDefinitions>
+        <md:DialogHost DialogTheme="Inherit" DialogContentUniformCornerRadius="20"
+                       IsOpen="{Binding IsOpenAnswerDialog, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}">
+            <md:DialogHost.DialogContent>
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                            Orientation="Vertical" MinWidth="500" MinHeight="250" Margin="5">
+                    <TextBlock HorizontalAlignment="Center" FontSize="14" Text="Новый вариант ответа"
+                               Margin="0,25,0,0" />
+                    <Grid Margin="25,25,25,25">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="50" />
+                        </Grid.RowDefinitions>
+                        <TextBox Grid.Row="0" Style="{DynamicResource MaterialDesignOutlinedTextBox}"
+                                 VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                                 FontSize="14" md:HintAssist.Hint="Введите вариант ответа:"
+                                 Text="{Binding SelectedAnswer.OptionAnswer, Mode=TwoWay,
+                            UpdateSourceTrigger=PropertyChanged}" />
+                        <CheckBox Grid.Row="1" Content="Правильный вариант ответа?"
+                                  Style="{DynamicResource MaterialDesignFilterChipPrimaryOutlineCheckBox}"
+                                  Margin="0,25,0,0"
+                                  IsChecked="{Binding SelectedAnswer.IsAnswered, Mode=TwoWay,
+                            UpdateSourceTrigger=PropertyChanged}"/>
+                        <Grid Grid.Row="2" Margin="0,25,0,0">
+                            <Button Width="150" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                    md:ButtonAssist.CornerRadius="10"
+                                    Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                                    Validation.ErrorTemplate="{x:Null}"
+                                    Content="Принять"
+                                    Command="{Binding OkDialogAnswerCommand}"
+                                    CommandParameter="{Binding SelectedAnswer.OptionAnswer}" />
+                            <Button Width="150" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                    md:ButtonAssist.CornerRadius="10"
+                                    Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                                    Content="Отмена"
+                                    Command="{Binding CancelDialogAnswerCommand}" />
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+            </md:DialogHost.DialogContent>
+        </md:DialogHost>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="15,15,15,15">
+                    <TextBox TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                             md:HintAssist.Hint="Введите вопрос:"
+                             Style="{DynamicResource MaterialDesignOutlinedTextBox}"
+                             Text="{Binding QuestionAsk, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+                </Grid>
+                <Grid Grid.Row="1" Margin="25,15,25,15">
+                    <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" FontSize="14"
+                               Text="Один правильный вариант ответа?" />
+                    <ToggleButton VerticalAlignment="Center" HorizontalAlignment="Right"
+                                  Style="{DynamicResource MaterialDesignSwitchDarkToggleButton}"
+                                  IsChecked="{Binding IsSingleAnswer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+                </Grid>
+                <Grid Grid.Row="2" Margin="25,0,25,0">
+                    <StackPanel Orientation="Vertical">
+                        <Button Style="{DynamicResource MaterialDesignFlatDarkButton}" Margin="0,5,0,5"
+                                md:ButtonAssist.CornerRadius="10" Content="Добавить новый вариант ответа"
+                                Command="{Binding AddNewAnswerCommand}"
+                                IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+                        <Button Style="{DynamicResource MaterialDesignFlatDarkButton}" Margin="0,5,0,5"
+                                md:ButtonAssist.CornerRadius="10" Content="Редактировать вариант ответа"
+                                Validation.ErrorTemplate="{x:Null}"
+                                Command="{Binding EditAnswerCommand}"
+                                CommandParameter="{Binding SelectedAnswer}"
+                                IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+                        <Button Style="{DynamicResource MaterialDesignFlatDarkButton}" Margin="0,5,0,5"
+                                md:ButtonAssist.CornerRadius="10" Content="Удалить вариант ответа"
+                                Validation.ErrorTemplate="{x:Null}"
+                                Command="{Binding DeleteAnswerCommand}"
+                                CommandParameter="{Binding SelectedAnswer}"
+                                IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+                        <Button Style="{DynamicResource MaterialDesignFlatDarkButton}" Margin="0,5,0,5"
+                                md:ButtonAssist.CornerRadius="10" Content="Удалить все варианты ответа"
+                                Command="{Binding DeleteAllAnswersCommand}"
+                                CommandParameter="{Binding CountAnswer}"
+                                IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+            <Grid Grid.Column="1" Margin="15,0,15,0">
+                <ListView ItemsSource="{Binding AnswersList, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                          SelectionMode="Single"
+                          SelectedItem="{Binding SelectedAnswer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          Validation.ErrorTemplate="{x:Null}"
+                          IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Вариант ответа"
+                                            DisplayMemberBinding="{Binding OptionAnswer, Mode=OneWay,
+                                UpdateSourceTrigger=PropertyChanged}" />
+                            <GridViewColumn Header="Да\Нет"
+                                            DisplayMemberBinding="{Binding IsAnswered, Mode=OneWay,
+                                UpdateSourceTrigger=PropertyChanged}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Grid>
+        </Grid>
+        <Grid Grid.Row="1" Margin="25,0,25,0">
+            <Button VerticalAlignment="Center" HorizontalAlignment="Left"
+                    Width="150" md:ButtonAssist.CornerRadius="10"
+                    Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                    Content="Принять"
+                    Command="{Binding OkAskViewCommand}"
+                    IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+            <Button VerticalAlignment="Center" HorizontalAlignment="Right"
+                    Width="150" md:ButtonAssist.CornerRadius="10"
+                    Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                    Content="Отменить"
+                    Command="{Binding CancelAskViewCommand}"
+                    IsEnabled="{Binding IsOpenAnswerDialog, Converter={StaticResource BoolConverter}}" />
+        </Grid>
+    </Grid>
+</Page>

@@ -1,0 +1,65 @@
+﻿<Window x:Class="TestUI.Views.Dialogs.Errors.ErrorsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TestUI.Views.Dialogs.Errors"
+        xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        Height="300" Width="600"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize" WindowStyle="None" ShowInTaskbar="False"
+        AllowsTransparency="True" Background="{x:Null}" BorderThickness="1">
+    <Window.Effect>
+        <DropShadowEffect ShadowDepth="0"
+                          Color="Red"
+                          Opacity="1"
+                          BlurRadius="5" />
+    </Window.Effect>
+
+    <Border CornerRadius="20" Background="{DynamicResource MaterialDesignPaper}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="30" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="50" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0"
+                    Background="{DynamicResource PrimaryHueDarkBrush}" CornerRadius="20,20,0,0"
+                    MouseDown="OnDragMoveClicked">
+                <Grid>
+                    <TextBlock x:Name="TitleTb" VerticalAlignment="Center" HorizontalAlignment="Left"
+                               Foreground="{DynamicResource MaterialDesignPaper}" FontSize="14"
+                               Margin="25,0,0,0" />
+                </Grid>
+            </Border>
+                <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid Grid.Column="0">
+                    <md:PackIcon VerticalAlignment="Center" HorizontalAlignment="Center"
+                                 Width="75" Height="75"
+                                 Kind="ErrorOutline" Foreground="{DynamicResource PrimaryHueDarkBrush}" />
+                </Grid>
+                <Grid Grid.Column="1">
+                    <ScrollViewer>
+                        <TextBlock x:Name="DetailsTb"
+                                   VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                   Foreground="{DynamicResource MaterialDesignBody}" FontSize="14"
+                                   TextWrapping="Wrap" Margin="0,0,10,0" />
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+            <Grid Grid.Row="2">
+                <Button x:Name="ResultBt" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        MinWidth="150"
+                        Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                        md:ButtonAssist.CornerRadius="10"
+                        FontSize="14" Content="Принять" Click="OnCloseViewClicked" />
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
