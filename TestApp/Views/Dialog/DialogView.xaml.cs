@@ -1,5 +1,9 @@
 ﻿using MaterialDesignThemes.Wpf;
+using System;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Input;
+using System.Windows.Interop;
 using TestApp.Views.Dialog.DialogContent;
 
 namespace TestApp.Views.Dialog;
@@ -10,6 +14,10 @@ public partial class DialogView : Window, IDialogView
     private const PackIconKind _error = PackIconKind.ErrorOutline;
     private const PackIconKind _question = PackIconKind.QuestionBoxOutline;
     private const PackIconKind _warning = PackIconKind.WarningOutline;
+
+    private const int _wMsg = 161;
+    private const int _wParam = 2;
+    private const int _lParam = 0;
     #endregion
 
     #region Конструктор
@@ -47,4 +55,15 @@ public partial class DialogView : Window, IDialogView
         ShowDialog();
     }
     #endregion
+
+    #region Системные вызовы
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageA")]
+    private static partial IntPtr SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
+    #endregion
+
+    private void OnMoveChanged(object sender, MouseButtonEventArgs e)
+    {
+        var helper = new WindowInteropHelper(this);
+        SendMessage(helper.Handle, _wMsg, _wParam, _lParam);
+    }
 }

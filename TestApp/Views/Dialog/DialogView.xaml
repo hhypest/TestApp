@@ -16,7 +16,8 @@
                 <RowDefinition Height="*" />
                 <RowDefinition Height="50" />
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="Transparent" CornerRadius="20,20,0,0">
+            <Border Grid.Row="0" Background="Transparent" CornerRadius="20,20,0,0"
+                    MouseLeftButtonDown="OnMoveChanged">
                 <Grid>
                     <TextBlock x:Name="CaptionView"
                                VerticalAlignment="Center" HorizontalAlignment="Center"
