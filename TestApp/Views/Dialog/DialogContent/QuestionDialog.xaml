@@ -1,0 +1,33 @@
+﻿<UserControl x:Class="TestApp.Views.Dialog.DialogContent.QuestionDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:TestApp.Views.Dialog.DialogContent"
+             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="45" d:DesignWidth="400">
+
+    <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Button x:Name="OkButton"
+                Grid.Column="0"
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                Width="150"
+                md:ButtonAssist.CornerRadius="10"
+                FontSize="16" Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                Content="OK"
+                Click="OnOkClicked" />
+        <Button x:Name="CancelButton"
+                Grid.Column="1"
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                Width="150"
+                md:ButtonAssist.CornerRadius="10"
+                FontSize="16" Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                Content="Отмена"
+                Click="OnCancelClicked" />
+    </Grid>
+</UserControl>

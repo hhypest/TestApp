@@ -29,15 +29,24 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid Grid.Column="0">
-                    
+                    <md:PackIcon x:Name="IconView"
+                                 VerticalAlignment="Center" HorizontalAlignment="Center"
+                                 Width="130" Height="130"
+                                 Foreground="{DynamicResource PrimaryHueDarkBrush}" />
                 </Grid>
                 <Grid Grid.Column="1">
-                    
+                    <ScrollViewer VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                        <TextBlock x:Name="MessageView"
+                                   VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                   FontSize="16" Foreground="{DynamicResource MaterialDesignBody}" />
+                    </ScrollViewer>
                 </Grid>
             </Grid>
             <Grid Grid.Row="2">
-                <ContentPresenter x:Name="ContentView"
-                                  VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
+                <ContentControl x:Name="ContentView"
+                                VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
             </Grid>
         </Grid>
     </Border>

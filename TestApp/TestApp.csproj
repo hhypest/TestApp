@@ -23,7 +23,6 @@
     <Folder Include="Extensions\" />
     <Folder Include="Models\" />
     <Folder Include="settings\" />
-    <Folder Include="Views\Dialog\DialogContent\" />
     <Folder Include="Views\Shell\" />
     <Folder Include="Views\Pages\" />
   </ItemGroup>
