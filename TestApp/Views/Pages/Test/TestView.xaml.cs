@@ -1,6 +1,6 @@
 ﻿using System.Windows.Controls;
 
-namespace TestApp.Views.Test;
+namespace TestApp.Views.Pages.Test;
 
 public partial class TestView : Page, ITestView
 {

@@ -17,10 +17,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="ViewModels\" />
-    <Folder Include="Converters\" />
     <Folder Include="Models\" />
+    <Folder Include="Services\Navigation\" />
     <Folder Include="settings\" />
+    <Folder Include="ViewModels\Test\" />
+    <Folder Include="ViewModels\Ask\" />
+    <Folder Include="ViewModels\Answer\" />
   </ItemGroup>
 
   <ItemGroup>

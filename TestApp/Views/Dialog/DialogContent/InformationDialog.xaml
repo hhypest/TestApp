@@ -7,7 +7,7 @@
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d" 
              d:DesignHeight="45" d:DesignWidth="250">
-    
+
     <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
         <Button x:Name="OkButton"
                 Width="150"

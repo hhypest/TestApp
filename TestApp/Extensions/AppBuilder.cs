@@ -7,8 +7,8 @@ using TestApp.Services.Dialog;
 using TestApp.Views.Dialog;
 using TestApp.Views.Pages.CreateTest;
 using TestApp.Views.Pages.Launch;
+using TestApp.Views.Pages.Test;
 using TestApp.Views.Shell;
-using TestApp.Views.Test;
 
 namespace TestApp.Extensions;
 
