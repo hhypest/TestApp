@@ -8,6 +8,7 @@ using TestApp.Views.Dialog;
 using TestApp.Views.Pages.CreateTest;
 using TestApp.Views.Pages.Launch;
 using TestApp.Views.Shell;
+using TestApp.Views.Test;
 
 namespace TestApp.Extensions;
 
@@ -27,6 +28,7 @@ public static class AppBuilder
         services.AddSingleton<IShellView, ShellView>();
         services.AddTransient<ILaunchView, LaunchView>();
         services.AddTransient<ICreateTestView, CreateTestView>();
+        services.AddTransient<ITestView, TestView>();
         services.AddTransient<IDialogView, DialogView>();
     }
 
@@ -45,7 +47,7 @@ public static class AppBuilder
     public static void AppStarted(this IHost host)
     {
         var shell = ActivatorUtilities.GetServiceOrCreateInstance<IShellView>(host.Services);
-        var page = ActivatorUtilities.GetServiceOrCreateInstance<ILaunchView>(host.Services);
+        var page = ActivatorUtilities.GetServiceOrCreateInstance<ITestView>(host.Services);
         shell.NavigationTo(page);
         shell.ShowView();
     }

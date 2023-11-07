@@ -1,0 +1,130 @@
+﻿<Page x:Class="TestApp.Views.Test.TestView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:TestApp.Views.Test"
+      xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+      mc:Ignorable="d" 
+      d:DesignHeight="500" d:DesignWidth="1100">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="50" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Menu Margin="5,0,5,0"
+                  VerticalAlignment="Center"
+                  FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                  md:MenuAssist.TopLevelMenuItemHeight="30">
+                <MenuItem Header="Файл">
+                    <MenuItem Header="Создать новый тест"
+                              Icon="{md:PackIcon Kind=CreateOutline}" />
+                    <MenuItem Header="Загрузить тест"
+                              Icon="{md:PackIcon Kind=DownloadOutline}" />
+                    <MenuItem Header="Сохранить">
+                        <MenuItem Header="Сохранить"
+                                  Icon="{md:PackIcon Kind=ContentSaveOutline}" />
+                        <MenuItem Header="Сохранить как"
+                                  Icon="{md:PackIcon Kind=ContentSaveAllOutline}" />
+                    </MenuItem>
+                </MenuItem>
+                <MenuItem Header="Правка">
+                    <MenuItem Header="Добавить вопрос"
+                              Icon="{md:PackIcon Kind=ArchiveAddOutline}" />
+                    <MenuItem Header="Редактировать выбранный вопрос"
+                              Icon="{md:PackIcon Kind=ArchiveEditOutline}" />
+                    <Separator />
+                    <MenuItem Header="Удалить выбранный вопрос"
+                              Icon="{md:PackIcon Kind=ArchiveRemoveOutline}" />
+                    <MenuItem Header="Удалить все вопросы"
+                              Icon="{md:PackIcon Kind=RemoveBoxOutline}" />
+                </MenuItem>
+            </Menu>
+        </Grid>
+        <Grid Grid.Row="1" Margin="5,0,5,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <GroupBox Grid.Column="0">
+                <GroupBox.HeaderTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <md:PackIcon VerticalAlignment="Center"
+                                         Width="25"
+                                         Height="25"
+                                         Foreground="{DynamicResource MaterialDesignBody}"
+                                         Kind="ListBoxOutline" />
+                            <TextBlock Margin="25,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                                       Text="Список вопросов" />
+                        </StackPanel>
+                    </DataTemplate>
+                </GroupBox.HeaderTemplate>
+                <ListView>
+                    
+                </ListView>
+            </GroupBox>
+            <GridSplitter Grid.Column="1"
+                          VerticalAlignment="Stretch" HorizontalAlignment="Center"
+                          Width="3"
+                          Background="{DynamicResource PrimaryHueDarkBrush}"
+                          ShowsPreview="False" />
+            <GroupBox Grid.Column="2">
+                <GroupBox.HeaderTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <md:PackIcon VerticalAlignment="Center"
+                                         Width="25"
+                                         Height="25"
+                                         Foreground="{DynamicResource MaterialDesignBody}"
+                                         Kind="ViewAgendaOutline" />
+                            <TextBlock Margin="25,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                                       Text="Варианты ответов" />
+                        </StackPanel>
+                    </DataTemplate>
+                </GroupBox.HeaderTemplate>
+                <ListView>
+                    
+                </ListView>
+            </GroupBox>
+        </Grid>
+        <Grid Grid.Row="2">
+            <StatusBar Margin="5,0,5,0" Background="Transparent">
+                <StatusBarItem Margin="15,0,0,0"
+                               VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock VerticalAlignment="Center"
+                               FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                               Text="Название теста" />
+                </StatusBarItem>
+                <StatusBarItem Margin="15,0,0,0"
+                               VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock VerticalAlignment="Center"
+                               FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                               Text="Сохранение теста" />
+                </StatusBarItem>
+                <StatusBarItem Margin="15,0,0,0"
+                               VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock VerticalAlignment="Center"
+                               FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                               Text="Вопросы теста" />
+                </StatusBarItem>
+                <StatusBarItem Margin="0,0,15,0"
+                               VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock VerticalAlignment="Center"
+                               FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                               Text="Путь теста" />
+                </StatusBarItem>
+            </StatusBar>
+        </Grid>
+    </Grid>
+</Page>
