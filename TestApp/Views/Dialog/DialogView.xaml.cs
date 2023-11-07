@@ -20,6 +20,10 @@ public partial class DialogView : Window, IDialogView
     private const int _lParam = 0;
     #endregion
 
+    #region Свойства окна
+    public bool ResultDialog { get; private set; }
+    #endregion
+
     #region Конструктор
     public DialogView()
     {
@@ -53,6 +57,12 @@ public partial class DialogView : Window, IDialogView
     public void ShowView()
     {
         ShowDialog();
+        ResultDialog = (bool)DialogResult!;
+    }
+
+    public void SetOwner(Window owner)
+    {
+        Owner = owner;
     }
     #endregion
 

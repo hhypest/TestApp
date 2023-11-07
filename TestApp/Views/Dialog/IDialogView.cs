@@ -1,4 +1,6 @@
-﻿namespace TestApp.Views.Dialog;
+﻿using System.Windows;
+
+namespace TestApp.Views.Dialog;
 
 public enum TypeDialogView : byte
 {
@@ -9,7 +11,11 @@ public enum TypeDialogView : byte
 
 public interface IDialogView
 {
+    public bool ResultDialog { get; }
+
     public void CreateView(string title, string message, TypeDialogView typeDialog);
 
     public void ShowView();
+
+    public void SetOwner(Window owner);
 }
