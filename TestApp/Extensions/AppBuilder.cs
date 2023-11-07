@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.IO;
 using TestApp.Services.Dialog;
+using TestApp.ViewModels.Launch;
 using TestApp.Views.Dialog;
 using TestApp.Views.Pages.Ask;
 using TestApp.Views.Pages.Launch;
@@ -21,6 +22,7 @@ public static class AppBuilder
 
     private static void AddViewModels(this IServiceCollection services)
     {
+        services.AddTransient<ILaunchViewModel, LaunchViewModel>();
     }
 
     private static void AddViews(this IServiceCollection services)
@@ -47,7 +49,9 @@ public static class AppBuilder
     public static void AppStarted(this IHost host)
     {
         var shell = ActivatorUtilities.GetServiceOrCreateInstance<IShellView>(host.Services);
-        var page = ActivatorUtilities.GetServiceOrCreateInstance<IAskView>(host.Services);
+        var page = ActivatorUtilities.GetServiceOrCreateInstance<ILaunchView>(host.Services);
+        var dataContext = ActivatorUtilities.GetServiceOrCreateInstance<ILaunchViewModel>(host.Services);
+        page.SetDataContext(dataContext);
         shell.NavigationTo(page);
         shell.ShowView();
     }

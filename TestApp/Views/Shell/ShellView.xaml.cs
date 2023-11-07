@@ -1,6 +1,5 @@
 ﻿using MaterialDesignThemes.Wpf;
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
@@ -33,10 +32,6 @@ public partial class ShellView : Window, IShellView
     {
         InitializeComponent();
         MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
-
-#if DEBUG
-        Debug.WriteLine(this, "Конструктор главного окна");
-#endif
     }
 
     #endregion Конструктор
@@ -46,28 +41,16 @@ public partial class ShellView : Window, IShellView
     public void NavigationTo<T>(T page)
     {
         PresenterViews.NavigationService.Navigate(page);
-
-#if DEBUG
-        Debug.WriteLine(page, "Навигация до представления");
-#endif
     }
 
     public void SetDataContext<T>(T dataContext)
     {
         DataContext = dataContext;
-
-#if DEBUG
-        Debug.WriteLine(dataContext, "Установка контекста");
-#endif
     }
 
     public void ShowView()
     {
         Show();
-
-#if DEBUG
-        Debug.WriteLine(this, "Вывод окна");
-#endif
     }
 
     #endregion Реализация интерфейса

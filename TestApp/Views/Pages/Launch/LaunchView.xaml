@@ -4,10 +4,17 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:launch="clr-namespace:TestApp.ViewModels.Launch"
+      xmlns:converter="clr-namespace:TestApp.Converters"
       mc:Ignorable="d"
-      d:DesignHeight="450" d:DesignWidth="800">
+      d:DesignHeight="450" d:DesignWidth="800"
+      d:DataContext="{d:DesignInstance Type=launch:LaunchViewModel}">
+    <Page.Resources>
+        <converter:EnableConverter x:Key="EnableTo" />
+    </Page.Resources>
 
-    <md:DialogHost DialogTheme="Inherit" DialogContentUniformCornerRadius="20">
+    <md:DialogHost DialogTheme="Inherit" DialogContentUniformCornerRadius="20"
+                   IsOpen="{Binding IsOpenDialog}">
         <md:DialogHost.DialogContent>
             <Grid Margin="15,0,15,0">
                 <Grid.RowDefinitions>
@@ -17,7 +24,8 @@
                 <Grid Grid.Row="0" Margin="0,25,0,25">
                     <TextBox HorizontalAlignment="Stretch"
                              FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
-                             md:HintAssist.Hint="Введите название теста" />
+                             md:HintAssist.Hint="Введите название теста"
+                             Text="{Binding TitleTest, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
@@ -25,38 +33,48 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Button Grid.Column="0"
-                        VerticalAlignment="Center" HorizontalAlignment="Center"
-                        Width="150"
-                        FontSize="16"
-                        md:ButtonAssist.CornerRadius="10"
-                        Content="Создать" />
+                            VerticalAlignment="Center" HorizontalAlignment="Center"
+                            Width="150"
+                            FontSize="16"
+                            md:ButtonAssist.CornerRadius="10"
+                            Validation.ErrorTemplate="{x:Null}"
+                            Content="Создать"
+                            Command="{Binding AcceptCreateTestCommand}"
+                            CommandParameter="{Binding TitleTest}" />
                     <Button Grid.Column="1"
-                        VerticalAlignment="Center" HorizontalContentAlignment="Center"
-                        Width="150"
-                        FontSize="16"
-                        md:ButtonAssist.CornerRadius="10"
-                        Content="Отмена" />
+                            VerticalAlignment="Center" HorizontalContentAlignment="Center"
+                            Width="150"
+                            FontSize="16"
+                            md:ButtonAssist.CornerRadius="10"
+                            Content="Отмена"
+                            Command="{Binding CancelCreateTestCommand}" />
                 </Grid>
             </Grid>
         </md:DialogHost.DialogContent>
         <Border CornerRadius="250,0,250,0"
-            Height="350" Width="700"
-            BorderThickness="3" BorderBrush="{DynamicResource PrimaryHueDarkBrush}">
+                Height="350" Width="700"
+                BorderThickness="3" BorderBrush="{DynamicResource PrimaryHueDarkBrush}">
             <StackPanel Orientation="Vertical"
-                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                        VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock Margin="0,0,0,15" HorizontalAlignment="Center"
-                       Foreground="{DynamicResource MaterialDesignBody}"
-                       Text="Добро пожаловать"
-                       FontSize="22" FontFamily="Segoe Print" />
+                           Foreground="{DynamicResource MaterialDesignBody}"
+                           Text="Добро пожаловать"
+                           FontSize="22" FontFamily="Segoe Print" />
                 <Button Margin="0,0,0,15" Width="450"
-                    md:ButtonAssist.CornerRadius="10"
-                    Content="Создать новый тест" />
+                        md:ButtonAssist.CornerRadius="10"
+                        IsEnabled="{Binding IsOpenDialog, Converter={StaticResource EnableTo}}"
+                        Content="Создать новый тест"
+                        Command="{Binding CreateNewTestCommand}" />
                 <Button Margin="0,0,0,15" Width="450"
-                    md:ButtonAssist.CornerRadius="10"
-                    Content="Открыть тест" />
+                        md:ButtonAssist.CornerRadius="10"
+                        IsEnabled="{Binding IsOpenDialog, Converter={StaticResource EnableTo}}"
+                        Content="Открыть тест"
+                        Command="{Binding LoadTestCommand}" />
                 <Button Margin="0,0,0,15" Width="450"
-                    md:ButtonAssist.CornerRadius="10"
-                    Content="Пройти тест" />
+                        md:ButtonAssist.CornerRadius="10"
+                        IsEnabled="{Binding IsOpenDialog, Converter={StaticResource EnableTo}}"
+                        Content="Пройти тест"
+                        Command="{Binding ResolveTestCommand}" />
             </StackPanel>
         </Border>
     </md:DialogHost>

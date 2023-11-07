@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Hosting;
-using System.Diagnostics;
 using System.Windows;
 using TestApp.Extensions;
 
@@ -12,10 +11,6 @@ public partial class App : Application
     public App()
     {
         AppHost = Host.CreateDefaultBuilder().AppBuild();
-
-#if DEBUG
-        Debug.WriteLine(AppHost, "Создание хоста приложения");
-#endif
     }
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -23,10 +18,6 @@ public partial class App : Application
         await AppHost.StartAsync();
         AppHost.AppStarted();
         base.OnStartup(e);
-
-#if DEBUG
-        Debug.WriteLine(AppHost, "Запуск хоста приложения");
-#endif
     }
 
     protected override async void OnExit(ExitEventArgs e)
@@ -34,9 +25,5 @@ public partial class App : Application
         AppHost.AppStoped();
         await AppHost.StopAsync();
         base.OnExit(e);
-
-#if DEBUG
-        Debug.WriteLine(AppHost, "Остановка хоста приложения");
-#endif
     }
 }

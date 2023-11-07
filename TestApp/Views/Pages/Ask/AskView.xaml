@@ -56,7 +56,7 @@
                     <ToolBar VerticalAlignment="Top" Background="Transparent">
                         <Button Width="40" Height="40"
                                 Style="{DynamicResource MaterialDesignIconForegroundButton}"
-                                ToolTip="Добавить вариант ответа" Click="addBtn">
+                                ToolTip="Добавить вариант ответа">
                             <md:PackIcon Width="35" Height="35"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
                                          Kind="AddCircleOutline" />
