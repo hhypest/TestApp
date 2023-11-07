@@ -2,9 +2,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using System;
+using System.IO;
 using TestApp.Services.Dialog;
 using TestApp.Views.Dialog;
+using TestApp.Views.Pages.CreateTest;
+using TestApp.Views.Pages.Launch;
 using TestApp.Views.Shell;
 
 namespace TestApp.Extensions;
@@ -23,12 +25,14 @@ public static class AppBuilder
     private static void AddViews(this IServiceCollection services)
     {
         services.AddSingleton<IShellView, ShellView>();
+        services.AddTransient<ILaunchView, LaunchView>();
+        services.AddTransient<ICreateTestView, CreateTestView>();
         services.AddTransient<IDialogView, DialogView>();
     }
 
     public static IHost AppBuild(this IHostBuilder hostBuilder)
     {
-        return hostBuilder.ConfigureAppConfiguration(config => config.AddJsonFile($@"{AppContext.BaseDirectory}settings\appsettings.json").Build())
+        return hostBuilder.ConfigureAppConfiguration(config => config.SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile(@"settings\appsettings.json").Build())
             .ConfigureServices((_, services) =>
             {
                 services.AddServices();
@@ -41,6 +45,8 @@ public static class AppBuilder
     public static void AppStarted(this IHost host)
     {
         var shell = ActivatorUtilities.GetServiceOrCreateInstance<IShellView>(host.Services);
+        var page = ActivatorUtilities.GetServiceOrCreateInstance<ILaunchView>(host.Services);
+        shell.NavigationTo(page);
         shell.ShowView();
     }
 

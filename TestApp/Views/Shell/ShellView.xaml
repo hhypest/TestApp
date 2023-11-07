@@ -38,7 +38,8 @@
                         <Button x:Name="MinButton" Margin="5,0,5,0"
                                 VerticalAlignment="Center" HorizontalAlignment="Center"
                                 Width="35" Height="35"
-                                Style="{DynamicResource MaterialDesignIconForegroundButton}" Click="OnMinAppClicked">
+                                Style="{DynamicResource MaterialDesignIconForegroundButton}"
+                                Click="OnMinAppClicked">
                             <md:PackIcon x:Name="IconMin"
                                          Width="30" Height="30"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
@@ -67,7 +68,7 @@
                     </StackPanel>
                 </Grid>
             </Border>
-            <Frame x:Name="PresenterViews" NavigationUIVisibility="Hidden" />
+            <Frame x:Name="PresenterViews" Grid.Row="1" NavigationUIVisibility="Hidden" />
         </Grid>
     </Border>
 </Window>

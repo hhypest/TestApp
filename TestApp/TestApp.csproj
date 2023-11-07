@@ -21,7 +21,6 @@
     <Folder Include="Converters\" />
     <Folder Include="Models\" />
     <Folder Include="settings\" />
-    <Folder Include="Views\Pages\" />
   </ItemGroup>
 
   <ItemGroup>
