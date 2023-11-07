@@ -11,6 +11,7 @@ namespace TestApp.Views.Dialog;
 public partial class DialogView : Window, IDialogView
 {
     #region Константы
+
     private const PackIconKind _error = PackIconKind.ErrorOutline;
     private const PackIconKind _question = PackIconKind.QuestionBoxOutline;
     private const PackIconKind _warning = PackIconKind.WarningOutline;
@@ -18,20 +19,26 @@ public partial class DialogView : Window, IDialogView
     private const int _wMsg = 161;
     private const int _wParam = 2;
     private const int _lParam = 0;
-    #endregion
+
+    #endregion Константы
 
     #region Свойства окна
+
     public bool ResultDialog { get; private set; }
-    #endregion
+
+    #endregion Свойства окна
 
     #region Конструктор
+
     public DialogView()
     {
         InitializeComponent();
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void CreateView(string title, string message, TypeDialogView typeDialog)
     {
         CaptionView.Text = title;
@@ -43,10 +50,12 @@ public partial class DialogView : Window, IDialogView
                 IconView.Kind = _warning;
                 ContentView.Content = new InformationDialog(this);
                 break;
+
             case TypeDialogView.QuestionDialog:
                 IconView.Kind = _question;
                 ContentView.Content = new QuestionDialog(this);
                 break;
+
             case TypeDialogView.ErrorDialog:
                 IconView.Kind = _error;
                 ContentView.Content = new InformationDialog(this);
@@ -64,12 +73,15 @@ public partial class DialogView : Window, IDialogView
     {
         Owner = owner;
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 
     #region Системные вызовы
+
     [LibraryImport("user32.dll", EntryPoint = "SendMessageA")]
     private static partial IntPtr SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
-    #endregion
+
+    #endregion Системные вызовы
 
     private void OnMoveChanged(object sender, MouseButtonEventArgs e)
     {

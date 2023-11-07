@@ -5,13 +5,16 @@ namespace TestApp.Views.Pages.Ask;
 public partial class AskView : Page, IAskView
 {
     #region Конструктор
+
     public AskView()
     {
         InitializeComponent();
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void NavigationTo<T>(T page)
     {
         NavigationService.Navigate(page);
@@ -21,5 +24,6 @@ public partial class AskView : Page, IAskView
     {
         DataContext = dataContext;
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }

@@ -5,13 +5,16 @@ namespace TestApp.Views.Pages.Launch;
 public partial class LaunchView : Page, ILaunchView
 {
     #region Конструктор
+
     public LaunchView()
     {
         InitializeComponent();
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void NavigationTo<T>(T page)
     {
         NavigationService.Navigate(page);
@@ -21,5 +24,6 @@ public partial class LaunchView : Page, ILaunchView
     {
         DataContext = dataContext;
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }

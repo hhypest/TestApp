@@ -1,29 +1,34 @@
-﻿using System.Runtime.InteropServices;
+﻿using MaterialDesignThemes.Wpf;
 using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
-using MaterialDesignThemes.Wpf;
 using System.Windows.Interop;
-using System.Diagnostics;
 
 namespace TestApp.Views.Shell;
 
 public partial class ShellView : Window, IShellView
 {
     #region Константы
+
     private const PackIconKind _maxIcon = PackIconKind.WindowMaximize;
     private const PackIconKind _restoreIcon = PackIconKind.WindowRestore;
 
     private const int _wMsg = 161;
     private const int _wParam = 2;
     private const int _lParam = 0;
-    #endregion
+
+    #endregion Константы
 
     #region Свойства окна
-    private bool IsStateWindow {  get; set; }
-    #endregion
+
+    private bool IsStateWindow { get; set; }
+
+    #endregion Свойства окна
 
     #region Конструктор
+
     public ShellView()
     {
         InitializeComponent();
@@ -33,9 +38,11 @@ public partial class ShellView : Window, IShellView
         Debug.WriteLine(this, "Конструктор главного окна");
 #endif
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void NavigationTo<T>(T page)
     {
         PresenterViews.NavigationService.Navigate(page);
@@ -62,20 +69,24 @@ public partial class ShellView : Window, IShellView
         Debug.WriteLine(this, "Вывод окна");
 #endif
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 
     #region Системные вызовы
+
     [LibraryImport("user32.dll", EntryPoint = "SendMessageA")]
     private static partial IntPtr SendMessage(IntPtr hWnd, int wMsg, int wParam, int lParam);
-    #endregion
+
+    #endregion Системные вызовы
 
     #region Реализация поведения окна
+
     private void OnMoveChanged(object sender, MouseButtonEventArgs e)
     {
         var helper = new WindowInteropHelper(this);
         SendMessage(helper.Handle, _wMsg, _wParam, _lParam);
 
-        if (WindowState is WindowState.Normal ||  WindowState is WindowState.Minimized)
+        if (WindowState is WindowState.Normal || WindowState is WindowState.Minimized)
         {
             IsStateWindow = false;
             IconMax.Kind = _maxIcon;
@@ -101,6 +112,7 @@ public partial class ShellView : Window, IShellView
                 IsStateWindow = false;
                 IconMax.Kind = _maxIcon;
                 break;
+
             case false:
                 WindowState = WindowState.Maximized;
                 IsStateWindow = true;
@@ -113,5 +125,6 @@ public partial class ShellView : Window, IShellView
     {
         WindowState = WindowState.Minimized;
     }
-    #endregion
+
+    #endregion Реализация поведения окна
 }
