@@ -1,0 +1,111 @@
+﻿<Page x:Class="TestApp.Views.Pages.Ask.AskView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:TestApp.Views.Pages.Ask"
+      xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+      mc:Ignorable="d" 
+      d:DesignHeight="500" d:DesignWidth="1100">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="50" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <WrapPanel Grid.Column="0"
+                       Width="375"
+                       Margin="5,0,5,0"
+                       Orientation="Vertical">
+                <TextBlock Width="350"
+                           Margin="0,5,0,0"
+                           HorizontalAlignment="Left"
+                           FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                           Text="Вопрос" />
+                <TextBox Width="350"
+                         Margin="0,35,0,35"
+                         HorizontalAlignment="Stretch"
+                         FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                         Style="{DynamicResource MaterialDesignOutlinedTextBox}"
+                         md:HintAssist.Hint="Введите вопрос" />
+                <Separator Width="350" Margin="0,5,0,5" Background="{DynamicResource PrimaryHueDarkBrush}" />
+                <CheckBox Width="350" 
+                          Style="{DynamicResource MaterialDesignFilterChipPrimaryOutlineCheckBox}"
+                          FontSize="16"
+                          Content="Один правильный вариант ответа?" />
+                <Separator Width="350" Margin="0,5,0,5" Background="{DynamicResource PrimaryHueDarkBrush}" />
+                <Button Width="350"
+                        Margin="0,15,0,15"
+                        FontSize="16"
+                        Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                        md:ButtonAssist.CornerRadius="10"
+                        Content="Добавить новый вариант ответа" />
+                <Button Width="350"
+                        Margin="0,15,0,15"
+                        FontSize="16"
+                        Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                        md:ButtonAssist.CornerRadius="10"
+                        Content="Редактировать вариант ответа" />
+                <Separator Width="350" Margin="0,5,0,5" Background="{DynamicResource PrimaryHueDarkBrush}" />
+                <Button Width="350"
+                        Margin="0,15,0,15"
+                        FontSize="16"
+                        Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                        md:ButtonAssist.CornerRadius="10"
+                        Content="Удалить вариант ответа" />
+                <Button Width="350"
+                        Margin="0,15,0,15"
+                        FontSize="16"
+                        Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                        md:ButtonAssist.CornerRadius="10"
+                        Content="Удалить все варианты" />
+            </WrapPanel>
+            <GroupBox Grid.Column="1" Margin="0,0,5,0">
+                <GroupBox.HeaderTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <md:PackIcon VerticalAlignment="Center"
+                                         Width="25"
+                                         Height="25"
+                                         Foreground="{DynamicResource MaterialDesignBody}"
+                                         Kind="ViewAgendaOutline" />
+                            <TextBlock Margin="25,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                                       Text="Варианты ответов" />
+                        </StackPanel>
+                    </DataTemplate>
+                </GroupBox.HeaderTemplate>
+                <ListView>
+                    
+                </ListView>
+            </GroupBox>
+        </Grid>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0"
+                    Width="150"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                    FontSize="16"
+                    md:ButtonAssist.CornerRadius="10"
+                    Content="Принять" />
+            <Button Grid.Column="1"
+                    Width="150"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                    FontSize="16"
+                    md:ButtonAssist.CornerRadius="10"
+                    Content="Отмена" />
+        </Grid>
+    </Grid>
+</Page>
