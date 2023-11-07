@@ -9,6 +9,9 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.Red.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Accent/MaterialDesignColor.Cyan.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignOutlinedTextBox}" />
+            <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatDarkButton}" />
+            <Style TargetType="CheckBox" BasedOn="{StaticResource MaterialDesignFilterChipPrimaryOutlineCheckBox}" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

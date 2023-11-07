@@ -6,7 +6,6 @@ using System.IO;
 using TestApp.Services.Dialog;
 using TestApp.Views.Dialog;
 using TestApp.Views.Pages.Ask;
-using TestApp.Views.Pages.CreateTest;
 using TestApp.Views.Pages.Launch;
 using TestApp.Views.Pages.Test;
 using TestApp.Views.Shell;
@@ -28,7 +27,6 @@ public static class AppBuilder
     {
         services.AddSingleton<IShellView, ShellView>();
         services.AddTransient<ILaunchView, LaunchView>();
-        services.AddTransient<ICreateTestView, CreateTestView>();
         services.AddTransient<ITestView, TestView>();
         services.AddTransient<IAskView, AskView>();
         services.AddTransient<IDialogView, DialogView>();

@@ -12,7 +12,6 @@
         <Button x:Name="OkButton"
                 Width="150"
                 md:ButtonAssist.CornerRadius="10"
-                Style="{DynamicResource MaterialDesignFlatDarkButton}"
                 FontSize="16"
                 Content="OK"
                 Click="OnOkClicked" />

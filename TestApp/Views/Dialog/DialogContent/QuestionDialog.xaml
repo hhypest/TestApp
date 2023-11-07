@@ -18,7 +18,7 @@
                 VerticalAlignment="Center" HorizontalAlignment="Center"
                 Width="150"
                 md:ButtonAssist.CornerRadius="10"
-                FontSize="16" Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                FontSize="16"
                 Content="OK"
                 Click="OnOkClicked" />
         <Button x:Name="CancelButton"
@@ -26,7 +26,7 @@
                 VerticalAlignment="Center" HorizontalAlignment="Center"
                 Width="150"
                 md:ButtonAssist.CornerRadius="10"
-                FontSize="16" Style="{DynamicResource MaterialDesignFlatDarkButton}"
+                FontSize="16"
                 Content="Отмена"
                 Click="OnCancelClicked" />
     </Grid>
