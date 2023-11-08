@@ -1,4 +1,4 @@
-﻿using TestApp.Views.Dialog;
+﻿using TestApp.Extensions;
 
 namespace TestApp.Services.Dialog;
 

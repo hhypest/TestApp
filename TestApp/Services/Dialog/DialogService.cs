@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using System.Windows;
+using TestApp.Extensions;
 using TestApp.Views.Dialog;
 
 namespace TestApp.Services.Dialog;
