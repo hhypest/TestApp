@@ -61,7 +61,7 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
         CountAsk = 0;
         AsksList.Clear();
 
-        _navigationService.NavigationTo(Extensions.NavigationType.Test);
+        _navigationService.NavigationTo(NavigationType.Test);
     }
 
     public void Receive(CreateAskMessage message)
@@ -103,7 +103,10 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
     [RelayCommand]
     private void CreateNewTest()
     {
-        throw new NotImplementedException();
+        if (!IsSaveTest && !_dialogService.ShowQuestion("Внимание!", $"Тест <{TitleTest}> не сохранен. Продолжить?"))
+            return;
+
+        _navigationService.NavigationTo(NavigationType.Launch);
     }
 
     [RelayCommand]

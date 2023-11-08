@@ -30,18 +30,18 @@ public sealed class DialogService : IDialogService
         _services = services;
     }
 
-    public void ShowMessage(string title, string message, TypeDialogView typeDialog)
+    public void ShowMessage(string title, string message)
     {
         var dialog = ActivatorUtilities.GetServiceOrCreateInstance<IDialogView>(_services);
-        dialog.CreateView(title, message, typeDialog);
+        dialog.CreateView(title, message, TypeDialogView.ErrorDialog);
         dialog.SetOwner(CurrentWindow!);
         dialog.ShowView();
     }
 
-    public bool ShowQuestion(string title, string message, TypeDialogView typeDialog)
+    public bool ShowQuestion(string title, string message)
     {
         var dialog = ActivatorUtilities.GetServiceOrCreateInstance<IDialogView>(_services);
-        dialog.CreateView(title, message, typeDialog);
+        dialog.CreateView(title, message, TypeDialogView.QuestionDialog);
         dialog.SetOwner(CurrentWindow!);
         dialog.ShowView();
 

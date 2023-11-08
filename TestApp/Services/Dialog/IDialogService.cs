@@ -1,10 +1,8 @@
-﻿using TestApp.Extensions;
-
-namespace TestApp.Services.Dialog;
+﻿namespace TestApp.Services.Dialog;
 
 public interface IDialogService
 {
-    public void ShowMessage(string title, string message, TypeDialogView typeDialog);
+    public void ShowMessage(string title, string message);
 
-    public bool ShowQuestion(string title, string message, TypeDialogView typeDialog);
+    public bool ShowQuestion(string title, string message);
 }
