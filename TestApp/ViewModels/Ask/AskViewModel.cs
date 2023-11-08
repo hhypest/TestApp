@@ -57,6 +57,10 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipie
             if (value)
             {
                 _messenger.RegisterAll(this);
+                if (!IsEditItem)
+                    return;
+
+                EditAsk = new EditAskItem(TitleAsk, IsSingleAnswer, AnswersList.Select(answer => new EditAnswerItem(answer.TitleAnswer, answer.IsAnswered)).ToList());
             }
             else
             {
@@ -148,6 +152,7 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipie
         {
             IsEditItem = false;
             IsSubcribeMessage = false;
+            EditAsk = null;
             _messenger.Send(new EditAskMessage(true));
         }
         else

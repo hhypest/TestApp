@@ -133,7 +133,7 @@
                 <ListView ItemsSource="{Binding SelectedAsk.AnswersList}">
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Width="Auto" Header="Вариант ответа">
+                            <GridViewColumn Width="500" Header="Вариант ответа">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate DataType="answer:AnswerViewModel">
                                         <StackPanel Orientation="Horizontal">

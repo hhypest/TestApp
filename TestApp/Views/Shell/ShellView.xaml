@@ -9,7 +9,8 @@
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize" WindowStyle="None"
         AllowsTransparency="True" Background="Transparent">
 
-    <Border CornerRadius="20" Background="{DynamicResource MaterialDesignPaper}">
+    <Border CornerRadius="20" Background="{DynamicResource MaterialDesignPaper}"
+            BorderThickness="1" BorderBrush="{DynamicResource PrimaryHueDarkBrush}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="50" />

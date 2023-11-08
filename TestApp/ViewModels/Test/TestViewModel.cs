@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using TestApp.Extensions;
 using TestApp.Messages.AskMessages;
@@ -11,6 +12,7 @@ using TestApp.Messages.TestMessages;
 using TestApp.Services.Dialog;
 using TestApp.Services.Factory;
 using TestApp.Services.Navigation;
+using TestApp.ViewModels.Answer;
 using TestApp.ViewModels.Ask;
 
 namespace TestApp.ViewModels.Test;
@@ -35,6 +37,7 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
     private bool _isSaveTest;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DeleteAllAskCommand))]
     private int _countAsk;
 
     [ObservableProperty]
@@ -80,7 +83,25 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
 
     public void Receive(EditAskMessage message)
     {
-        throw new NotImplementedException();
+        if (message.Value)
+        {
+            _navigationService.NavigationTo(NavigationType.Test);
+            return;
+        }
+
+        SelectedAsk!.TitleAsk = SelectedAsk.EditAsk!.Value.TitleAsk;
+        SelectedAsk.IsSingleAnswer = SelectedAsk.EditAsk.Value.IsSingleAnswer;
+        SelectedAsk.AnswersList = new(SelectedAsk.EditAsk.Value.AnswerList.Select(answerItem =>
+        {
+            var answer = _factoryService.CreateViewModel<IAnswerViewModel>(NavigationType.Answer);
+            answer.TitleAnswer = answerItem.TitleAnswer;
+            answer.IsAnswered = answerItem.IsAnswered;
+
+            return answer;
+        }));
+        SelectedAsk.EditAsk = null;
+
+        _navigationService.NavigationTo(NavigationType.Test);
     }
     #endregion
 
@@ -138,7 +159,9 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
     [RelayCommand(CanExecute = nameof(OnCanExecuteChangeAsk))]
     private void EditSelectedAsk(IAskViewModel? ask)
     {
-        throw new NotImplementedException();
+        ask!.IsEditItem = true;
+        ask.IsSubcribeMessage = true;
+        _navigationService.NavigationTo(NavigationType.Ask, ask);
     }
 
     [RelayCommand(CanExecute = nameof(OnCanExecuteChangeAsk))]

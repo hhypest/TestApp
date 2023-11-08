@@ -172,7 +172,7 @@
                                   Validation.ErrorTemplate="{x:Null}">
                             <ListView.View>
                                 <GridView>
-                                    <GridViewColumn Width="Auto" Header="Вариант ответа">
+                                    <GridViewColumn Width="500" Header="Вариант ответа">
                                         <GridViewColumn.CellTemplate>
                                             <DataTemplate DataType="answer:AnswerViewModel">
                                                 <StackPanel Orientation="Horizontal">
@@ -182,6 +182,7 @@
                                                                  Kind="{Binding IsAnswered, Converter={StaticResource KindToConv}}" />
                                                     <TextBlock Margin="20,0,0,0"
                                                                VerticalAlignment="Center"
+                                                               Validation.ErrorTemplate="{x:Null}"
                                                                FontSize="16"
                                                                Foreground="{DynamicResource MaterialDesignBody}"
                                                                Text="{Binding TitleAnswer}" />
