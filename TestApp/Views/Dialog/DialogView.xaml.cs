@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using TestApp.Extensions;
 using TestApp.Views.Dialog.DialogContent;
 
 namespace TestApp.Views.Dialog;

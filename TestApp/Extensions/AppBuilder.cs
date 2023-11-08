@@ -1,10 +1,16 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.IO;
 using TestApp.Services.Dialog;
+using TestApp.Services.Factory;
+using TestApp.Services.Navigation;
+using TestApp.ViewModels.Answer;
+using TestApp.ViewModels.Ask;
 using TestApp.ViewModels.Launch;
+using TestApp.ViewModels.Test;
 using TestApp.Views.Dialog;
 using TestApp.Views.Pages.Ask;
 using TestApp.Views.Pages.Launch;
@@ -17,12 +23,18 @@ public static class AppBuilder
 {
     private static void AddServices(this IServiceCollection services)
     {
+        services.AddSingleton<IMessenger, StrongReferenceMessenger>();
+        services.AddSingleton<IFactoryService, FactoryService>();
+        services.AddSingleton<INavigationService, NavigationService>();
         services.AddTransient<IDialogService, DialogService>();
     }
 
     private static void AddViewModels(this IServiceCollection services)
     {
+        services.AddSingleton<ITestViewModel, TestViewModel>();
         services.AddTransient<ILaunchViewModel, LaunchViewModel>();
+        services.AddTransient<IAskViewModel, AskViewModel>();
+        services.AddTransient<IAnswerViewModel, AnswerViewModel>();
     }
 
     private static void AddViews(this IServiceCollection services)
@@ -48,15 +60,13 @@ public static class AppBuilder
 
     public static void AppStarted(this IHost host)
     {
-        var shell = ActivatorUtilities.GetServiceOrCreateInstance<IShellView>(host.Services);
-        var page = ActivatorUtilities.GetServiceOrCreateInstance<ILaunchView>(host.Services);
-        var dataContext = ActivatorUtilities.GetServiceOrCreateInstance<ILaunchViewModel>(host.Services);
-        page.SetDataContext(dataContext);
-        shell.NavigationTo(page);
-        shell.ShowView();
+        var navigationService = ActivatorUtilities.GetServiceOrCreateInstance<INavigationService>(host.Services);
+        navigationService.StartService();
     }
 
     public static void AppStoped(this IHost host)
     {
+        var navigationService = ActivatorUtilities.GetServiceOrCreateInstance<INavigationService>(host.Services);
+        navigationService.StopService();
     }
 }

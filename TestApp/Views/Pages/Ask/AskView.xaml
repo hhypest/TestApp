@@ -4,29 +4,42 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:ask="clr-namespace:TestApp.ViewModels.Ask"
+      xmlns:answer="clr-namespace:TestApp.ViewModels.Answer"
+      xmlns:converter="clr-namespace:TestApp.Converters"
       mc:Ignorable="d"
-      d:DesignHeight="500" d:DesignWidth="1100">
+      d:DesignHeight="500" d:DesignWidth="1100"
+      d:DataContext="{d:DesignInstance Type=ask:AskViewModel}">
+    <Page.Resources>
+        <converter:EnableConverter x:Key="EnableToConv" />
+        <converter:KindConverter x:Key="KindToConv" />
+    </Page.Resources>
 
-    <md:DialogHost x:Name="dHost" DialogTheme="Inherit" DialogContentUniformCornerRadius="20">
+    <md:DialogHost x:Name="dHost" DialogTheme="Inherit" DialogContentUniformCornerRadius="20"
+                   IsOpen="{Binding IsOpenDialog}">
         <md:DialogHost.DialogContent>
-            <Grid Margin="5,0,5,0" Width="500" Height="250">
+            <Grid Width="500" Height="200" Validation.ErrorTemplate="{x:Null}"
+                  DataContext="{Binding SelectedAnswer}">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="50" />
                 </Grid.RowDefinitions>
-                <Grid Grid.Row="0" Margin="0,15,0,15">
+                <Grid Grid.Row="0">
                     <StackPanel Orientation="Vertical"
                                 VerticalAlignment="Center" HorizontalAlignment="Stretch">
-                        <TextBox Margin="0,0,0,15"
+                        <TextBox Margin="25,10,25,10"
                                  HorizontalAlignment="Stretch"
                                  FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
-                                 md:HintAssist.Hint="Введите вариант ответа" />
-                        <CheckBox VerticalAlignment="Center" HorizontalAlignment="Center"
+                                 md:HintAssist.Hint="Введите вариант ответа"
+                                 Text="{Binding TitleAnswer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <CheckBox Margin="0,10,0,10"
+                                  VerticalAlignment="Center" HorizontalAlignment="Center"
                                   FontSize="16"
-                                  Content="Правильный вариант ответа?" />
+                                  Content="Правильный вариант ответа?"
+                                  IsChecked="{Binding IsAnswered, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Grid>
-                <Grid Grid.Row="1">
+                <Grid Grid.Row="1" Margin="0,10,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
@@ -36,13 +49,15 @@
                             Width="150"
                             FontSize="16"
                             md:ButtonAssist.CornerRadius="10"
-                            Content="Создать" />
+                            Content="Принять"
+                            Command="{Binding AcceptInputAnswerCommand}" />
                     <Button Grid.Column="1"
                             VerticalAlignment="Center" HorizontalContentAlignment="Center"
                             Width="150"
                             FontSize="16"
                             md:ButtonAssist.CornerRadius="10"
-                            Content="Отмена" />
+                            Content="Отмена"
+                            Command="{Binding CancelInputAnswerCommand}" />
                 </Grid>
             </Grid>
         </md:DialogHost.DialogContent>
@@ -56,14 +71,18 @@
                     <ToolBar VerticalAlignment="Top" Background="Transparent">
                         <Button Width="40" Height="40"
                                 Style="{DynamicResource MaterialDesignIconForegroundButton}"
-                                ToolTip="Добавить вариант ответа">
+                                ToolTip="Добавить вариант ответа"
+                                Command="{Binding AddNewAnswerCommand}">
                             <md:PackIcon Width="35" Height="35"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
                                          Kind="AddCircleOutline" />
                         </Button>
                         <Button Width="40" Height="40"
                                 Style="{DynamicResource MaterialDesignIconForegroundButton}"
-                                ToolTip="Редактировать вариант ответа">
+                                ToolTip="Редактировать вариант ответа"
+                                Validation.ErrorTemplate="{x:Null}"
+                                Command="{Binding EditSelectedAnswerCommand}"
+                                CommandParameter="{Binding SelectedAnswer}">
                             <md:PackIcon Width="35" Height="35"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
                                          Kind="EditCircleOutline" />
@@ -71,14 +90,18 @@
                         <Separator Background="{DynamicResource PrimaryHueDarkBrush}" />
                         <Button Width="40" Height="40"
                                 Style="{DynamicResource MaterialDesignIconForegroundButton}"
-                                ToolTip="Удалить вариант ответа">
+                                ToolTip="Удалить вариант ответа"
+                                Validation.ErrorTemplate="{x:Null}"
+                                Command="{Binding DeleteSelectedAnswerCommand}"
+                                CommandParameter="{Binding SelectedAnswer}">
                             <md:PackIcon Width="35" Height="35"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
                                          Kind="RemoveCircleOutline" />
                         </Button>
                         <Button Width="40" Height="40"
                                 Style="{DynamicResource MaterialDesignIconForegroundButton}"
-                                ToolTip="Удалить все варианты">
+                                ToolTip="Удалить все варианты"
+                                Command="{Binding DeleteAllAnswerCommand}">
                             <md:PackIcon Width="35" Height="35"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
                                          Kind="RemoveCircleMultipleOutline" />
@@ -86,14 +109,16 @@
                         <Separator Background="{DynamicResource PrimaryHueDarkBrush}" />
                         <Button Width="40" Height="40"
                                 Style="{DynamicResource MaterialDesignIconForegroundButton}"
-                                ToolTip="Сохранить">
+                                ToolTip="Сохранить"
+                                Command="{Binding AcceptInputAskCommand}">
                             <md:PackIcon Width="35" Height="35"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
                                          Kind="CheckCircleOutline" />
                         </Button>
                         <Button Width="40" Height="40"
-                            Style="{DynamicResource MaterialDesignIconForegroundButton}"
-                            ToolTip="Отмена">
+                                Style="{DynamicResource MaterialDesignIconForegroundButton}"
+                                ToolTip="Отмена"
+                                Command="{Binding CancelInputAskCommand}">
                             <md:PackIcon Width="35" Height="35"
                                          Foreground="{DynamicResource PrimaryHueDarkBrush}"
                                          Kind="CancelCircleOutline" />
@@ -115,11 +140,13 @@
                              Margin="0,15,5,15"
                              HorizontalAlignment="Stretch"
                              FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
-                             md:HintAssist.Hint="Введите вариант ответа" />
+                             md:HintAssist.Hint="Введите вариант ответа"
+                             Text="{Binding TitleAsk, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <CheckBox Grid.Column="1"
                               VerticalAlignment="Center"
                               FontSize="16"
-                              Content="Один правильный вариант ответа в вопросе?" />
+                              Content="Один правильный вариант ответа в вопросе?"
+                              IsChecked="{Binding IsSingleAnswer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>
                 <Grid Grid.Row="1" Margin="0,15,0,15">
                     <GroupBox>
@@ -139,7 +166,31 @@
                                 </StackPanel>
                             </DataTemplate>
                         </GroupBox.HeaderTemplate>
-                        <ListView>
+                        <ListView ItemsSource="{Binding AnswersList}"
+                                  SelectedItem="{Binding SelectedAnswer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectionMode="Single"
+                                  Validation.ErrorTemplate="{x:Null}">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Width="Auto" Header="Вариант ответа">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate DataType="answer:AnswerViewModel">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <md:PackIcon Width="25" Height="25"
+                                                                 VerticalAlignment="Center"
+                                                                 Foreground="{DynamicResource PrimaryHueDarkBrush}"
+                                                                 Kind="{Binding IsAnswered, Converter={StaticResource KindToConv}}" />
+                                                    <TextBlock Margin="20,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="16"
+                                                               Foreground="{DynamicResource MaterialDesignBody}"
+                                                               Text="{Binding TitleAnswer}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
                         </ListView>
                     </GroupBox>
                 </Grid>

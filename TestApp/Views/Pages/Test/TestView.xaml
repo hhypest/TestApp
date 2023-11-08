@@ -4,8 +4,19 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:test="clr-namespace:TestApp.ViewModels.Test"
+      xmlns:ask="clr-namespace:TestApp.ViewModels.Ask"
+      xmlns:answer="clr-namespace:TestApp.ViewModels.Answer"
+      xmlns:converter="clr-namespace:TestApp.Converters"
       mc:Ignorable="d"
-      d:DesignHeight="500" d:DesignWidth="1100">
+      d:DesignHeight="500" d:DesignWidth="1100"
+      d:DataContext="{d:DesignInstance Type=test:TestViewModel}">
+    <Page.Resources>
+        <converter:CountConverter x:Key="CountToConv" />
+        <converter:KindConverter x:Key="KindToConv" />
+        <converter:SaveConverter x:Key="SaveToConv" />
+        <converter:CountToEnableConverter x:Key="CountToBoolConv" />
+    </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -20,26 +31,38 @@
                   md:MenuAssist.TopLevelMenuItemHeight="30">
                 <MenuItem Header="Файл">
                     <MenuItem Header="Создать новый тест"
-                              Icon="{md:PackIcon Kind=CreateOutline}" />
+                              Icon="{md:PackIcon Kind=CreateOutline}"
+                              Command="{Binding CreateNewTestCommand}" />
                     <MenuItem Header="Загрузить тест"
-                              Icon="{md:PackIcon Kind=DownloadOutline}" />
-                    <MenuItem Header="Сохранить">
+                              Icon="{md:PackIcon Kind=DownloadOutline}"
+                              Command="{Binding LoadTestCommand}" />
+                    <MenuItem Header="Сохранить"
+                              IsEnabled="{Binding CountAsk, Converter={StaticResource CountToBoolConv}}">
                         <MenuItem Header="Сохранить"
-                                  Icon="{md:PackIcon Kind=ContentSaveOutline}" />
+                                  Icon="{md:PackIcon Kind=ContentSaveOutline}"
+                                  Command="{Binding SaveTestCommand}"
+                                  CommandParameter="{Binding PathSaveTest}" />
                         <MenuItem Header="Сохранить как"
-                                  Icon="{md:PackIcon Kind=ContentSaveAllOutline}" />
+                                  Icon="{md:PackIcon Kind=ContentSaveAllOutline}"
+                                  Command="{Binding SaveTestAsCommand}" />
                     </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Правка">
                     <MenuItem Header="Добавить вопрос"
-                              Icon="{md:PackIcon Kind=ArchiveAddOutline}" />
+                              Icon="{md:PackIcon Kind=ArchiveAddOutline}"
+                              Command="{Binding AddNewAskCommand}" />
                     <MenuItem Header="Редактировать выбранный вопрос"
-                              Icon="{md:PackIcon Kind=ArchiveEditOutline}" />
+                              Icon="{md:PackIcon Kind=ArchiveEditOutline}"
+                              Command="{Binding EditSelectedAskCommand}"
+                              CommandParameter="{Binding SelectedAsk}" />
                     <Separator />
                     <MenuItem Header="Удалить выбранный вопрос"
-                              Icon="{md:PackIcon Kind=ArchiveRemoveOutline}" />
+                              Icon="{md:PackIcon Kind=ArchiveRemoveOutline}"
+                              Command="{Binding DeleteSelectedAskCommand}"
+                              CommandParameter="{Binding SelectedAsk}" />
                     <MenuItem Header="Удалить все вопросы"
-                              Icon="{md:PackIcon Kind=RemoveBoxOutline}" />
+                              Icon="{md:PackIcon Kind=RemoveBoxOutline}"
+                              Command="{Binding DeleteAllAskCommand}" />
                 </MenuItem>
             </Menu>
         </Grid>
@@ -66,7 +89,23 @@
                         </StackPanel>
                     </DataTemplate>
                 </GroupBox.HeaderTemplate>
-                <ListView>
+                <ListView ItemsSource="{Binding AsksList}"
+                          SelectedItem="{Binding SelectedAsk, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate DataType="ask:AskViewModel">
+                            <StackPanel Orientation="Horizontal">
+                                <md:PackIcon Width="25" Height="25"
+                                             VerticalAlignment="Center"
+                                             Foreground="{DynamicResource PrimaryHueDarkBrush}"
+                                             Kind="QuestionMarkCircleOutline" />
+                                <TextBlock Margin="20,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                                           Text="{Binding TitleAsk}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
                 </ListView>
             </GroupBox>
             <GridSplitter Grid.Column="1"
@@ -91,7 +130,28 @@
                         </StackPanel>
                     </DataTemplate>
                 </GroupBox.HeaderTemplate>
-                <ListView>
+                <ListView ItemsSource="{Binding SelectedAsk.AnswersList}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Width="Auto" Header="Вариант ответа">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate DataType="answer:AnswerViewModel">
+                                        <StackPanel Orientation="Horizontal">
+                                            <md:PackIcon Width="25" Height="25"
+                                                         VerticalAlignment="Center"
+                                                         Foreground="{DynamicResource PrimaryHueDarkBrush}"
+                                                         Kind="{Binding IsAnswered, Converter={StaticResource KindToConv}}" />
+                                            <TextBlock Margin="20,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="16"
+                                                       Foreground="{DynamicResource MaterialDesignBody}"
+                                                       Text="{Binding TitleAnswer}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                        </GridView>
+                    </ListView.View>
                 </ListView>
             </GroupBox>
         </Grid>
@@ -101,25 +161,25 @@
                                VerticalAlignment="Center" HorizontalAlignment="Left">
                     <TextBlock VerticalAlignment="Center"
                                FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
-                               Text="Название теста" />
+                               Text="{Binding TitleTest}" />
                 </StatusBarItem>
                 <StatusBarItem Margin="15,0,0,0"
                                VerticalAlignment="Center" HorizontalAlignment="Left">
                     <TextBlock VerticalAlignment="Center"
                                FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
-                               Text="Сохранение теста" />
+                               Text="{Binding IsSaveTest, Converter={StaticResource SaveToConv}}" />
                 </StatusBarItem>
                 <StatusBarItem Margin="15,0,0,0"
                                VerticalAlignment="Center" HorizontalAlignment="Left">
                     <TextBlock VerticalAlignment="Center"
                                FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
-                               Text="Вопросы теста" />
+                               Text="{Binding CountAsk, Converter={StaticResource CountToConv}}" />
                 </StatusBarItem>
                 <StatusBarItem Margin="0,0,15,0"
                                VerticalAlignment="Center" HorizontalAlignment="Right">
                     <TextBlock VerticalAlignment="Center"
                                FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
-                               Text="Путь теста" />
+                               Text="{Binding PathSaveTest}" />
                 </StatusBarItem>
             </StatusBar>
         </Grid>

@@ -1,13 +1,19 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
+using TestApp.Messages.TestMessages;
 
 namespace TestApp.ViewModels.Launch;
 
 public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
 {
+    #region Зависимости
+    private readonly IMessenger _messenger;
+    #endregion
+
     #region Свойства модели представления
     [ObservableProperty]
     [NotifyDataErrorInfo]
@@ -20,8 +26,9 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
     #endregion
 
     #region Конструктор
-    public LaunchViewModel()
+    public LaunchViewModel(IMessenger messenger)
     {
+        _messenger = messenger;
         _titleTest = "Новый тест";
     }
     #endregion
@@ -36,19 +43,19 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
     [RelayCommand]
     private Task LoadTest()
     {
-        throw new NotSupportedException();
+        throw new NotImplementedException();
     }
 
     [RelayCommand]
     private Task ResolveTest()
     {
-        throw new NotSupportedException();
+        throw new NotImplementedException();
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteAcceptCreateTest))]
     private void AcceptCreateTest(string? title)
     {
-        throw new NotSupportedException();
+        _messenger.Send(new CreateTestMessage(title!));
     }
 
     [RelayCommand]
