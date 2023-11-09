@@ -76,7 +76,8 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
     [RelayCommand]
     private async Task ResolveTest()
     {
-        throw new NotImplementedException();
+        _dialogService.ShowMessage("Внимание", "Данный функционал, к сожалению, не реализован. Разработчик работает на реализацией.");
+        await Task.Delay(1000);
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteAcceptCreateTest))]
