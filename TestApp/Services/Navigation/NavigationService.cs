@@ -1,5 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
-using System;
+﻿using System;
 using TestApp.Extensions;
 using TestApp.Services.Factory;
 using TestApp.ViewModels.Ask;
@@ -11,17 +10,22 @@ namespace TestApp.Services.Navigation;
 public sealed class NavigationService : INavigationService
 {
     #region Зависимости
+
     private readonly IFactoryService _factoryService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Конструктор
+
     public NavigationService(IFactoryService factoryService)
     {
         _factoryService = factoryService;
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void StartService()
     {
         var shell = _factoryService.CreateShellView();
@@ -65,5 +69,6 @@ public sealed class NavigationService : INavigationService
         page.SetDataContext(dataContext);
         shell.NavigationTo(page);
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }

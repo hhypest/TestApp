@@ -28,13 +28,16 @@ public sealed class DialogService : IDialogService
     #endregion Определение активного окна
 
     #region Конструктор
+
     public DialogService(IServiceProvider services)
     {
         _services = services;
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public FileInfo? LoadFileDialog(string extensionsFile)
     {
         var dialog = new OpenFileDialog()
@@ -88,5 +91,6 @@ public sealed class DialogService : IDialogService
 
         return dialog.ResultDialog;
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }

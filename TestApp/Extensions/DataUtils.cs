@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-using System;
-using System.IO;
+﻿using System.IO;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;

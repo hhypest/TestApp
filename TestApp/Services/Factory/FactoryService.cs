@@ -16,17 +16,22 @@ namespace TestApp.Services.Factory;
 public sealed class FactoryService : IFactoryService
 {
     #region Зависимости
+
     private readonly IServiceProvider _services;
-    #endregion
+
+    #endregion Зависимости
 
     #region Конструктор
+
     public FactoryService(IServiceProvider services)
     {
         _services = services;
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public IShellView CreateShellView()
     {
         return ActivatorUtilities.GetServiceOrCreateInstance<IShellView>(_services);
@@ -55,5 +60,6 @@ public sealed class FactoryService : IFactoryService
             _ => throw new NotSupportedException()
         };
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }

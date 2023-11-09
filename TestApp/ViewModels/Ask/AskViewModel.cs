@@ -15,11 +15,14 @@ namespace TestApp.ViewModels.Ask;
 public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipient<CreateAnswerMessage>, IRecipient<EditAnswerMessage>, IRecipient<CanExecuteMessage>
 {
     #region Зависимости
+
     private readonly IMessenger _messenger;
     private readonly IFactoryService _factoryService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AcceptInputAskCommand))]
     [NotifyDataErrorInfo]
@@ -66,10 +69,13 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipie
             {
                 _messenger.UnregisterAll(this);
             }
-        } }
-    #endregion
+        }
+    }
+
+    #endregion Свойства модели представления
 
     #region Обработка сообщений
+
     public void Receive(CreateAnswerMessage message)
     {
         IsOpenDialog = false;
@@ -103,9 +109,11 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipie
     {
         AcceptInputAskCommand.NotifyCanExecuteChanged();
     }
-    #endregion
+
+    #endregion Обработка сообщений
 
     #region Конструктор
+
     public AskViewModel(IMessenger messenger, IFactoryService factoryService)
     {
         _messenger = messenger;
@@ -113,9 +121,11 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipie
         _titleAsk = "Новый вопрос";
         _answersList = new();
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Команды
+
     [RelayCommand]
     private void AddNewAnswer()
     {
@@ -177,9 +187,11 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipie
             _messenger.Send(new CreateAskMessage(null));
         }
     }
-    #endregion
+
+    #endregion Команды
 
     #region Предикаты
+
     private bool CanExecuteChangeAnswer(IAnswerViewModel? answer)
     {
         return answer is not null;
@@ -203,5 +215,6 @@ public partial class AskViewModel : ObservableValidator, IAskViewModel, IRecipie
 
         return true;
     }
-    #endregion
+
+    #endregion Предикаты
 }

@@ -4,10 +4,10 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      xmlns:test="clr-namespace:TestApp.ViewModels.Test"
-      xmlns:ask="clr-namespace:TestApp.ViewModels.Ask"
-      xmlns:answer="clr-namespace:TestApp.ViewModels.Answer"
       xmlns:converter="clr-namespace:TestApp.Converters"
+      xmlns:answer="clr-namespace:TestApp.ViewModels.Answer"
+      xmlns:ask="clr-namespace:TestApp.ViewModels.Ask"
+      xmlns:test="clr-namespace:TestApp.ViewModels.Test"
       mc:Ignorable="d"
       d:DesignHeight="500" d:DesignWidth="1100"
       d:DataContext="{d:DesignInstance Type=test:TestViewModel}">

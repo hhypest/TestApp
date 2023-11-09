@@ -12,7 +12,7 @@ public interface ITestViewModel
 
     public bool IsSaveTest { get; set; }
 
-    public int CountAsk {  get; set; }
+    public int CountAsk { get; set; }
 
     public ObservableCollection<IAskViewModel> AsksList { get; set; }
 

@@ -85,10 +85,12 @@ public partial class DialogView : Window, IDialogView
     #endregion Системные вызовы
 
     #region Реализация поведения окна
+
     private void OnMoveChanged(object sender, MouseButtonEventArgs e)
     {
         var helper = new WindowInteropHelper(this);
         SendMessage(helper.Handle, _wMsg, _wParam, _lParam);
     }
-    #endregion
+
+    #endregion Реализация поведения окна
 }

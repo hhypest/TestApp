@@ -9,10 +9,13 @@ namespace TestApp.ViewModels.Answer;
 public partial class AnswerViewModel : ObservableValidator, IAnswerViewModel
 {
     #region Зависимости
+
     private readonly IMessenger _messenger;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AcceptInputAnswerCommand))]
     [NotifyDataErrorInfo]
@@ -22,26 +25,33 @@ public partial class AnswerViewModel : ObservableValidator, IAnswerViewModel
 
     private bool _isAnswered;
 
-    public bool IsAnswered { get => _isAnswered; set
+    public bool IsAnswered
+    {
+        get => _isAnswered; set
         {
             if (!SetProperty(ref _isAnswered, value))
                 return;
 
             _messenger.Send(new CanExecuteMessage(true));
-        } }
+        }
+    }
 
     public bool IsEditItem { get; set; }
-    #endregion
+
+    #endregion Свойства модели представления
 
     #region Конструктор
+
     public AnswerViewModel(IMessenger messenger)
     {
         _messenger = messenger;
         _titleAnswer = "Новый вариант ответа";
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Команды
+
     [RelayCommand(CanExecute = nameof(CanExecuteAcceptInput))]
     private void AcceptInputAnswer()
     {
@@ -69,12 +79,15 @@ public partial class AnswerViewModel : ObservableValidator, IAnswerViewModel
             _messenger.Send(new CreateAnswerMessage(null));
         }
     }
-    #endregion
+
+    #endregion Команды
 
     #region Предикаты
+
     private bool CanExecuteAcceptInput()
     {
         return !string.IsNullOrWhiteSpace(TitleAnswer) && TitleAnswer.Length > 4;
     }
-    #endregion
+
+    #endregion Предикаты
 }

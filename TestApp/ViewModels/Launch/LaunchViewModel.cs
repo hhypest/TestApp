@@ -14,12 +14,15 @@ namespace TestApp.ViewModels.Launch;
 public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
 {
     #region Зависимости
+
     private readonly IMessenger _messenger;
     private readonly ILogger _logger;
     private readonly IDialogService _dialogService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Required(ErrorMessage = "Название теста не может быть пустым!")]
@@ -28,9 +31,11 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
 
     [ObservableProperty]
     private bool _isOpenDialog;
-    #endregion
+
+    #endregion Свойства модели представления
 
     #region Конструктор
+
     public LaunchViewModel(IMessenger messenger, ILogger<LaunchViewModel> logger, IDialogService dialogService)
     {
         _messenger = messenger;
@@ -38,9 +43,11 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
         _dialogService = dialogService;
         _titleTest = "Новый тест";
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Команды
+
     [RelayCommand]
     private void CreateNewTest()
     {
@@ -84,12 +91,15 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
         IsOpenDialog = false;
         TitleTest = "Новый тест";
     }
-    #endregion
+
+    #endregion Команды
 
     #region Предикаты
+
     private bool CanExecuteAcceptCreateTest(string? title)
     {
         return !string.IsNullOrWhiteSpace(title) && title.Length > 4;
     }
-    #endregion
+
+    #endregion Предикаты
 }

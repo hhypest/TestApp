@@ -10,6 +10,7 @@ namespace TestApp.Extensions;
 public static class MapUtils
 {
     #region Модель данных в модель представления
+
     public static void GetTestViewModel(this ITestViewModel testViewModel, TestModel test, IFactoryService factory, string pathSave)
     {
         testViewModel.TitleTest = test.TitleTest;
@@ -39,9 +40,11 @@ public static class MapUtils
 
         return answerViewModel;
     }
-    #endregion
+
+    #endregion Модель данных в модель представления
 
     #region Модель представления в модель данных
+
     public static TestModel GetTestModel(this ITestViewModel test)
     {
         return new(test.TitleTest, test.AsksList.Select(ask => ask.GetAskModel()).ToList());
@@ -56,5 +59,6 @@ public static class MapUtils
     {
         return new(answer.TitleAnswer, answer.IsAnswered);
     }
-    #endregion
+
+    #endregion Модель представления в модель данных
 }

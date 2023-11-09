@@ -22,13 +22,16 @@ public partial class TestViewModel :
     IRecipient<CreateTestMessage>, IRecipient<CreateAskMessage>, IRecipient<EditAskMessage>, IRecipient<LoadTestMessage>
 {
     #region Зависимости
+
     private readonly ILogger<TestViewModel> _logger;
     private readonly IFactoryService _factoryService;
     private readonly INavigationService _navigationService;
     private readonly IDialogService _dialogService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
+
     [ObservableProperty]
     private string _titleTest;
 
@@ -55,9 +58,11 @@ public partial class TestViewModel :
             IsActive = value;
         }
     }
-    #endregion
+
+    #endregion Свойства модели представления
 
     #region Обработка сообщений
+
     public void Receive(CreateTestMessage message)
     {
         TitleTest = message.Value;
@@ -114,9 +119,11 @@ public partial class TestViewModel :
         this.GetTestViewModel(test, _factoryService, filePath);
         _navigationService.NavigationTo(NavigationType.Test);
     }
-    #endregion
+
+    #endregion Обработка сообщений
 
     #region Коструктор
+
     public TestViewModel(IMessenger messenger,
                          ILogger<TestViewModel> logger,
                          IFactoryService factoryService,
@@ -133,9 +140,11 @@ public partial class TestViewModel :
         _pathSaveTest = string.Empty;
         _asksList = new();
     }
-    #endregion
+
+    #endregion Коструктор
 
     #region Команды
+
     [RelayCommand]
     private void CreateNewTest()
     {
@@ -237,9 +246,11 @@ public partial class TestViewModel :
         CountAsk = 0;
         IsSaveTest = false;
     }
-    #endregion
+
+    #endregion Команды
 
     #region Предикаты
+
     private bool OnCanExecuteSaveTest(string? path)
     {
         return !string.IsNullOrWhiteSpace(path);
@@ -254,5 +265,6 @@ public partial class TestViewModel :
     {
         return CountAsk > 0;
     }
-    #endregion
+
+    #endregion Предикаты
 }
