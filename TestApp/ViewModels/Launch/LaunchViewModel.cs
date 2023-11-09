@@ -41,13 +41,13 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
     }
 
     [RelayCommand]
-    private Task LoadTest()
+    private async Task LoadTest()
     {
         throw new NotImplementedException();
     }
 
     [RelayCommand]
-    private Task ResolveTest()
+    private async Task ResolveTest()
     {
         throw new NotImplementedException();
     }

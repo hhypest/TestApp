@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32;
 using System;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using TestApp.Extensions;
@@ -25,9 +27,48 @@ public sealed class DialogService : IDialogService
 
     #endregion Определение активного окна
 
+    #region Конструктор
     public DialogService(IServiceProvider services)
     {
         _services = services;
+    }
+    #endregion
+
+    #region Реализация интерфейса
+    public FileInfo? LoadFileDialog(string extensionsFile)
+    {
+        var dialog = new OpenFileDialog()
+        {
+            CheckPathExists = true,
+            CheckFileExists = true,
+            Multiselect = false,
+            RestoreDirectory = false,
+            Filter = extensionsFile,
+            AddExtension = false,
+            Title = "Загрузка файла теста"
+        };
+
+        if (dialog.ShowDialog() == false)
+            return null;
+
+        return new FileInfo(dialog.FileName);
+    }
+
+    public FileInfo? SaveFileDialog(string extensionsFile, string? fileName = null)
+    {
+        var dialog = new SaveFileDialog()
+        {
+            RestoreDirectory = false,
+            Filter = extensionsFile,
+            FileName = fileName ?? "Новый тест",
+            AddExtension = false,
+            Title = "Сохранение файла теста"
+        };
+
+        if (dialog.ShowDialog() == false)
+            return null;
+
+        return new FileInfo(dialog.FileName);
     }
 
     public void ShowMessage(string title, string message)
@@ -47,4 +88,5 @@ public sealed class DialogService : IDialogService
 
         return dialog.ResultDialog;
     }
+    #endregion
 }

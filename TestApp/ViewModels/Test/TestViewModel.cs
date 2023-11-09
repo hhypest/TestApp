@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using TestApp.Extensions;
+using TestApp.Messages.AnswerMessages;
 using TestApp.Messages.AskMessages;
 using TestApp.Messages.TestMessages;
 using TestApp.Services.Dialog;
@@ -86,6 +87,7 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
         if (message.Value)
         {
             _navigationService.NavigationTo(NavigationType.Test);
+            IsSaveTest = false;
             return;
         }
 
@@ -99,6 +101,7 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
 
             return answer;
         }));
+        SelectedAsk.CountAnswer = SelectedAsk.AnswersList.Count;
         SelectedAsk.EditAsk = null;
 
         _navigationService.NavigationTo(NavigationType.Test);
@@ -131,21 +134,64 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
     }
 
     [RelayCommand]
-    private Task LoadTest()
+    private async Task LoadTest()
     {
-        throw new NotImplementedException();
+        if (!IsSaveTest && !_dialogService.ShowQuestion("Внимание!", $"Тест <{TitleTest}> не сохранен. Продолжить?"))
+            return;
+
+        var filePath = _dialogService.LoadFileDialog("Файл теста|*.json");
+        if (filePath is null)
+            return;
+
+        try
+        {
+            var test = await DataUtils.LoadTestFile(filePath.FullName);
+            this.GetTestViewModel(test, _factoryService, filePath.FullName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при открытии файла");
+            _dialogService.ShowMessage("Ошибка", $"Ошибка при открытии файла\n{ex.Message}\n{ex.StackTrace}\n{ex.Source}");
+        }
     }
 
     [RelayCommand(CanExecute = nameof(OnCanExecuteSaveTest))]
-    private Task SaveTest(string? path)
+    private async Task SaveTest(string? path)
     {
-        throw new NotImplementedException();
+        var test = this.GetTestModel();
+
+        try
+        {
+            await test.SaveTestFile(path!);
+            IsSaveTest = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при сохранении файла");
+            _dialogService.ShowMessage("Ошибка", $"Ошибка при сохранении файла\n{ex.Message}\n{ex.StackTrace}\n{ex.Source}");
+        }
     }
 
     [RelayCommand]
-    private Task SaveTestAs()
+    private async Task SaveTestAs()
     {
-        throw new NotImplementedException();
+        var filePath = _dialogService.SaveFileDialog("Файл теста|*.json", TitleTest);
+        if (filePath is null)
+            return;
+
+        PathSaveTest = filePath.FullName;
+        var test = this.GetTestModel();
+
+        try
+        {
+            await test.SaveTestFile(PathSaveTest);
+            IsSaveTest = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при сохранении файла");
+            _dialogService.ShowMessage("Ошибка", $"Ошибка при сохранении файла\n{ex.Message}\n{ex.StackTrace}\n{ex.Source}");
+        }
     }
 
     [RelayCommand]

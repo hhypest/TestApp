@@ -39,8 +39,9 @@
                     <ScrollViewer VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                         <TextBlock x:Name="MessageView"
                                    VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                                   TextWrapping="Wrap"
                                    ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                    FontSize="16" Foreground="{DynamicResource MaterialDesignBody}" />
                     </ScrollViewer>
                 </Grid>
