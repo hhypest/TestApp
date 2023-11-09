@@ -1,10 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
+using TestApp.Extensions;
 using TestApp.Messages.TestMessages;
+using TestApp.Services.Dialog;
 
 namespace TestApp.ViewModels.Launch;
 
@@ -12,6 +15,8 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
 {
     #region Зависимости
     private readonly IMessenger _messenger;
+    private readonly ILogger _logger;
+    private readonly IDialogService _dialogService;
     #endregion
 
     #region Свойства модели представления
@@ -26,9 +31,11 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
     #endregion
 
     #region Конструктор
-    public LaunchViewModel(IMessenger messenger)
+    public LaunchViewModel(IMessenger messenger, ILogger<LaunchViewModel> logger, IDialogService dialogService)
     {
         _messenger = messenger;
+        _logger = logger;
+        _dialogService = dialogService;
         _titleTest = "Новый тест";
     }
     #endregion
@@ -43,7 +50,20 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
     [RelayCommand]
     private async Task LoadTest()
     {
-        throw new NotImplementedException();
+        var filePath = _dialogService.LoadFileDialog("Файл теста|*.json");
+        if (filePath is null)
+            return;
+
+        try
+        {
+            var test = await DataUtils.LoadTestFile(filePath.FullName);
+            _messenger.Send(new LoadTestMessage((test, filePath.FullName)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при открытии файла");
+            _dialogService.ShowMessage("Ошибка", $"Ошибка при открытии файла\n{ex.Message}\n{ex.StackTrace}\n{ex.Source}");
+        }
     }
 
     [RelayCommand]

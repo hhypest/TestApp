@@ -7,7 +7,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using TestApp.Extensions;
-using TestApp.Messages.AnswerMessages;
 using TestApp.Messages.AskMessages;
 using TestApp.Messages.TestMessages;
 using TestApp.Services.Dialog;
@@ -18,7 +17,9 @@ using TestApp.ViewModels.Ask;
 
 namespace TestApp.ViewModels.Test;
 
-public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecipient<CreateTestMessage>, IRecipient<CreateAskMessage>, IRecipient<EditAskMessage>
+public partial class TestViewModel :
+    ObservableRecipient, ITestViewModel,
+    IRecipient<CreateTestMessage>, IRecipient<CreateAskMessage>, IRecipient<EditAskMessage>, IRecipient<LoadTestMessage>
 {
     #region Зависимости
     private readonly ILogger<TestViewModel> _logger;
@@ -106,10 +107,21 @@ public partial class TestViewModel : ObservableRecipient, ITestViewModel, IRecip
 
         _navigationService.NavigationTo(NavigationType.Test);
     }
+
+    public void Receive(LoadTestMessage message)
+    {
+        (var test, var filePath) = message.Value;
+        this.GetTestViewModel(test, _factoryService, filePath);
+        _navigationService.NavigationTo(NavigationType.Test);
+    }
     #endregion
 
     #region Коструктор
-    public TestViewModel(IMessenger messenger, ILogger<TestViewModel> logger, IFactoryService factoryService, INavigationService navigationService, IDialogService dialogService)
+    public TestViewModel(IMessenger messenger,
+                         ILogger<TestViewModel> logger,
+                         IFactoryService factoryService,
+                         INavigationService navigationService,
+                         IDialogService dialogService)
         : base(messenger)
     {
         _logger = logger;

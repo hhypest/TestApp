@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using Microsoft.Extensions.Logging;
+using System;
+using System.IO;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -25,7 +27,7 @@ public static class DataUtils
         using var stream = new FileStream(filePath, streamOption);
         var test = await JsonSerializer.DeserializeAsync<TestModel>(stream, jsonOption) ?? throw new JsonException($"Невозможно открыть файл - {filePath}");
 
-        if (test.AsksList.Count < 1 || test.AsksList[0].AnswersList.Count < 1)
+        if (test.AsksList is null || test.AsksList.Count < 1 || test.AsksList[0].AnswersList.Count < 1)
             throw new JsonException($"Невозможно открыть файл - {filePath}");
 
         return test;
