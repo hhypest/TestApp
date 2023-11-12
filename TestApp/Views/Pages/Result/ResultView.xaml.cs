@@ -5,13 +5,16 @@ namespace TestApp.Views.Pages.Result;
 public partial class ResultView : Page, IResultView
 {
     #region Конструктор
+
     public ResultView()
     {
         InitializeComponent();
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void NavigationTo<T>(T page)
     {
         NavigationService.Navigate(page);
@@ -21,5 +24,6 @@ public partial class ResultView : Page, IResultView
     {
         DataContext = dataContext;
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }

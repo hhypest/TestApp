@@ -19,9 +19,11 @@ namespace TestApp.ViewModels.Resolve;
 public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateResolveMessage>, IResolveViewModel
 {
     #region Зависимости
+
     private readonly IFactoryService _factoryService;
     private readonly INavigationService _navigationService;
-    #endregion
+
+    #endregion Зависимости
 
     #region Свойства модели представления
 
@@ -53,10 +55,13 @@ public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateRe
         set
         {
             IsActive = value;
-        } }
-    #endregion
+        }
+    }
+
+    #endregion Свойства модели представления
 
     #region Обработка сообщений
+
     public void Receive(CreateResolveMessage message)
     {
         var asksList = message.Value.AsksList;
@@ -69,9 +74,11 @@ public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateRe
         AsksWrong = new();
         NextAsk(AsksStack.Pop());
     }
-    #endregion
+
+    #endregion Обработка сообщений
 
     #region Конструктор
+
     public ResolveViewModel(IMessenger messenger,
                             IFactoryService factoryService,
                             INavigationService navigationService)
@@ -80,9 +87,11 @@ public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateRe
         _factoryService = factoryService;
         _navigationService = navigationService;
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Функции прохождения теста
+
     private static void ShuffleAsksList(List<AskModel> list)
     {
         for (var i = list.Count - 1; i > 0; i--)
@@ -131,9 +140,11 @@ public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateRe
         {
             case ( > 0, > 0) when AsksWrong.Count == CountAsks:
                 break;
+
             case (0, > 0):
                 asksWrong = 100.0;
                 break;
+
             default:
                 asksWrong = Math.Abs(((Convert.ToDouble(AsksWrong.Count) / Convert.ToDouble(CountAsks)) - 1.00) * 100.0);
                 break;
@@ -142,9 +153,11 @@ public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateRe
         var result = CountAsks - AsksWrong.Count;
         return $"Тест <{TitleTest}> закончен. Количество правильных ответов - {result} из {CountAsks}. Результат {asksWrong}%";
     }
-    #endregion
+
+    #endregion Функции прохождения теста
 
     #region Команды
+
     [RelayCommand]
     private void RelayNextAsk()
     {
@@ -158,6 +171,11 @@ public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateRe
             var result = _factoryService.CreateViewModel<IResultViewModel>(NavigationType.Result);
             result.AsksList = new(AsksWrong.Select(ask => ask.GetAskViewModel(_factoryService)));
             result.ResultTest = GetResult();
+            result.IsVisibleExpander = AsksWrong.Count switch
+            {
+                > 0 => true,
+                _ => false
+            };
             IsSubscribeMessage = false;
             _navigationService.NavigationTo(NavigationType.Result, result);
             return;
@@ -168,5 +186,6 @@ public partial class ResolveViewModel : ObservableRecipient, IRecipient<CreateRe
 
         NextAsk(AsksStack.Pop());
     }
-    #endregion
+
+    #endregion Команды
 }

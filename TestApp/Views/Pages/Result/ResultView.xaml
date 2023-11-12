@@ -1,19 +1,19 @@
 ﻿<Page x:Class="TestApp.Views.Pages.Result.ResultView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
       xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-      xmlns:result="clr-namespace:TestApp.ViewModels.Result"
-      xmlns:ask="clr-namespace:TestApp.ViewModels.Ask"
-      xmlns:answer="clr-namespace:TestApp.ViewModels.Answer"
-      xmlns:local="clr-namespace:TestApp.Views.Pages.Result"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:converter="clr-namespace:TestApp.Converters"
-      mc:Ignorable="d" 
+      xmlns:answer="clr-namespace:TestApp.ViewModels.Answer"
+      xmlns:ask="clr-namespace:TestApp.ViewModels.Ask"
+      xmlns:result="clr-namespace:TestApp.ViewModels.Result"
+      mc:Ignorable="d"
       d:DesignHeight="500" d:DesignWidth="1100"
       d:DataContext="{d:DesignInstance Type=result:ResultViewModel}">
     <Page.Resources>
         <converter:KindConverter x:Key="KindToConv" />
+        <converter:BoolConverter x:Key="BoolToConv" />
     </Page.Resources>
 
     <Grid Margin="5">
@@ -46,8 +46,9 @@
                            Text="{Binding ResultTest}" />
             </Grid>
             <Grid Grid.Row="1">
-                <Expander Header="Показать вопросы и правилиные варианты ответов"
-                          Foreground="{DynamicResource MaterialDesignBody}">
+                <Expander Header="Показать вопросы и правильные варианты ответов"
+                          Foreground="{DynamicResource MaterialDesignBody}"
+                          Visibility="{Binding IsVisibleExpander, Converter={StaticResource BoolToConv}}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

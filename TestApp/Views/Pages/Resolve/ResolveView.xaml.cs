@@ -5,13 +5,16 @@ namespace TestApp.Views.Pages.Resolve;
 public partial class ResolveView : Page, IResolveView
 {
     #region Конструктор
+
     public ResolveView()
     {
         InitializeComponent();
     }
-    #endregion
+
+    #endregion Конструктор
 
     #region Реализация интерфейса
+
     public void NavigationTo<T>(T page)
     {
         NavigationService.Navigate(page);
@@ -21,5 +24,6 @@ public partial class ResolveView : Page, IResolveView
     {
         DataContext = dataContext;
     }
-    #endregion
+
+    #endregion Реализация интерфейса
 }
