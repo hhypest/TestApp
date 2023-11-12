@@ -6,8 +6,12 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using TestApp.Extensions;
+using TestApp.Messages.ResolveMessage;
 using TestApp.Messages.TestMessages;
 using TestApp.Services.Dialog;
+using TestApp.Services.Factory;
+using TestApp.Services.Navigation;
+using TestApp.ViewModels.Resolve;
 
 namespace TestApp.ViewModels.Launch;
 
@@ -17,6 +21,8 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
 
     private readonly IMessenger _messenger;
     private readonly ILogger _logger;
+    private readonly IFactoryService _factoryService;
+    private readonly INavigationService _navigationService;
     private readonly IDialogService _dialogService;
 
     #endregion Зависимости
@@ -36,10 +42,16 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
 
     #region Конструктор
 
-    public LaunchViewModel(IMessenger messenger, ILogger<LaunchViewModel> logger, IDialogService dialogService)
+    public LaunchViewModel(IMessenger messenger,
+                           ILogger<LaunchViewModel> logger,
+                           IFactoryService factoryService,
+                           INavigationService navigationService,
+                           IDialogService dialogService)
     {
         _messenger = messenger;
         _logger = logger;
+        _factoryService = factoryService;
+        _navigationService = navigationService;
         _dialogService = dialogService;
         _titleTest = "Новый тест";
     }
@@ -76,8 +88,23 @@ public partial class LaunchViewModel : ObservableValidator, ILaunchViewModel
     [RelayCommand]
     private async Task ResolveTest()
     {
-        _dialogService.ShowMessage("Внимание", "Данный функционал, к сожалению, не реализован. Разработчик работает на реализацией.");
-        await Task.Delay(1000);
+        var filePath = _dialogService.LoadFileDialog("Файл теста|*.json");
+        if (filePath is null)
+            return;
+
+        try
+        {
+            var test = await DataUtils.LoadTestFile(filePath.FullName);
+            var resolve = _factoryService.CreateViewModel<IResolveViewModel>(NavigationType.Resolve);
+            resolve.IsSubscribeMessage = true;
+            _messenger.Send(new CreateResolveMessage(test));
+            _navigationService.NavigationTo(NavigationType.Resolve, resolve);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при открытии файла");
+            _dialogService.ShowMessage("Ошибка", $"Ошибка при открытии файла\n{ex.Message}\n{ex.StackTrace}\n{ex.Source}");
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteAcceptCreateTest))]

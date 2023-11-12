@@ -10,10 +10,14 @@ using TestApp.Services.Navigation;
 using TestApp.ViewModels.Answer;
 using TestApp.ViewModels.Ask;
 using TestApp.ViewModels.Launch;
+using TestApp.ViewModels.Resolve;
+using TestApp.ViewModels.Result;
 using TestApp.ViewModels.Test;
 using TestApp.Views.Dialog;
 using TestApp.Views.Pages.Ask;
 using TestApp.Views.Pages.Launch;
+using TestApp.Views.Pages.Resolve;
+using TestApp.Views.Pages.Result;
 using TestApp.Views.Pages.Test;
 using TestApp.Views.Shell;
 
@@ -24,8 +28,8 @@ public static class AppBuilder
     private static void AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IMessenger, StrongReferenceMessenger>();
-        services.AddSingleton<IFactoryService, FactoryService>();
-        services.AddSingleton<INavigationService, NavigationService>();
+        services.AddTransient<IFactoryService, FactoryService>();
+        services.AddTransient<INavigationService, NavigationService>();
         services.AddTransient<IDialogService, DialogService>();
     }
 
@@ -35,6 +39,8 @@ public static class AppBuilder
         services.AddTransient<ILaunchViewModel, LaunchViewModel>();
         services.AddTransient<IAskViewModel, AskViewModel>();
         services.AddTransient<IAnswerViewModel, AnswerViewModel>();
+        services.AddTransient<IResolveViewModel, ResolveViewModel>();
+        services.AddTransient<IResultViewModel, ResultViewModel>();
     }
 
     private static void AddViews(this IServiceCollection services)
@@ -43,6 +49,8 @@ public static class AppBuilder
         services.AddTransient<ILaunchView, LaunchView>();
         services.AddTransient<ITestView, TestView>();
         services.AddTransient<IAskView, AskView>();
+        services.AddTransient<IResolveView, ResolveView>();
+        services.AddTransient<IResultView, ResultView>();
         services.AddTransient<IDialogView, DialogView>();
     }
 

@@ -6,5 +6,7 @@ public enum NavigationType
     Launch,
     Test,
     Ask,
-    Answer
+    Answer,
+    Resolve,
+    Result
 }

@@ -3,6 +3,8 @@ using TestApp.Extensions;
 using TestApp.Services.Factory;
 using TestApp.ViewModels.Ask;
 using TestApp.ViewModels.Launch;
+using TestApp.ViewModels.Resolve;
+using TestApp.ViewModels.Result;
 using TestApp.ViewModels.Test;
 
 namespace TestApp.Services.Navigation;
@@ -54,6 +56,8 @@ public sealed class NavigationService : INavigationService
             NavigationType.Launch => _factoryService.CreateViewModel<ILaunchViewModel>(NavigationType.Launch),
             NavigationType.Test => _factoryService.CreateViewModel<ITestViewModel>(NavigationType.Test),
             NavigationType.Ask => _factoryService.CreateViewModel<IAskViewModel>(NavigationType.Ask),
+            NavigationType.Resolve => _factoryService.CreateViewModel<IResolveViewModel>(NavigationType.Resolve),
+            NavigationType.Result => _factoryService.CreateViewModel<IResultViewModel>(NavigationType.Result),
             _ => throw new NotSupportedException()
         };
 

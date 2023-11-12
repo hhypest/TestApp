@@ -109,9 +109,10 @@
                 </ListView>
             </GroupBox>
             <GridSplitter Grid.Column="1"
+                          Margin="1,0,1,0"
                           VerticalAlignment="Stretch" HorizontalAlignment="Center"
                           Width="3"
-                          Background="{DynamicResource PrimaryHueDarkBrush}"
+                          Background="{DynamicResource PrimaryHueMidBrush}"
                           ShowsPreview="False" />
             <GroupBox Grid.Column="2">
                 <GroupBox.HeaderTemplate>

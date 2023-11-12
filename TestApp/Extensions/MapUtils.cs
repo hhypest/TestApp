@@ -21,7 +21,7 @@ public static class MapUtils
         testViewModel.AsksList = new(test.AsksList.Select(ask => ask.GetAskViewModel(factory)));
     }
 
-    private static IAskViewModel GetAskViewModel(this AskModel ask, IFactoryService factory)
+    public static IAskViewModel GetAskViewModel(this AskModel ask, IFactoryService factory)
     {
         var askViewModel = factory.CreateViewModel<IAskViewModel>(NavigationType.Ask);
         askViewModel.TitleAsk = ask.TitleAsk;
@@ -32,7 +32,7 @@ public static class MapUtils
         return askViewModel;
     }
 
-    private static IAnswerViewModel GetAnswerViewModel(this AnswerModel answer, IFactoryService factory)
+    public static IAnswerViewModel GetAnswerViewModel(this AnswerModel answer, IFactoryService factory)
     {
         var answerViewModel = factory.CreateViewModel<IAnswerViewModel>(NavigationType.Answer);
         answerViewModel.TitleAnswer = answer.TitleAnswer;
@@ -50,12 +50,12 @@ public static class MapUtils
         return new(test.TitleTest, test.AsksList.Select(ask => ask.GetAskModel()).ToList());
     }
 
-    private static AskModel GetAskModel(this IAskViewModel ask)
+    public static AskModel GetAskModel(this IAskViewModel ask)
     {
         return new(ask.TitleAsk, ask.IsSingleAnswer, ask.AnswersList.Select(answer => answer.GetAnswerModel()).ToList());
     }
 
-    private static AnswerModel GetAnswerModel(this IAnswerViewModel answer)
+    public static AnswerModel GetAnswerModel(this IAnswerViewModel answer)
     {
         return new(answer.TitleAnswer, answer.IsAnswered);
     }

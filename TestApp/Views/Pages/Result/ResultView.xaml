@@ -1,0 +1,107 @@
+﻿<Page x:Class="TestApp.Views.Pages.Result.ResultView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+      xmlns:result="clr-namespace:TestApp.ViewModels.Result"
+      xmlns:ask="clr-namespace:TestApp.ViewModels.Ask"
+      xmlns:answer="clr-namespace:TestApp.ViewModels.Answer"
+      xmlns:local="clr-namespace:TestApp.Views.Pages.Result"
+      xmlns:converter="clr-namespace:TestApp.Converters"
+      mc:Ignorable="d" 
+      d:DesignHeight="500" d:DesignWidth="1100"
+      d:DataContext="{d:DesignInstance Type=result:ResultViewModel}">
+    <Page.Resources>
+        <converter:KindConverter x:Key="KindToConv" />
+    </Page.Resources>
+
+    <Grid Margin="5">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0">
+            <md:PackIcon Width="150" Height="150"
+                         VerticalAlignment="Center" HorizontalAlignment="Center"
+                         Foreground="{DynamicResource PrimaryHueDarkBrush}"
+                         Kind="InformationVariant" />
+        </Grid>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="50" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+                <TextBlock VerticalAlignment="Top" HorizontalAlignment="Center"
+                           Foreground="{DynamicResource MaterialDesignBody}"
+                           FontSize="22"
+                           Text="Результаты теста" />
+                <TextBlock Margin="0,50,0,0"
+                           VerticalAlignment="Center" HorizontalAlignment="Stretch"
+                           Foreground="{DynamicResource MaterialDesignBody}"
+                           FontSize="16"
+                           TextWrapping="Wrap"
+                           Text="{Binding ResultTest}" />
+            </Grid>
+            <Grid Grid.Row="1">
+                <Expander Header="Показать вопросы и правилиные варианты ответов"
+                          Foreground="{DynamicResource MaterialDesignBody}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ListView Grid.Column="0"
+                                  ItemsSource="{Binding AsksList}"
+                                  SelectedItem="{Binding SelectedAsk, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectionMode="Single">
+                            <ListView.ItemTemplate>
+                                <DataTemplate DataType="ask:AskViewModel">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Width="25" Height="25"
+                                                     VerticalAlignment="Center"
+                                                     Foreground="{DynamicResource PrimaryHueDarkBrush}"
+                                                     Kind="QuestionMarkCircleOutline" />
+                                        <TextBlock Margin="20,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="16" Foreground="{DynamicResource MaterialDesignBody}"
+                                                   Text="{Binding TitleAsk}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <ListView Grid.Column="1"
+                                  ItemsSource="{Binding SelectedAsk.AnswersList}"
+                                  SelectionMode="Single">
+                            <ListView.ItemTemplate>
+                                <DataTemplate DataType="answer:AnswerViewModel">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Width="25" Height="25"
+                                                     VerticalAlignment="Center"
+                                                     Foreground="{DynamicResource PrimaryHueDarkBrush}"
+                                                     Kind="{Binding IsAnswered, Converter={StaticResource KindToConv}}" />
+                                        <TextBlock Margin="20,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="16"
+                                                   Foreground="{DynamicResource MaterialDesignBody}"
+                                                   Text="{Binding TitleAnswer}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Expander>
+            </Grid>
+            <Grid Grid.Row="2">
+                <Button Width="150"
+                        VerticalAlignment="Center" HorizontalAlignment="Center"
+                        md:ButtonAssist.CornerRadius="10"
+                        FontSize="16"
+                        Content="Завершить"
+                        Command="{Binding CompleteResultCommand}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

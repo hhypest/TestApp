@@ -4,10 +4,14 @@ using TestApp.Extensions;
 using TestApp.ViewModels.Answer;
 using TestApp.ViewModels.Ask;
 using TestApp.ViewModels.Launch;
+using TestApp.ViewModels.Resolve;
+using TestApp.ViewModels.Result;
 using TestApp.ViewModels.Test;
 using TestApp.Views;
 using TestApp.Views.Pages.Ask;
 using TestApp.Views.Pages.Launch;
+using TestApp.Views.Pages.Resolve;
+using TestApp.Views.Pages.Result;
 using TestApp.Views.Pages.Test;
 using TestApp.Views.Shell;
 
@@ -45,6 +49,8 @@ public sealed class FactoryService : IFactoryService
             NavigationType.Launch => ActivatorUtilities.GetServiceOrCreateInstance<ILaunchView>(_services),
             NavigationType.Test => ActivatorUtilities.GetServiceOrCreateInstance<ITestView>(_services),
             NavigationType.Ask => ActivatorUtilities.GetServiceOrCreateInstance<IAskView>(_services),
+            NavigationType.Resolve => ActivatorUtilities.GetServiceOrCreateInstance<IResolveView>(_services),
+            NavigationType.Result => ActivatorUtilities.GetServiceOrCreateInstance<IResultView>(_services),
             _ => throw new NotSupportedException()
         };
     }
@@ -57,6 +63,8 @@ public sealed class FactoryService : IFactoryService
             NavigationType.Test => (T)ActivatorUtilities.GetServiceOrCreateInstance<ITestViewModel>(_services),
             NavigationType.Ask => (T)ActivatorUtilities.GetServiceOrCreateInstance<IAskViewModel>(_services),
             NavigationType.Answer => (T)ActivatorUtilities.GetServiceOrCreateInstance<IAnswerViewModel>(_services),
+            NavigationType.Resolve => (T)ActivatorUtilities.GetServiceOrCreateInstance<IResolveViewModel>(_services),
+            NavigationType.Result => (T)ActivatorUtilities.GetServiceOrCreateInstance<IResultViewModel>(_services),
             _ => throw new NotSupportedException()
         };
     }
