@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Folder Name="/Элементы решения/">
+    <File Path="LICENSE.txt" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="TestApp.Core/TestApp.Core.fsproj" Id="6dc8bf0c-2b23-407b-8644-676f349df79c" />
+  <Project Path="TestApp.Domain/TestApp.Domain.fsproj" Id="ef71bfad-a6fe-43f4-a0d6-ce7546f28272" />
+</Solution>

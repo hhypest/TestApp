@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<Compile Include="Monads\Results.fs" />
+	<Compile Include="Monads\Options.fs" />
+	<Compile Include="Messages\Messages.fs" />
+	<Compile Include="Messages\Handlers.fs" />
+	<Compile Include="Types\Attributes.fs" />
+	<Compile Include="Types\Errors.fs" />
+	<Compile Include="Types\Data.fs" />
+	<Compile Include="Types\Queries.fs" />
+	<Compile Include="Types\Commands.fs" />
+	<Compile Include="Events\Events.fs" />
+	<Compile Include="Events\EventsConverter.fs" />
+	<Compile Include="Extensions\MapExtension.fs" />
+	<Compile Include="Extensions\SerializeExtension.fs" />
+  </ItemGroup>
+
+</Project>
