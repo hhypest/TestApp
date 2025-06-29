@@ -5,19 +5,15 @@ open System.Threading.Tasks
 open TestApp.Core.Types
 open TestApp.Core.Monads
 open TestApp.Core.Messages
-open TestApp.Core.Extensions
 open TestApp.Domain.Abstractions
+open TestApp.Domain.Extensions
 
 type public GetAnswerHandler(repository: IAnswerRepository) =
     class
         interface IQueryHandler<GetAnswerQuery, Result<AnswerData, Error>> with
             member _.Handle(query: GetAnswerQuery)(token: CancellationToken) : Task<Result<AnswerData, Error>> = 
                 task {
-                    let! answer = (query.AnswerId, token) ||> repository.GetById
-                    return
-                        match answer with
-                            | Success entity -> entity |> DataMapper.map |> Success
-                            | Failure error -> error |> Failure
+                    return! (query.AnswerId, token) ||> repository.GetById
                 }
     end
 
@@ -26,11 +22,7 @@ type public GetAllAnswersHandler(repository: IAnswerRepository) =
         interface IQueryHandler<GetAnswersQuery, Result<seq<AnswerData>, Error>> with
             member _.Handle(query: GetAnswersQuery)(token: CancellationToken) : Task<Result<seq<AnswerData>, Error>> = 
                 task {
-                    let! answers = (query.AskId, token) ||> repository.GetAllAnswers
-                    return
-                        match answers with
-                            | Success entities -> entities |> Seq.map DataMapper.map |> Success
-                            | Failure error -> error |> Failure
+                    return! (query.AskId, token) ||> repository.GetAllAnswers
                 }
     end
 
@@ -39,7 +31,7 @@ type public CreateAnswerHandler(repository: IAnswerRepository) =
         interface ICommandHandler<PostAnswerCommand, Result<int, Error>> with
             member _.Handle(command: PostAnswerCommand)(token: CancellationToken)  : Task<Result<int, Error>> = 
                 task {
-                    let answerEntity = command.Query |> DataMapper.map
+                    let answerEntity = command.Query.AnswerToEntity()
                     return! (answerEntity, token) ||> repository.CreateAnswer
                 }
     end
@@ -49,7 +41,7 @@ type public UpdateAnswerHandler(repository: IAnswerRepository) =
         interface ICommandHandler<PutAnswerCommand, Result<int, Error>> with
             member _.Handle(command: PutAnswerCommand)(token: CancellationToken): Task<Result<int, Error>> = 
                 task {
-                    let answerEntity = command.Query |> DataMapper.mapBack
+                    let answerEntity = command.Query.AnswerToEntity()
                     return! (answerEntity, token) ||> repository.UpdateAnswer
                 }
     end

@@ -9,8 +9,8 @@ open TestApp.Domain.Entities
 
 type public IAnswerRepository =
     interface
-        abstract member GetById : answerId: Guid -> token: CancellationToken -> Task<Result<AnswerEntity, Error>>
-        abstract member GetAllAnswers : askId: Guid -> token: CancellationToken -> Task<Result<seq<AnswerEntity>, Error>>
+        abstract member GetById : answerId: Guid -> token: CancellationToken -> Task<Result<AnswerData, Error>>
+        abstract member GetAllAnswers : askId: Guid -> token: CancellationToken -> Task<Result<seq<AnswerData>, Error>>
         abstract member CreateAnswer : answer: AnswerEntity -> token: CancellationToken -> Task<Result<int, Error>>
         abstract member UpdateAnswer : answer: AnswerEntity -> token: CancellationToken -> Task<Result<int, Error>>
         abstract member DeleteAnswer : answerId: Guid -> token: CancellationToken -> Task<Result<int, Error>>
