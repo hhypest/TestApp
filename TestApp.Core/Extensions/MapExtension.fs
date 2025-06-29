@@ -3,18 +3,19 @@
 open System
 open System.Collections.Frozen
 open System.Collections.Generic
-open System.Reflection
+open System.Linq
 open System.Linq.Expressions
+open System.Reflection
 open Microsoft.FSharp.Core
 open TestApp.Core.Types
 
-[<Sealed>]
-type private DataMapperPlaceholder =
-    class
-    end
-
 module public DataMapper =
 
+    [<Sealed>]
+    type private DataMapperPlaceholder =
+        class
+        end
+    
     type private Rule<'TSource, 'TTarget> = {
         From: Func<'TSource, 'TTarget>
         To: Func<'TTarget, 'TSource>
@@ -46,7 +47,8 @@ module public DataMapper =
         props |> Seq.map(fun p -> getTargetPropertyName p, p) |> dict
 
     let private isEnumerableType(t: Type) =
-        typeof<System.Collections.IEnumerable>.IsAssignableFrom(t) && t.IsGenericType
+        t.GetInterfaces()
+        |> Seq.exists (fun i -> i.IsGenericType && i.GetGenericTypeDefinition() = typedefof<IEnumerable<_>>)
 
     let private allTypes : Type seq =
         AppDomain.CurrentDomain.GetAssemblies()
@@ -74,35 +76,32 @@ module public DataMapper =
         Expression.Bind(dstProp, Expression.Property(srcParam, srcProp))
 
     let private buildCollectionBinding(srcParam: ParameterExpression)(srcProp: PropertyInfo)(dstProp: PropertyInfo)(methodName: string) =
-        let srcElementType = srcProp.PropertyType.GetGenericArguments()[0]
-        let dstElementType = dstProp.PropertyType.GetGenericArguments()[0]
+        let srcElementType = srcProp.PropertyType.GetGenericArguments().[0]
+        let dstElementType = dstProp.PropertyType.GetGenericArguments().[0]
 
         let dataMapperType = typeof<DataMapperPlaceholder>.DeclaringType
         let mapMethod = 
             dataMapperType.GetMethod(methodName, BindingFlags.Public ||| BindingFlags.Static)
                 .MakeGenericMethod([| srcElementType; dstElementType |])
 
-    // Получаем метод Select из Enumerable
+        // Используем LINQ Select для преобразования коллекции
         let selectMethod = 
-            typeof<System.Linq.Enumerable>.GetMethods()
+            typeof<Enumerable>.GetMethods()
             |> Seq.find (fun m -> m.Name = "Select" && m.GetParameters().Length = 2)
             |> fun m -> m.MakeGenericMethod([| srcElementType; dstElementType |])
 
         let srcValue = Expression.Property(srcParam, srcProp)
-    
-    // Создаем лямбду для преобразования элементов
         let param = Expression.Parameter(srcElementType, "x")
         let mapCall = Expression.Call(mapMethod, param)
         let lambda = Expression.Lambda(mapCall, param)
-    
-    // Вызываем Select для преобразования коллекции
         let mapped = Expression.Call(selectMethod, srcValue, lambda)
         Expression.Bind(dstProp, mapped)
 
     let private tryBuildBinding(srcParam: ParameterExpression)(srcProp: PropertyInfo)(dstProp: PropertyInfo)(methodName: string) : MemberBinding option =
         match srcProp.PropertyType, dstProp.PropertyType with
         | s, d when s = d -> Some (buildSimpleBinding srcParam srcProp dstProp)
-        | s, _ when isEnumerableType s -> Some (buildCollectionBinding srcParam srcProp dstProp methodName)
+        | s, d when isEnumerableType s && isEnumerableType d -> 
+            Some (buildCollectionBinding srcParam srcProp dstProp methodName)
         | _ -> None
 
     let private tryBuildBindingFromProps(srcParam: ParameterExpression)(dstPropsMap: IDictionary<string, PropertyInfo>)(srcProp: PropertyInfo)(methodName: string) =
@@ -112,8 +111,8 @@ module public DataMapper =
         | _ -> None
 
     let private buildBindings(srcType: Type)(dstType: Type)(srcParam: ParameterExpression)(methodName: string) : ResizeArray<MemberBinding> =
-        let srcProps = propertyCache[srcType]
-        let dstPropsMap = makeNamedMap propertyCache[dstType]
+        let srcProps = propertyCache.[srcType]
+        let dstPropsMap = makeNamedMap propertyCache.[dstType]
         srcProps |> Seq.choose(fun p -> tryBuildBindingFromProps srcParam dstPropsMap p methodName) |> ResizeArray
 
     let private buildLambda<'a, 'b>(methodName: string) : Func<'a, 'b> =
@@ -129,14 +128,33 @@ module public DataMapper =
         struct(typeof<'a>, typeof<'b>), box rule
 
     let private createRuleDynamic(src: Type)(dst: Type) : struct(Type * Type) * obj =
-        let t = typeof<DataMapperPlaceholder>.DeclaringType
-        let mi = t.GetMethod("createRule", BindingFlags.NonPublic ||| BindingFlags.Static)
-        let generic = mi.MakeGenericMethod([| src; dst |])
-        generic.Invoke(null, [||]) :?> struct(Type * Type) * obj
+        let moduleType = typeof<DataMapperPlaceholder>.DeclaringType
+        if isNull moduleType then
+            invalidOp "DeclaringType for DataMapperPlaceholder is null"
+
+        let flags = BindingFlags.NonPublic ||| BindingFlags.Static
+        let methods = moduleType.GetMethods(flags)
+        let mi = 
+            methods 
+            |> Array.tryFind (fun m -> 
+                m.Name = "createRule" && 
+                m.IsGenericMethodDefinition && 
+                m.GetGenericArguments().Length = 2)
+        
+        match mi with
+        | Some m ->
+            let generic = m.MakeGenericMethod([| src; dst |])
+            generic.Invoke(null, [||]) :?> struct(Type * Type) * obj
+        | None ->
+            invalidOp "createRule method not found"
 
     let private ruleCache : FrozenDictionary<struct(Type * Type), obj> =
         getProfiledPairs profiledTypes
-        |> Seq.map (fun (src, dst) -> createRuleDynamic src dst)
+        |> Seq.map (fun (src, dst) -> 
+            try
+                createRuleDynamic src dst
+            with ex ->
+                invalidOp $"Failed to create rule for {src.Name} -> {dst.Name}: {ex.Message}")
         |> dict
         |> FrozenDictionary.ToFrozenDictionary
 
