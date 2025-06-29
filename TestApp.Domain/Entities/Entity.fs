@@ -3,6 +3,7 @@
 open System
 open System.Collections.Generic
 open TestApp.Core.Events
+open TestApp.Core.Types
 
 [<AbstractClass>]
 type public Entity() =
@@ -27,6 +28,8 @@ type public AnswerEntity() =
         member val public AskId: Guid = Guid.Empty with get, set
         member val public AnswerTitle: string = String.Empty with get, set
         member val public IsCorrect: bool = false with get, set
+
+        [<IgnoreMap>]
         member val public Ask: AskEntity = Unchecked.defaultof<_> with get, set
     end
 
@@ -38,6 +41,8 @@ and public AskEntity() =
         member val public AskTitle: string = String.Empty with get, set
         member val public IsSingle: bool = false with get, set
         member val public AnswersList: seq<AnswerEntity> = Seq.empty with get, set
+
+        [<IgnoreMap>]
         member val public Test: TestEntity = Unchecked.defaultof<_> with get, set
     end
 
