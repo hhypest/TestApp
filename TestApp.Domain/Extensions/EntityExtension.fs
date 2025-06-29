@@ -3,10 +3,14 @@
 open System
 open System.Runtime.CompilerServices
 open TestApp.Core.Events
+open TestApp.Core.Types
 open TestApp.Core.Extensions
 open TestApp.Domain.Entities
 
 [<Extension>]
+[<Mapper(typeof<AnswerEntity>, typeof<AnswerData>)>]
+[<Mapper(typeof<AskEntity>, typeof<AskData>)>]
+[<Mapper(typeof<TestEntity>, typeof<TestData>)>]
 type public EntityExtension () =
     [<Extension>]
     static member public AnswerCreated(answer: AnswerEntity) : unit =

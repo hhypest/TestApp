@@ -78,12 +78,25 @@ module public DataMapper =
         let dstElementType = dstProp.PropertyType.GetGenericArguments()[0]
 
         let dataMapperType = typeof<DataMapperPlaceholder>.DeclaringType
-        let mapMethod =
+        let mapMethod = 
             dataMapperType.GetMethod(methodName, BindingFlags.Public ||| BindingFlags.Static)
                 .MakeGenericMethod([| srcElementType; dstElementType |])
 
+    // Получаем метод Select из Enumerable
+        let selectMethod = 
+            typeof<System.Linq.Enumerable>.GetMethods()
+            |> Seq.find (fun m -> m.Name = "Select" && m.GetParameters().Length = 2)
+            |> fun m -> m.MakeGenericMethod([| srcElementType; dstElementType |])
+
         let srcValue = Expression.Property(srcParam, srcProp)
-        let mapped = Expression.Call(mapMethod, srcValue)
+    
+    // Создаем лямбду для преобразования элементов
+        let param = Expression.Parameter(srcElementType, "x")
+        let mapCall = Expression.Call(mapMethod, param)
+        let lambda = Expression.Lambda(mapCall, param)
+    
+    // Вызываем Select для преобразования коллекции
+        let mapped = Expression.Call(selectMethod, srcValue, lambda)
         Expression.Bind(dstProp, mapped)
 
     let private tryBuildBinding(srcParam: ParameterExpression)(srcProp: PropertyInfo)(dstProp: PropertyInfo)(methodName: string) : MemberBinding option =
@@ -116,8 +129,8 @@ module public DataMapper =
         struct(typeof<'a>, typeof<'b>), box rule
 
     let private createRuleDynamic(src: Type)(dst: Type) : struct(Type * Type) * obj =
-        let mi =
-            typeof<DataMapperPlaceholder>.DeclaringType.GetMethod("createRule", BindingFlags.NonPublic ||| BindingFlags.Static)
+        let t = typeof<DataMapperPlaceholder>.DeclaringType
+        let mi = t.GetMethod("createRule", BindingFlags.NonPublic ||| BindingFlags.Static)
         let generic = mi.MakeGenericMethod([| src; dst |])
         generic.Invoke(null, [||]) :?> struct(Type * Type) * obj
 

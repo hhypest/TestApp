@@ -8,4 +8,5 @@
   </Folder>
   <Project Path="TestApp.Core/TestApp.Core.fsproj" Id="6dc8bf0c-2b23-407b-8644-676f349df79c" />
   <Project Path="TestApp.Domain/TestApp.Domain.fsproj" Id="ef71bfad-a6fe-43f4-a0d6-ce7546f28272" />
+  <Project Path="TestApp.xUnit/TestApp.xUnit.csproj" Id="8c6fc635-93f2-4211-abc7-307949580a86" />
 </Solution>
