@@ -5,25 +5,23 @@ open System.Threading.Tasks
 open TestApp.Core.Messages
 open TestApp.Domain.Queries
 open TestApp.Domain.Entities
+open TestApp.Infrastructure.UnitOfWork
 
 /// <summary>
 /// Handler for GetAllTestsQuery
-/// Demonstrates how to implement query handlers in CQRS pattern
+/// Retrieves all tests from the database
 /// </summary>
-type public GetAllTestsQueryHandler() =
+type public GetAllTestsQueryHandler(unitOfWork: IUnitOfWork) =
     interface IQueryHandler<GetAllTestsQuery, seq<TestEntity>> with
         member _.Handle (query: GetAllTestsQuery) (token: CancellationToken) : Task<seq<TestEntity>> =
             task {
                 try
-                    // TODO: Retrieve from read-only repository/cache
-                    // let tests = await readRepository.GetAllAsync(token)
-                    
-                    // For now, return empty sequence
-                    // In real implementation, you would query from database
-                    return Seq.empty<TestEntity>
+                    // Retrieve all tests from repository
+                    let! tests = unitOfWork.Tests.GetAllAsync(token)
+                    return tests
                     
                 with ex ->
                     // Log error and return empty sequence
-                    // In production, you might want to throw or return Result type
+                    System.Console.WriteLine($"Error retrieving tests: {ex.Message}")
                     return Seq.empty<TestEntity>
             }
