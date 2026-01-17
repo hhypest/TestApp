@@ -1,12 +1,13 @@
 <Solution>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
-  </Folder>
-  <Folder Name="/Элементы решения/">
     <File Path="LICENSE.txt" />
     <File Path="README.md" />
   </Folder>
-  <Project Path="TestApp.Core/TestApp.Core.fsproj" Id="6dc8bf0c-2b23-407b-8644-676f349df79c" />
-  <Project Path="TestApp.Domain/TestApp.Domain.fsproj" Id="ef71bfad-a6fe-43f4-a0d6-ce7546f28272" />
-  <Project Path="TestApp.xUnit/TestApp.xUnit.csproj" Id="8c6fc635-93f2-4211-abc7-307949580a86" />
+  <Folder Name="/src/">
+    <Project Path="src/TestApp.Core/TestApp.Core.csproj" Id="6216d3fd-1eae-4d73-a24f-2bc25ca88f25" />
+    <Project Path="src/TestApp.Domain/TestApp.Domain.csproj" Id="a4f5a070-f729-481f-8094-1ed7665d007f" />
+    <Project Path="src/TestApp.Messaging/TestApp.Messaging.csproj" Id="91d1565e-9db1-45f5-92c9-badaaf6297ec" />
+  </Folder>
+  <Folder Name="/tests/" />
 </Solution>
