@@ -29,9 +29,25 @@ public readonly struct Validation<TError, TValue>
     public readonly bool IsInvalid => !_isValid;
 
     public static Validation<TError, TValue> Valid(TValue value) => new(value);
-    public static Validation<TError, TValue> Invalid(IEnumerable<TError> errors) => new([.. errors]);
-    public static Validation<TError, TValue> Invalid(params TError[] errors) => new([.. errors]);
+    public static Validation<TError, TValue> Invalid(IEnumerable<TError> errors)
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+        return CreateInvalid([.. errors]);
+    }
+    public static Validation<TError, TValue> Invalid(params TError[] errors)
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+        return CreateInvalid([.. errors]);
+    }
     public static Validation<TError, TValue> Invalid(TError error) => new([error]);
+
+    private static Validation<TError, TValue> CreateInvalid(ImmutableArray<TError> errors)
+    {
+        if (errors.IsDefaultOrEmpty)
+            throw new ArgumentException("Validation.Invalid requires at least one error.", nameof(errors));
+
+        return new(errors);
+    }
 
     public Validation<TError, TNewValue> Map<TNewValue>(Func<TValue, TNewValue> map)
         where TNewValue : notnull
