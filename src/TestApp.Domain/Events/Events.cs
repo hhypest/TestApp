@@ -2,6 +2,6 @@
 
 public abstract record DomainEvent : IDomainEvent
 {
-    public Guid EventId => Guid.CreateVersion7();
-    public DateTimeOffset OccurredAt => DateTimeOffset.UtcNow;
+    public Guid EventId { get; } = Guid.CreateVersion7();
+    public DateTimeOffset OccurredAt { get; } = DateTimeOffset.UtcNow;
 }

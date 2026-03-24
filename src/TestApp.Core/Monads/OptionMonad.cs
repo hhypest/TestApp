@@ -14,7 +14,11 @@ public readonly struct Option<TSome>
         _state = true;
     }
 
-    public static Option<TSome> Some(TSome some) => new(some);
+    public static Option<TSome> Some(TSome some)
+    {
+        ArgumentNullException.ThrowIfNull(some);
+        return new(some);
+    }
     public static Option<TSome> None => default;
 
     public static implicit operator Option<TSome>(TSome some) => Some(some);
