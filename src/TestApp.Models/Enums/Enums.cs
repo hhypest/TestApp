@@ -1,4 +1,4 @@
-﻿namespace TestApp.Core.Data;
+﻿namespace TestApp.Models.Enums;
 
 public enum PassType
 {

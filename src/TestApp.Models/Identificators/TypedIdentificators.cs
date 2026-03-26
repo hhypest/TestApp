@@ -1,4 +1,4 @@
-﻿namespace TestApp.Core.Data;
+﻿namespace TestApp.Models.Identificators;
 
 public readonly record struct TestId(Guid Id)
 {

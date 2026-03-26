@@ -1,10 +1,9 @@
 ﻿using System.Collections.Immutable;
-using TestApp.Core.Data;
 
 namespace TestApp.Core.Applicatives;
 
 public readonly struct Validation<TError, TValue>
-    where TError : notnull, Error
+    where TError : notnull
     where TValue : notnull
 {
     private readonly ImmutableArray<TError> _errors;

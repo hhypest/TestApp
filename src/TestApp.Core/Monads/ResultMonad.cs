@@ -1,10 +1,8 @@
-﻿using TestApp.Core.Data;
-
-namespace TestApp.Core.Monads;
+﻿namespace TestApp.Core.Monads;
 
 public readonly struct Result<TSuccess, TFailure>
     where TSuccess : notnull
-    where TFailure : notnull, Error
+    where TFailure : notnull
 {
     private readonly TSuccess _success;
     private readonly TFailure _failure;
