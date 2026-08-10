@@ -14,8 +14,7 @@ public sealed class StartAttemptCommandHandler(
     ITestAttemptRepository attempts,
     IPublishedTestRevisionRepository revisions,
     ICurrentActor actor,
-    IClock clock,
-    IUnitOfWork unitOfWork) : ICommandHandler<StartAttemptCommand, Result<TestAttemptId, Error>>
+    IClock clock) : ICommandHandler<StartAttemptCommand, Result<TestAttemptId, Error>>
 {
     public async Task<Result<TestAttemptId, Error>> Handle(StartAttemptCommand command, CancellationToken ct)
     {
@@ -34,14 +33,7 @@ public sealed class StartAttemptCommandHandler(
 
         var now = clock.UtcNow;
         if (!assignment.IsAvailableAt(now))
-            return Error.Conflict("assignment.unavailable", "The assignment is outside its availability window.");
-
-        if (assignment.AttemptLimit is { } limit)
-        {
-            var count = await attempts.CountAttemptsAsync(assignment.Id, actor.UserId, ct);
-            if (count >= limit)
-                return Error.Conflict("assignment.attempt_limit_reached", "The attempt limit has been reached.");
-        }
+            return Error.Conflict("assignment.unavailable", "The assignment is unavailable or cancelled.");
 
         var revision = await revisions.GetAsync(assignment.RevisionId, ct);
         if (revision is null)
@@ -56,8 +48,10 @@ public sealed class StartAttemptCommandHandler(
             now,
             revision.Questions.Select(q => q.Id));
 
-        await attempts.AddAsync(attempt, ct);
-        await unitOfWork.SaveChangesAsync(ct);
+        var added = await attempts.TryAddWithinLimitAsync(attempt, assignment.AttemptLimit, ct);
+        if (!added)
+            return Error.Conflict("assignment.attempt_limit_reached", "The attempt limit has been reached.");
+
         return id;
     }
 }
