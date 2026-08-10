@@ -44,15 +44,8 @@ public sealed class RenameTestCommandHandler(ITestRepository tests, IUnitOfWork 
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        try
-        {
-            var result = test.Rename(command.Title);
-            return await Save(result, test.Id, unitOfWork, ct);
-        }
-        catch (ArgumentException ex)
-        {
-            return Error.Validation("test.title", ex.Message);
-        }
+        try { return await TestCommandResult.Save(test.Rename(command.Title), test.Id, unitOfWork, ct); }
+        catch (ArgumentException ex) { return Error.Validation("test.title", ex.Message); }
     }
 }
 
@@ -84,7 +77,7 @@ public sealed class UpdateQuestionCommandHandler(ITestRepository tests, IUnitOfW
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        try { return await Save(test.UpdateQuestion(command.QuestionId, command.Text, command.Type, command.Points), test.Id, unitOfWork, ct); }
+        try { return await TestCommandResult.Save(test.UpdateQuestion(command.QuestionId, command.Text, command.Type, command.Points), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.question.text", ex.Message); }
     }
 }
@@ -96,7 +89,7 @@ public sealed class RemoveQuestionCommandHandler(ITestRepository tests, IUnitOfW
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        return await Save(test.RemoveQuestion(command.QuestionId), test.Id, unitOfWork, ct);
+        return await TestCommandResult.Save(test.RemoveQuestion(command.QuestionId), test.Id, unitOfWork, ct);
     }
 }
 
@@ -107,7 +100,7 @@ public sealed class ReorderQuestionCommandHandler(ITestRepository tests, IUnitOf
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        return await Save(test.ReorderQuestion(command.QuestionId, command.Order), test.Id, unitOfWork, ct);
+        return await TestCommandResult.Save(test.ReorderQuestion(command.QuestionId, command.Order), test.Id, unitOfWork, ct);
     }
 }
 
@@ -139,7 +132,7 @@ public sealed class UpdateAnswerOptionCommandHandler(ITestRepository tests, IUni
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        try { return await Save(test.UpdateAnswerOption(command.QuestionId, command.OptionId, command.Text, command.IsCorrect), test.Id, unitOfWork, ct); }
+        try { return await TestCommandResult.Save(test.UpdateAnswerOption(command.QuestionId, command.OptionId, command.Text, command.IsCorrect), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.answer_option.text", ex.Message); }
     }
 }
@@ -151,7 +144,7 @@ public sealed class RemoveAnswerOptionCommandHandler(ITestRepository tests, IUni
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        return await Save(test.RemoveAnswerOption(command.QuestionId, command.OptionId), test.Id, unitOfWork, ct);
+        return await TestCommandResult.Save(test.RemoveAnswerOption(command.QuestionId, command.OptionId), test.Id, unitOfWork, ct);
     }
 }
 
@@ -162,7 +155,7 @@ public sealed class ReorderAnswerOptionCommandHandler(ITestRepository tests, IUn
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        return await Save(test.ReorderAnswerOption(command.QuestionId, command.OptionId, command.Order), test.Id, unitOfWork, ct);
+        return await TestCommandResult.Save(test.ReorderAnswerOption(command.QuestionId, command.OptionId, command.Order), test.Id, unitOfWork, ct);
     }
 }
 
@@ -173,7 +166,7 @@ public sealed class ArchiveTestCommandHandler(ITestRepository tests, IUnitOfWork
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        return await Save(test.Archive(), test.Id, unitOfWork, ct);
+        return await TestCommandResult.Save(test.Archive(), test.Id, unitOfWork, ct);
     }
 }
 
@@ -188,10 +181,3 @@ internal static class TestCommandResult
             async _ => { await unitOfWork.SaveChangesAsync(ct); return Result<TestId, Error>.Success(id); },
             error => Task.FromResult(Result<TestId, Error>.Failure(error.ToApplicationError())));
 }
-
-file static async Task<Result<TestId, Error>> Save(
-    Result<Test, TestApp.Domain.Common.DomainError> result,
-    TestId id,
-    IUnitOfWork unitOfWork,
-    CancellationToken ct)
-    => await TestCommandResult.Save(result, id, unitOfWork, ct);
