@@ -1,19 +1,22 @@
-﻿using TestApp.Domain.Events;
-
 namespace TestApp.Domain.Entities;
 
-public abstract class Entity
+public abstract class Entity<TId>
+    where TId : notnull
 {
-    private readonly IList<IDomainEvent> _events = [];
-    public IReadOnlyCollection<IDomainEvent> Events => [.._events];
-
-    protected void Raise(IDomainEvent domainEvent)
+    protected Entity(TId id)
     {
-        _events.Add(domainEvent);
+        Id = id ?? throw new ArgumentNullException(nameof(id));
     }
 
-    public void ClearEvents()
+    public TId Id { get; }
+
+    public override bool Equals(object? obj)
     {
-        _events.Clear();
+        if (obj is not Entity<TId> other || GetType() != other.GetType())
+            return false;
+
+        return EqualityComparer<TId>.Default.Equals(Id, other.Id);
     }
+
+    public override int GetHashCode() => HashCode.Combine(GetType(), Id);
 }
