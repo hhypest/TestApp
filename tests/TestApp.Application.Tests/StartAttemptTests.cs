@@ -20,7 +20,7 @@ public sealed class StartAttemptTests
         var attempts = new AttemptRepo();
         var handler = new StartAttemptCommandHandler(assignments, attempts, new Actor(ExternalUserId.FromSubject("user-1"), new HashSet<ExternalGroupId> { group }), new Clock(now), new Uow());
 
-        var result = await handler.Handle(new StartAttemptCommand(assignment.Id), default);
+        var result = await handler.Handle(new StartAttemptCommand(assignment.Id), TestContext.Current.CancellationToken);
         Assert.True(result.Match(_ => true, _ => false));
         Assert.NotNull(attempts.Value);
     }
