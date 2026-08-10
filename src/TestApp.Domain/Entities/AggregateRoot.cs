@@ -2,7 +2,13 @@ using TestApp.Domain.Events;
 
 namespace TestApp.Domain.Entities;
 
-public abstract class AggregateRoot<TId> : Entity<TId> where TId : notnull
+public interface IAggregateRoot
+{
+    IReadOnlyCollection<IDomainEvent> DomainEvents { get; }
+    void ClearDomainEvents();
+}
+
+public abstract class AggregateRoot<TId> : Entity<TId>, IAggregateRoot where TId : notnull
 {
     private readonly List<IDomainEvent> _domainEvents = [];
 
