@@ -40,8 +40,7 @@ public sealed class StartAttemptTests
             attempts,
             new RevisionRepo(revision),
             new Actor(userId, new HashSet<ExternalGroupId> { group }),
-            new Clock(now),
-            new Uow());
+            new Clock(now));
 
         var result = await handler.Handle(new StartAttemptCommand(assignment.Id), TestContext.Current.CancellationToken);
 
@@ -61,11 +60,18 @@ public sealed class StartAttemptTests
     {
         public TestAttempt? Value;
         public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) => Task.FromResult(Value?.Id == id ? Value : null);
-        public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) => Task.FromResult(Value is null ? 0 : 1);
         public Task AddAsync(TestAttempt attempt, CancellationToken ct = default)
         {
             Value = attempt;
             return Task.CompletedTask;
+        }
+        public Task<bool> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
+        {
+            if (attemptLimit is { } limit && Value is not null && limit <= 1)
+                return Task.FromResult(false);
+            Value = attempt;
+            return Task.FromResult(true);
         }
     }
 
@@ -82,8 +88,4 @@ public sealed class StartAttemptTests
     }
 
     private sealed record Clock(DateTimeOffset UtcNow) : IClock;
-    private sealed class Uow : IUnitOfWork
-    {
-        public Task SaveChangesAsync(CancellationToken ct = default) => Task.CompletedTask;
-    }
 }
