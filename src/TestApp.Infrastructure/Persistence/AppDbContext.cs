@@ -31,14 +31,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         });
     }
 
-    public async Task SaveChangesAsync(CancellationToken ct = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
-        var roots = ChangeTracker.Entries().Where(e => e.Entity is IAggregateRoot).Select(e => (IAggregateRoot)e.Entity).ToArray();
+        var roots = ChangeTracker.Entries()
+            .Where(e => e.Entity is IAggregateRoot)
+            .Select(e => (IAggregateRoot)e.Entity)
+            .ToArray();
+
         foreach (var domainEvent in roots.SelectMany(x => x.DomainEvents))
             OutboxMessages.Add(OutboxMessage.From(domainEvent));
 
-        await base.SaveChangesAsync(ct);
-        foreach (var root in roots) root.ClearDomainEvents();
+        var affected = await base.SaveChangesAsync(ct);
+        foreach (var root in roots)
+            root.ClearDomainEvents();
+
+        return affected;
+    }
+
+    async Task IUnitOfWork.SaveChangesAsync(CancellationToken ct)
+    {
+        await SaveChangesAsync(ct);
     }
 }
 
@@ -50,8 +62,22 @@ public sealed class OutboxMessage
     public string Payload { get; private set; } = string.Empty;
     public DateTimeOffset? ProcessedAt { get; private set; }
     public string? Error { get; private set; }
+
     private OutboxMessage() { }
-    public static OutboxMessage From(IDomainEvent e) => new() { Id = e.EventId, OccurredAt = e.OccurredAt, Type = e.GetType().AssemblyQualifiedName ?? e.GetType().FullName!, Payload = JsonSerializer.Serialize(e, e.GetType()) };
-    public void MarkProcessed(DateTimeOffset at) { ProcessedAt = at; Error = null; }
+
+    public static OutboxMessage From(IDomainEvent e) => new()
+    {
+        Id = e.EventId,
+        OccurredAt = e.OccurredAt,
+        Type = e.GetType().AssemblyQualifiedName ?? e.GetType().FullName!,
+        Payload = JsonSerializer.Serialize(e, e.GetType())
+    };
+
+    public void MarkProcessed(DateTimeOffset at)
+    {
+        ProcessedAt = at;
+        Error = null;
+    }
+
     public void MarkFailed(string error) => Error = error;
 }
