@@ -42,6 +42,7 @@ public interface ITestAttemptRepository
     Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken cancellationToken = default);
     Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken cancellationToken = default);
     Task AddAsync(TestAttempt attempt, CancellationToken cancellationToken = default);
+    Task<bool> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken cancellationToken = default);
 }
 
 public interface IUnitOfWork
