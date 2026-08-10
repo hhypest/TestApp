@@ -1,15 +1,7 @@
 <Solution>
-  <Folder Name="/Solution Items/">
-    <File Path=".editorconfig" />
-    <File Path="LICENSE.txt" />
-    <File Path="README.md" />
-  </Folder>
+  <Folder Name="/Solution Items/"><File Path=".editorconfig" /><File Path="LICENSE.txt" /><File Path="README.md" /></Folder>
   <Folder Name="/src/">
-    <Project Path="src/TestApp.Core/TestApp.Core.csproj" Id="6216d3fd-1eae-4d73-a24f-2bc25ca88f25" />
-    <Project Path="src/TestApp.Domain/TestApp.Domain.csproj" Id="a4f5a070-f729-481f-8094-1ed7665d007f" />
-    <Project Path="src/TestApp.Messaging/TestApp.Messaging.csproj" Id="91d1565e-9db1-45f5-92c9-badaaf6297ec" />
-    <Project Path="src/TestApp.Models/TestApp.Models.csproj" Id="be2b272f-1d95-4254-81ef-1b23f72d1540" />
-    <Project Path="src/TestApp.Application/TestApp.Application.csproj" />
+    <Project Path="src/TestApp.Core/TestApp.Core.csproj" /><Project Path="src/TestApp.Domain/TestApp.Domain.csproj" /><Project Path="src/TestApp.Messaging/TestApp.Messaging.csproj" /><Project Path="src/TestApp.Models/TestApp.Models.csproj" /><Project Path="src/TestApp.Application/TestApp.Application.csproj" /><Project Path="src/TestApp.Infrastructure/TestApp.Infrastructure.csproj" /><Project Path="src/TestApp.Api/TestApp.Api.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/"><Project Path="tests/TestApp.Domain.Tests/TestApp.Domain.Tests.csproj" /><Project Path="tests/TestApp.Application.Tests/TestApp.Application.Tests.csproj" /></Folder>
 </Solution>
