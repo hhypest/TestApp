@@ -31,22 +31,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         });
     }
 
-    public async Task Commit(CancellationToken ct)
+    public async Task SaveChangesAsync(CancellationToken ct = default)
     {
-        var events = ChangeTracker.Entries()
-            .Where(e => e.Entity is IAggregateRoot)
-            .SelectMany(e => ((IAggregateRoot)e.Entity).DomainEvents)
-            .ToArray();
-
-        foreach (var domainEvent in events)
-        {
+        var roots = ChangeTracker.Entries().Where(e => e.Entity is IAggregateRoot).Select(e => (IAggregateRoot)e.Entity).ToArray();
+        foreach (var domainEvent in roots.SelectMany(x => x.DomainEvents))
             OutboxMessages.Add(OutboxMessage.From(domainEvent));
-        }
 
-        await SaveChangesAsync(ct);
-
-        foreach (var entry in ChangeTracker.Entries().Where(e => e.Entity is IAggregateRoot))
-            ((IAggregateRoot)entry.Entity).ClearDomainEvents();
+        await base.SaveChangesAsync(ct);
+        foreach (var root in roots) root.ClearDomainEvents();
     }
 }
 
@@ -58,17 +50,8 @@ public sealed class OutboxMessage
     public string Payload { get; private set; } = string.Empty;
     public DateTimeOffset? ProcessedAt { get; private set; }
     public string? Error { get; private set; }
-
     private OutboxMessage() { }
-
-    public static OutboxMessage From(IDomainEvent domainEvent) => new()
-    {
-        Id = domainEvent.EventId,
-        OccurredAt = domainEvent.OccurredAt,
-        Type = domainEvent.GetType().AssemblyQualifiedName ?? domainEvent.GetType().FullName!,
-        Payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType())
-    };
-
+    public static OutboxMessage From(IDomainEvent e) => new() { Id = e.EventId, OccurredAt = e.OccurredAt, Type = e.GetType().AssemblyQualifiedName ?? e.GetType().FullName!, Payload = JsonSerializer.Serialize(e, e.GetType()) };
     public void MarkProcessed(DateTimeOffset at) { ProcessedAt = at; Error = null; }
     public void MarkFailed(string error) => Error = error;
 }
