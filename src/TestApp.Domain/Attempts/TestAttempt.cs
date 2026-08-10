@@ -35,8 +35,15 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     public IReadOnlyDictionary<QuestionId, IReadOnlyCollection<AnswerOptionId>> Answers => _answers;
 
     private TestAttempt() { }
+
     private TestAttempt(TestAttemptId id, TestAssignmentId assignmentId, ExternalUserId userId, DateTimeOffset startedAt)
-    { Id = id; AssignmentId = assignmentId; UserId = userId; Status = AttemptStatus.InProgress; StartedAt = startedAt; }
+        : base(id)
+    {
+        AssignmentId = assignmentId;
+        UserId = userId;
+        Status = AttemptStatus.InProgress;
+        StartedAt = startedAt;
+    }
 
     public static TestAttempt Start(TestAttemptId id, TestAssignmentId assignmentId, ExternalUserId userId, DateTimeOffset startedAt)
     {
