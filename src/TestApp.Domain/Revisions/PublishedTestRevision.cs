@@ -39,12 +39,11 @@ public sealed class PublishedTestRevision : AggregateRoot<PublishedTestRevisionI
         int version,
         string title,
         DateTimeOffset publishedAt,
-        IEnumerable<PublishedQuestion> questions)
+        IEnumerable<PublishedQuestion> questions) : base(id)
     {
         if (version <= 0)
             throw new ArgumentOutOfRangeException(nameof(version));
 
-        Id = id;
         TestId = testId;
         Version = version;
         Title = title;
