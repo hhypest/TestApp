@@ -1,4 +1,5 @@
 using TestApp.Domain.Tests;
+using Xunit;
 
 namespace TestApp.Domain.Tests.Unit;
 
