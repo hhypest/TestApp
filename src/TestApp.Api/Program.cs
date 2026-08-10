@@ -11,6 +11,7 @@ using TestApp.Domain.Identity;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
 using TestApp.Infrastructure;
+using TestApp.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,6 +61,13 @@ builder.Services.AddScoped<GetAttemptQueryHandler>();
 builder.Services.AddScoped<GetAttemptResultQueryHandler>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
