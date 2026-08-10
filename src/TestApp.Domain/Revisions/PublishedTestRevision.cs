@@ -1,3 +1,6 @@
+using TestApp.Core.Monads;
+using TestApp.Domain.Attempts;
+using TestApp.Domain.Common;
 using TestApp.Domain.Entities;
 using TestApp.Domain.Tests;
 
@@ -68,5 +71,47 @@ public sealed class PublishedTestRevision : AggregateRoot<PublishedTestRevisionI
             .ToArray();
 
         return new PublishedTestRevision(id, test.Id, version, test.Title, publishedAt, questions);
+    }
+
+    public Result<PublishedQuestion, DomainError> ValidateAnswer(QuestionId questionId, IEnumerable<AnswerOptionId> selectedOptionIds)
+    {
+        ArgumentNullException.ThrowIfNull(selectedOptionIds);
+        var question = _questions.SingleOrDefault(q => q.Id == questionId);
+        if (question is null)
+            return DomainError.NotFound("revision.question.not_found", "Question does not exist in this published revision.");
+
+        var selected = selectedOptionIds.Distinct().ToArray();
+        if (selected.Length == 0)
+            return DomainError.Validation("revision.answer.empty", "At least one answer option must be selected.");
+        if (question.Type == QuestionType.SingleChoice && selected.Length != 1)
+            return DomainError.Validation("revision.single_choice.selection_count", "Single-choice question requires exactly one selected option.");
+
+        var validIds = question.Options.Select(o => o.Id).ToHashSet();
+        if (selected.Any(id => !validIds.Contains(id)))
+            return DomainError.Validation("revision.answer.invalid_option", "One or more selected options do not belong to this question.");
+
+        return question;
+    }
+
+    public AttemptScore CalculateScore(IEnumerable<QuestionResponse> responses)
+    {
+        ArgumentNullException.ThrowIfNull(responses);
+        var responseMap = responses.ToDictionary(r => r.Id);
+        decimal earned = 0;
+        decimal maximum = 0;
+
+        foreach (var question in _questions)
+        {
+            maximum += question.Points;
+            if (!responseMap.TryGetValue(question.Id, out var response))
+                continue;
+
+            var selected = response.SelectedOptions.Select(x => x.OptionId).ToHashSet();
+            var correct = question.Options.Where(o => o.IsCorrect).Select(o => o.Id).ToHashSet();
+            if (selected.SetEquals(correct))
+                earned += question.Points;
+        }
+
+        return new AttemptScore(earned, maximum);
     }
 }
