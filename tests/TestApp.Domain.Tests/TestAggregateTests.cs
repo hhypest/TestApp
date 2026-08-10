@@ -16,18 +16,18 @@ public sealed class TestAggregateTests
     public void Published_test_is_immutable()
     {
         var test = Test.Create("DDD");
-        test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1);
+        test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1, 1);
         test.Publish(DateTimeOffset.UtcNow);
-        Assert.Throws<InvalidOperationException>(() => test.AddQuestion("Another", QuestionType.SingleChoice, 1));
+        Assert.Throws<InvalidOperationException>(() => test.AddQuestion("Another", QuestionType.SingleChoice, 1, 2));
     }
 
     [Fact]
     public void Single_choice_requires_exactly_one_correct_answer()
     {
         var test = Test.Create("DDD");
-        var question = test.AddQuestion("Choose", QuestionType.SingleChoice, 1);
-        test.AddAnswerOption(question, "A", false);
-        test.AddAnswerOption(question, "B", false);
+        var question = test.AddQuestion("Choose", QuestionType.SingleChoice, 1, 1);
+        test.AddAnswerOption(question, "A", false, 1);
+        test.AddAnswerOption(question, "B", false, 2);
         Assert.Throws<InvalidOperationException>(() => test.Publish(DateTimeOffset.UtcNow));
     }
 }
