@@ -13,16 +13,22 @@ public readonly record struct TestAssignmentId(Guid Value)
 public abstract record AssignmentTarget
 {
     private AssignmentTarget() { }
-
     public sealed record User(ExternalUserId UserId) : AssignmentTarget;
     public sealed record Group(ExternalGroupId GroupId) : AssignmentTarget;
 }
 
-public sealed record TestAssigned(
-    TestAssignmentId AssignmentId,
-    PublishedTestRevisionId RevisionId,
-    AssignmentTarget Target,
-    DateTimeOffset OccurredAt) : DomainEvent(OccurredAt);
+public sealed record TestAssigned : DomainEvent
+{
+    public TestAssigned(TestAssignmentId assignmentId, PublishedTestRevisionId revisionId, AssignmentTarget target, DateTimeOffset occurredAt) : base(occurredAt)
+    {
+        AssignmentId = assignmentId;
+        RevisionId = revisionId;
+        Target = target;
+    }
+    public TestAssignmentId AssignmentId { get; }
+    public PublishedTestRevisionId RevisionId { get; }
+    public AssignmentTarget Target { get; }
+}
 
 public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
 {
@@ -32,40 +38,15 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
     public DateTimeOffset? AvailableUntil { get; private set; }
     public int? AttemptLimit { get; private set; }
 
-    private TestAssignment()
+    private TestAssignment() { Target = null!; }
+    private TestAssignment(TestAssignmentId id, PublishedTestRevisionId revisionId, AssignmentTarget target, DateTimeOffset availableFrom, DateTimeOffset? availableUntil, int? attemptLimit)
     {
-        Target = null!;
+        if (availableUntil is not null && availableUntil <= availableFrom) throw new ArgumentException("Availability end must be later than availability start.", nameof(availableUntil));
+        if (attemptLimit is <= 0) throw new ArgumentOutOfRangeException(nameof(attemptLimit));
+        Id = id; RevisionId = revisionId; Target = target; AvailableFrom = availableFrom; AvailableUntil = availableUntil; AttemptLimit = attemptLimit;
     }
 
-    private TestAssignment(
-        TestAssignmentId id,
-        PublishedTestRevisionId revisionId,
-        AssignmentTarget target,
-        DateTimeOffset availableFrom,
-        DateTimeOffset? availableUntil,
-        int? attemptLimit)
-    {
-        if (availableUntil is not null && availableUntil <= availableFrom)
-            throw new ArgumentException("Availability end must be later than availability start.", nameof(availableUntil));
-        if (attemptLimit is <= 0)
-            throw new ArgumentOutOfRangeException(nameof(attemptLimit));
-
-        Id = id;
-        RevisionId = revisionId;
-        Target = target;
-        AvailableFrom = availableFrom;
-        AvailableUntil = availableUntil;
-        AttemptLimit = attemptLimit;
-    }
-
-    public static TestAssignment Create(
-        TestAssignmentId id,
-        PublishedTestRevisionId revisionId,
-        AssignmentTarget target,
-        DateTimeOffset availableFrom,
-        DateTimeOffset? availableUntil,
-        int? attemptLimit,
-        DateTimeOffset occurredAt)
+    public static TestAssignment Create(TestAssignmentId id, PublishedTestRevisionId revisionId, AssignmentTarget target, DateTimeOffset availableFrom, DateTimeOffset? availableUntil, int? attemptLimit, DateTimeOffset occurredAt)
     {
         ArgumentNullException.ThrowIfNull(target);
         var assignment = new TestAssignment(id, revisionId, target, availableFrom, availableUntil, attemptLimit);
@@ -73,6 +54,5 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         return assignment;
     }
 
-    public bool IsAvailableAt(DateTimeOffset now) =>
-        now >= AvailableFrom && (AvailableUntil is null || now <= AvailableUntil);
+    public bool IsAvailableAt(DateTimeOffset now) => now >= AvailableFrom && (AvailableUntil is null || now <= AvailableUntil);
 }
