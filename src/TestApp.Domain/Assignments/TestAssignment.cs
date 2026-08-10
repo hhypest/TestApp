@@ -39,14 +39,35 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
     public int? AttemptLimit { get; private set; }
 
     private TestAssignment() { Target = null!; }
-    private TestAssignment(TestAssignmentId id, PublishedTestRevisionId revisionId, AssignmentTarget target, DateTimeOffset availableFrom, DateTimeOffset? availableUntil, int? attemptLimit)
+
+    private TestAssignment(
+        TestAssignmentId id,
+        PublishedTestRevisionId revisionId,
+        AssignmentTarget target,
+        DateTimeOffset availableFrom,
+        DateTimeOffset? availableUntil,
+        int? attemptLimit) : base(id)
     {
-        if (availableUntil is not null && availableUntil <= availableFrom) throw new ArgumentException("Availability end must be later than availability start.", nameof(availableUntil));
-        if (attemptLimit is <= 0) throw new ArgumentOutOfRangeException(nameof(attemptLimit));
-        Id = id; RevisionId = revisionId; Target = target; AvailableFrom = availableFrom; AvailableUntil = availableUntil; AttemptLimit = attemptLimit;
+        if (availableUntil is not null && availableUntil <= availableFrom)
+            throw new ArgumentException("Availability end must be later than availability start.", nameof(availableUntil));
+        if (attemptLimit is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(attemptLimit));
+
+        RevisionId = revisionId;
+        Target = target;
+        AvailableFrom = availableFrom;
+        AvailableUntil = availableUntil;
+        AttemptLimit = attemptLimit;
     }
 
-    public static TestAssignment Create(TestAssignmentId id, PublishedTestRevisionId revisionId, AssignmentTarget target, DateTimeOffset availableFrom, DateTimeOffset? availableUntil, int? attemptLimit, DateTimeOffset occurredAt)
+    public static TestAssignment Create(
+        TestAssignmentId id,
+        PublishedTestRevisionId revisionId,
+        AssignmentTarget target,
+        DateTimeOffset availableFrom,
+        DateTimeOffset? availableUntil,
+        int? attemptLimit,
+        DateTimeOffset occurredAt)
     {
         ArgumentNullException.ThrowIfNull(target);
         var assignment = new TestAssignment(id, revisionId, target, availableFrom, availableUntil, attemptLimit);
