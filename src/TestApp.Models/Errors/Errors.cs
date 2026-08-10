@@ -1,10 +1,9 @@
-﻿namespace TestApp.Models.Errors;
+namespace TestApp.Models.Errors;
 
-public abstract record Error(string ErrorMessage, DateTimeOffset ErrorDateUtc);
+public abstract record Error(string Code, string Message);
 
-public sealed record BadRequest(string Message) : Error(Message, DateTimeOffset.UtcNow);
-public sealed record Unauthorized(string Message) : Error(Message, DateTimeOffset.UtcNow);
-public sealed record Forbidden(string Message) : Error(Message, DateTimeOffset.UtcNow);
-public sealed record NotFound(string Message) : Error(Message, DateTimeOffset.UtcNow);
-public sealed record Conflict(string Message) : Error(Message, DateTimeOffset.UtcNow);
-public sealed record ValidationError(string Message) : Error(Message, DateTimeOffset.UtcNow);
+public sealed record NotFound(string Code, string Message) : Error(Code, Message);
+public sealed record Conflict(string Code, string Message) : Error(Code, Message);
+public sealed record ValidationError(string Code, string Message) : Error(Code, Message);
+public sealed record Unauthorized(string Code, string Message) : Error(Code, Message);
+public sealed record Forbidden(string Code, string Message) : Error(Code, Message);
