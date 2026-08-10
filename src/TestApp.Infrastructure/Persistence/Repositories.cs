@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using TestApp.Application.Abstractions;
 using TestApp.Domain.Assignments;
@@ -40,4 +41,27 @@ public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptReposit
         db.Attempts.CountAsync(x => x.AssignmentId == assignmentId && x.UserId == userId, ct);
 
     public async Task AddAsync(TestAttempt attempt, CancellationToken ct = default) => await db.Attempts.AddAsync(attempt, ct);
+
+    public async Task<bool> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+
+        if (attemptLimit is { } limit)
+        {
+            var count = await db.Attempts.CountAsync(
+                x => x.AssignmentId == attempt.AssignmentId && x.UserId == attempt.UserId,
+                ct);
+
+            if (count >= limit)
+            {
+                await transaction.RollbackAsync(ct);
+                return false;
+            }
+        }
+
+        await db.Attempts.AddAsync(attempt, ct);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return true;
+    }
 }
