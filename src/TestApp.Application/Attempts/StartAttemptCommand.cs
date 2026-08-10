@@ -12,6 +12,7 @@ public sealed record StartAttemptCommand(TestAssignmentId AssignmentId) : IComma
 public sealed class StartAttemptCommandHandler(
     ITestAssignmentRepository assignments,
     ITestAttemptRepository attempts,
+    IPublishedTestRevisionRepository revisions,
     ICurrentActor actor,
     IClock clock,
     IUnitOfWork unitOfWork) : ICommandHandler<StartAttemptCommand, Result<TestAttemptId, Error>>
@@ -37,13 +38,24 @@ public sealed class StartAttemptCommandHandler(
 
         if (assignment.AttemptLimit is { } limit)
         {
-            var count = await assignments.CountAttemptsAsync(assignment.Id, actor.UserId, ct);
+            var count = await attempts.CountAttemptsAsync(assignment.Id, actor.UserId, ct);
             if (count >= limit)
                 return Error.Conflict("assignment.attempt_limit_reached", "The attempt limit has been reached.");
         }
 
+        var revision = await revisions.GetAsync(assignment.RevisionId, ct);
+        if (revision is null)
+            return Error.NotFound("revision.not_found", "Published test revision was not found.");
+
         var id = TestAttemptId.New();
-        var attempt = TestAttempt.Start(id, assignment.Id, actor.UserId, now);
+        var attempt = TestAttempt.Start(
+            id,
+            assignment.Id,
+            revision.Id,
+            actor.UserId,
+            now,
+            revision.Questions.Select(q => q.Id));
+
         await attempts.AddAsync(attempt, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return id;
