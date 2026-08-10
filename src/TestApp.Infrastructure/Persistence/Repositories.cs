@@ -16,8 +16,12 @@ public sealed class TestRepository(AppDbContext db) : ITestRepository
 
 public sealed class PublishedTestRevisionRepository(AppDbContext db) : IPublishedTestRevisionRepository
 {
+    public Task<PublishedTestRevision?> GetAsync(PublishedTestRevisionId id, CancellationToken ct = default) =>
+        db.Revisions.SingleOrDefaultAsync(x => x.Id == id, ct);
+
     public async Task<int> GetNextVersionAsync(TestId testId, CancellationToken ct = default) =>
         (await db.Revisions.Where(x => x.TestId == testId).MaxAsync(x => (int?)x.Version, ct) ?? 0) + 1;
+
     public async Task AddAsync(PublishedTestRevision revision, CancellationToken ct = default) => await db.Revisions.AddAsync(revision, ct);
 }
 
@@ -25,11 +29,15 @@ public sealed class TestAssignmentRepository(AppDbContext db) : ITestAssignmentR
 {
     public Task<TestAssignment?> GetAsync(TestAssignmentId id, CancellationToken ct = default) => db.Assignments.SingleOrDefaultAsync(x => x.Id == id, ct);
     public async Task AddAsync(TestAssignment assignment, CancellationToken ct = default) => await db.Assignments.AddAsync(assignment, ct);
-    public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) =>
-        db.Attempts.CountAsync(x => x.AssignmentId == assignmentId && x.UserId == userId, ct);
 }
 
 public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptRepository
 {
+    public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) =>
+        db.Attempts.SingleOrDefaultAsync(x => x.Id == id, ct);
+
+    public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) =>
+        db.Attempts.CountAsync(x => x.AssignmentId == assignmentId && x.UserId == userId, ct);
+
     public async Task AddAsync(TestAttempt attempt, CancellationToken ct = default) => await db.Attempts.AddAsync(attempt, ct);
 }
