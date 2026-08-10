@@ -20,18 +20,16 @@ public sealed class PublishTestCommandHandler(
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null)
             return Error.NotFound("test.not_found", "Test was not found.");
-        if (test.Status != TestStatus.Draft)
-            return Error.Conflict("test.not_draft", "Only a draft test can be published.");
+        if (test.Status == TestStatus.Archived)
+            return Error.Conflict("test.archived", "Archived tests cannot be published.");
+        if (test.Status == TestStatus.Published)
+            return Error.Conflict("test.no_changes", "The current test definition is already published.");
 
         var now = clock.UtcNow;
-        try
-        {
-            test.Publish(now);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return Error.Validation("test.not_publishable", exception.Message);
-        }
+        var publish = test.Publish(now);
+        var publishError = publish.Match<Error?>(_ => null, error => error.ToApplicationError());
+        if (publishError is not null)
+            return publishError;
 
         var version = await revisions.GetNextVersionAsync(test.Id, ct);
         var revisionId = PublishedTestRevisionId.New();
