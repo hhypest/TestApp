@@ -1,0 +1,17 @@
+name: dotnet
+on:
+  push:
+    branches: [ beta-ddd, beta-ddd-architecture-refactor ]
+  pull_request:
+    branches: [ beta-ddd ]
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore TestApp.slnx
+      - run: dotnet build TestApp.slnx --no-restore --configuration Release
+      - run: dotnet test TestApp.slnx --no-build --configuration Release
