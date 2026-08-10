@@ -16,7 +16,12 @@ public sealed record AssignTestCommand(
     DateTimeOffset? AvailableUntil,
     int? AttemptLimit) : ICommand<Result<TestAssignmentId, Error>>;
 
-public sealed class AssignTestCommandHandler(ITestAssignmentRepository assignments, IUnitOfWork unitOfWork, IClock clock)
+public sealed class AssignTestCommandHandler(
+    ITestAssignmentRepository assignments,
+    IPublishedTestRevisionRepository revisions,
+    ICurrentActor actor,
+    IUnitOfWork unitOfWork,
+    IClock clock)
     : ICommandHandler<AssignTestCommand, Result<TestAssignmentId, Error>>
 {
     public async Task<Result<TestAssignmentId, Error>> Handle(AssignTestCommand command, CancellationToken ct)
@@ -28,12 +33,26 @@ public sealed class AssignTestCommandHandler(ITestAssignmentRepository assignmen
         if (command.AttemptLimit is <= 0)
             return Error.Validation("assignment.attempt_limit", "Attempt limit must be greater than zero.");
 
+        var revision = await revisions.GetAsync(command.RevisionId, ct);
+        if (revision is null)
+            return Error.NotFound("revision.not_found", "Published test revision was not found.");
+
         AssignmentTarget target = command.UserId is { } user
             ? new AssignmentTarget.User(user)
             : new AssignmentTarget.Group(command.GroupId!.Value);
 
+        var now = clock.UtcNow;
         var id = TestAssignmentId.New();
-        var assignment = TestAssignment.Create(id, command.RevisionId, target, command.AvailableFrom, command.AvailableUntil, command.AttemptLimit, clock.UtcNow);
+        var assignment = TestAssignment.Create(
+            id,
+            revision.Id,
+            target,
+            actor.UserId,
+            now,
+            command.AvailableFrom,
+            command.AvailableUntil,
+            command.AttemptLimit);
+
         await assignments.AddAsync(assignment, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return id;
