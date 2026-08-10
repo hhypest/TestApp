@@ -26,6 +26,7 @@ public interface ITestRepository
 
 public interface IPublishedTestRevisionRepository
 {
+    Task<PublishedTestRevision?> GetAsync(PublishedTestRevisionId id, CancellationToken cancellationToken = default);
     Task<int> GetNextVersionAsync(TestId testId, CancellationToken cancellationToken = default);
     Task AddAsync(PublishedTestRevision revision, CancellationToken cancellationToken = default);
 }
@@ -34,11 +35,12 @@ public interface ITestAssignmentRepository
 {
     Task<TestAssignment?> GetAsync(TestAssignmentId id, CancellationToken cancellationToken = default);
     Task AddAsync(TestAssignment assignment, CancellationToken cancellationToken = default);
-    Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken cancellationToken = default);
 }
 
 public interface ITestAttemptRepository
 {
+    Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken cancellationToken = default);
+    Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken cancellationToken = default);
     Task AddAsync(TestAttempt attempt, CancellationToken cancellationToken = default);
 }
 
