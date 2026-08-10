@@ -9,6 +9,7 @@
     <Project Path="src/TestApp.Domain/TestApp.Domain.csproj" Id="a4f5a070-f729-481f-8094-1ed7665d007f" />
     <Project Path="src/TestApp.Messaging/TestApp.Messaging.csproj" Id="91d1565e-9db1-45f5-92c9-badaaf6297ec" />
     <Project Path="src/TestApp.Models/TestApp.Models.csproj" Id="be2b272f-1d95-4254-81ef-1b23f72d1540" />
+    <Project Path="src/TestApp.Application/TestApp.Application.csproj" />
   </Folder>
   <Folder Name="/tests/" />
 </Solution>
