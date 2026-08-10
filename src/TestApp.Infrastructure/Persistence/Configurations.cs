@@ -63,6 +63,12 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<TestAssig
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasConversion(x => x.Value, x => new TestAssignmentId(x));
         b.Property(x => x.RevisionId).HasConversion(x => x.Value, x => new PublishedTestRevisionId(x));
+        b.Property(x => x.AssignedBy).HasConversion(x => x.Value, x => new ExternalUserId(x));
+        b.Property(x => x.CancelledBy)
+            .HasConversion(
+                x => x.HasValue ? x.Value.Value : null,
+                x => x == null ? (ExternalUserId?)null : new ExternalUserId(x));
+        b.Property(x => x.CancelReason).HasMaxLength(1000);
         b.Property(x => x.Target)
             .HasConversion(v => SerializeTarget(v), v => DeserializeTarget(v))
             .HasColumnName("target")
