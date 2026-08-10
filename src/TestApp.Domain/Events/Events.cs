@@ -1,7 +1,13 @@
-﻿namespace TestApp.Domain.Events;
+namespace TestApp.Domain.Events;
 
 public abstract record DomainEvent : IDomainEvent
 {
-    public Guid EventId { get; init; } = Guid.CreateVersion7();
-    public DateTimeOffset OccurredAt { get; init; } = DateTimeOffset.UtcNow;
+    protected DomainEvent(DateTimeOffset occurredAt)
+    {
+        EventId = Guid.CreateVersion7();
+        OccurredAt = occurredAt;
+    }
+
+    public Guid EventId { get; }
+    public DateTimeOffset OccurredAt { get; }
 }
