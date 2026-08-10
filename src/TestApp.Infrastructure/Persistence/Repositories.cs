@@ -10,27 +10,26 @@ namespace TestApp.Infrastructure.Persistence;
 
 public sealed class TestRepository(AppDbContext db) : ITestRepository
 {
-    public Task<Test?> Get(TestId id, CancellationToken ct) => db.Tests.SingleOrDefaultAsync(x => x.Id == id, ct);
-    public void Add(Test test) => db.Tests.Add(test);
+    public Task<Test?> GetAsync(TestId id, CancellationToken ct = default) => db.Tests.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public async Task AddAsync(Test test, CancellationToken ct = default) => await db.Tests.AddAsync(test, ct);
 }
 
-public sealed class RevisionRepository(AppDbContext db) : IRevisionRepository
+public sealed class PublishedTestRevisionRepository(AppDbContext db) : IPublishedTestRevisionRepository
 {
-    public Task<PublishedTestRevision?> Get(PublishedTestRevisionId id, CancellationToken ct) => db.Revisions.SingleOrDefaultAsync(x => x.Id == id, ct);
-    public void Add(PublishedTestRevision revision) => db.Revisions.Add(revision);
+    public async Task<int> GetNextVersionAsync(TestId testId, CancellationToken ct = default) =>
+        (await db.Revisions.Where(x => x.TestId == testId).MaxAsync(x => (int?)x.Version, ct) ?? 0) + 1;
+    public async Task AddAsync(PublishedTestRevision revision, CancellationToken ct = default) => await db.Revisions.AddAsync(revision, ct);
 }
 
-public sealed class AssignmentRepository(AppDbContext db) : IAssignmentRepository
+public sealed class TestAssignmentRepository(AppDbContext db) : ITestAssignmentRepository
 {
-    public Task<TestAssignment?> Get(TestAssignmentId id, CancellationToken ct) => db.Assignments.SingleOrDefaultAsync(x => x.Id == id, ct);
-    public void Add(TestAssignment assignment) => db.Assignments.Add(assignment);
-}
-
-public sealed class AttemptRepository(AppDbContext db) : IAttemptRepository
-{
-    public Task<TestAttempt?> Get(TestAttemptId id, CancellationToken ct) => db.Attempts.SingleOrDefaultAsync(x => x.Id == id, ct);
-    public void Add(TestAttempt attempt) => db.Attempts.Add(attempt);
-
-    public Task<int> CountForAssignment(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct) =>
+    public Task<TestAssignment?> GetAsync(TestAssignmentId id, CancellationToken ct = default) => db.Assignments.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public async Task AddAsync(TestAssignment assignment, CancellationToken ct = default) => await db.Assignments.AddAsync(assignment, ct);
+    public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) =>
         db.Attempts.CountAsync(x => x.AssignmentId == assignmentId && x.UserId == userId, ct);
+}
+
+public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptRepository
+{
+    public async Task AddAsync(TestAttempt attempt, CancellationToken ct = default) => await db.Attempts.AddAsync(attempt, ct);
 }
