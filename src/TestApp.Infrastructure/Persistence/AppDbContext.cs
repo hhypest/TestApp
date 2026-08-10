@@ -38,8 +38,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .Select(e => (IAggregateRoot)e.Entity)
             .ToArray();
 
-        foreach (var domainEvent in roots.SelectMany(x => x.DomainEvents))
-            OutboxMessages.Add(OutboxMessage.From(domainEvent));
+        foreach (var integrationEvent in roots
+                     .SelectMany(x => x.DomainEvents)
+                     .OfType<IIntegrationEvent>())
+        {
+            OutboxMessages.Add(OutboxMessage.From(integrationEvent));
+        }
 
         var affected = await base.SaveChangesAsync(ct);
         foreach (var root in roots)
@@ -65,7 +69,7 @@ public sealed class OutboxMessage
 
     private OutboxMessage() { }
 
-    public static OutboxMessage From(IDomainEvent e) => new()
+    public static OutboxMessage From(IIntegrationEvent e) => new()
     {
         Id = e.EventId,
         OccurredAt = e.OccurredAt,
