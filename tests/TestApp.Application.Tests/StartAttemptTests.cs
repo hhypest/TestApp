@@ -16,6 +16,7 @@ public sealed class StartAttemptTests
     {
         var now = DateTimeOffset.Parse("2026-08-10T12:00:00Z");
         var group = ExternalGroupId.FromExternalId("students");
+        var userId = ExternalUserId.FromSubject("user-1");
         var test = Test.Create("DDD");
         var question = test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
@@ -23,14 +24,22 @@ public sealed class StartAttemptTests
         test.AddAnswerOption(question, "Database table", false, 2);
         test.Publish(now);
         var revision = PublishedTestRevision.From(test, PublishedTestRevisionId.New(), 1, now);
-        var assignment = TestAssignment.Create(TestAssignmentId.New(), revision.Id, new AssignmentTarget.Group(group), now.AddHours(-1), now.AddHours(1), 1, now);
+        var assignment = TestAssignment.Create(
+            TestAssignmentId.New(),
+            revision.Id,
+            new AssignmentTarget.Group(group),
+            userId,
+            now,
+            now.AddHours(-1),
+            now.AddHours(1),
+            1);
         var assignments = new AssignmentRepo(assignment);
         var attempts = new AttemptRepo();
         var handler = new StartAttemptCommandHandler(
             assignments,
             attempts,
             new RevisionRepo(revision),
-            new Actor(ExternalUserId.FromSubject("user-1"), new HashSet<ExternalGroupId> { group }),
+            new Actor(userId, new HashSet<ExternalGroupId> { group }),
             new Clock(now),
             new Uow());
 
