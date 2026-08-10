@@ -1,9 +1,15 @@
 name: dotnet
 on:
   push:
-    branches: [ beta-ddd, beta-ddd-architecture-refactor ]
+    branches:
+      - beta-ddd
+      - beta-ddd-architecture-refactor
+      - 'beta-ddd-*'
   pull_request:
-    branches: [ beta-ddd ]
+    branches:
+      - beta-ddd
+      - beta-ddd-architecture-refactor
+      - 'beta-ddd-*'
 jobs:
   build-test:
     runs-on: ubuntu-latest
