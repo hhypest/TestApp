@@ -93,19 +93,33 @@ public sealed class AttemptConfiguration : IEntityTypeConfiguration<TestAttempt>
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasConversion(x => x.Value, x => new TestAttemptId(x));
         b.Property(x => x.AssignmentId).HasConversion(x => x.Value, x => new TestAssignmentId(x));
+        b.Property(x => x.RevisionId).HasConversion(x => x.Value, x => new PublishedTestRevisionId(x));
         b.Property(x => x.UserId).HasConversion(x => x.Value, x => new ExternalUserId(x));
-        b.Property(x => x.Answers)
-            .HasConversion(
-                v => JsonSerializer.Serialize(
-                    v.ToDictionary(x => x.Key.Value, x => x.Value.Select(o => o.Value).ToArray()),
-                    JsonSerializerOptions.Default),
-                v => (IReadOnlyDictionary<QuestionId, IReadOnlyCollection<AnswerOptionId>>)
-                    (JsonSerializer.Deserialize<Dictionary<Guid, Guid[]>>(v, JsonSerializerOptions.Default)
-                     ?? new Dictionary<Guid, Guid[]>())
-                    .ToDictionary(
-                        x => new QuestionId(x.Key),
-                        x => (IReadOnlyCollection<AnswerOptionId>)x.Value.Select(id => new AnswerOptionId(id)).ToArray()))
-            .HasColumnName("answers_json");
+        b.OwnsOne(x => x.Score, score =>
+        {
+            score.Property(x => x.Earned).HasColumnName("score_earned");
+            score.Property(x => x.Maximum).HasColumnName("score_maximum");
+            score.Ignore(x => x.Percentage);
+        });
+
+        b.OwnsMany(x => x.Responses, response =>
+        {
+            response.ToTable("question_responses");
+            response.WithOwner().HasForeignKey("TestAttemptId");
+            response.Property(x => x.Id).HasConversion(x => x.Value, x => new QuestionId(x));
+            response.HasKey("TestAttemptId", nameof(QuestionResponse.Id));
+
+            response.OwnsMany(x => x.SelectedOptions, selected =>
+            {
+                selected.ToTable("selected_answer_options");
+                selected.WithOwner().HasForeignKey("TestAttemptId", "QuestionId");
+                selected.Property<TestAttemptId>("TestAttemptId").HasConversion(x => x.Value, x => new TestAttemptId(x));
+                selected.Property<QuestionId>("QuestionId").HasConversion(x => x.Value, x => new QuestionId(x));
+                selected.Property(x => x.OptionId).HasConversion(x => x.Value, x => new AnswerOptionId(x));
+                selected.HasKey("TestAttemptId", "QuestionId", nameof(SelectedAnswerOption.OptionId));
+            });
+        });
+
         b.Ignore(x => x.DomainEvents);
         b.HasIndex(x => new { x.AssignmentId, x.UserId });
     }
