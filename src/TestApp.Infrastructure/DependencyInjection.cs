@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TestApp.Application.Abstractions;
+using TestApp.Application.Queries;
 using TestApp.Infrastructure.Identity;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
@@ -17,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<IPublishedTestRevisionRepository, PublishedTestRevisionRepository>();
         services.AddScoped<ITestAssignmentRepository, TestAssignmentRepository>();
         services.AddScoped<ITestAttemptRepository, TestAttemptRepository>();
+        services.AddScoped<IReadModelQueries, ReadModelQueries>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ICurrentActor, HttpCurrentActor>();
         services.AddSingleton<IClock, SystemClock>();
