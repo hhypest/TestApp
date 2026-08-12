@@ -67,6 +67,7 @@ builder.Services.AddScoped<GetMyAttemptsQueryHandler>();
 builder.Services.AddScoped<GetAttemptQueryHandler>();
 builder.Services.AddScoped<GetAttemptResultQueryHandler>();
 builder.Services.AddScoped<GetReviewerResultsQueryHandler>();
+builder.Services.AddScoped<GetReviewerAttemptResultQueryHandler>();
 
 var app = builder.Build();
 
@@ -115,6 +116,8 @@ app.MapGet("/api/me/attempts", async (int? page, int? pageSize, AttemptStatus? s
     Results.Ok(await h.Handle(new GetMyAttemptsQuery(page ?? 1, pageSize ?? 20, status), ct))).RequireAuthorization();
 app.MapGet("/api/results", async (Guid? testId, Guid? revisionId, AttemptOutcome? outcome, int? page, int? pageSize, GetReviewerResultsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetReviewerResultsQuery(testId is null ? null : new TestId(testId.Value), revisionId is null ? null : new PublishedTestRevisionId(revisionId.Value), outcome, page ?? 1, pageSize ?? 20), ct))).RequireAuthorization(Permissions.ResultsReview);
+app.MapGet("/api/results/{attemptId:guid}", async (Guid attemptId, GetReviewerAttemptResultQueryHandler h, CancellationToken ct) =>
+    await h.Handle(new GetReviewerAttemptResultQuery(new TestAttemptId(attemptId)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.ResultsReview);
 
 var attempts = app.MapGroup("/api/attempts").RequireAuthorization();
 attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct)));
