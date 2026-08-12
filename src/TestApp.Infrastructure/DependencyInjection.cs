@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using TestApp.Application.Abstractions;
 using TestApp.Application.Queries;
 using TestApp.Infrastructure.Identity;
@@ -31,6 +34,7 @@ public static class DependencyInjection
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
         services.AddSingleton<IStartupFilter, HealthEndpointStartupFilter>();
+        AddObservability(services);
         return services;
     }
 
@@ -47,5 +51,40 @@ public static class DependencyInjection
         services.AddScoped<IOutboxPublisher, TPublisher>();
         services.AddHostedService<OutboxProcessor>();
         return services;
+    }
+
+    private static void AddObservability(IServiceCollection services)
+    {
+        var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "TestApp.Api";
+        var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+
+        var telemetry = services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService(serviceName));
+
+        telemetry.WithTracing(tracing =>
+        {
+            tracing
+                .AddAspNetCoreInstrumentation(options =>
+                {
+                    options.Filter = context =>
+                        !context.Request.Path.StartsWithSegments("/health/live") &&
+                        !context.Request.Path.StartsWithSegments("/health/ready");
+                })
+                .AddHttpClientInstrumentation();
+
+            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                tracing.AddOtlpExporter();
+        });
+
+        telemetry.WithMetrics(metrics =>
+        {
+            metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation();
+
+            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                metrics.AddOtlpExporter();
+        });
     }
 }
