@@ -97,12 +97,15 @@ public sealed class OperationalRetentionTests
         var attemptCount = deadLetteredAt is null ? 0 : 10;
         var error = deadLetteredAt is null ? null : "dead-letter-probe";
         var lastAttemptAt = processedAt ?? deadLetteredAt;
+        DateTimeOffset? nextAttemptAt = null;
+        const string type = "Retention.Probe";
+        const string payload = "{}";
 
         return db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO outbox_messages
                 (Id, OccurredAt, Type, Payload, ProcessedAt, Error, AttemptCount, LastAttemptAt, NextAttemptAt, DeadLetteredAt)
             VALUES
-                ({id}, {occurredAt}, {'T'}, {'{}'}, {processedAt}, {error}, {attemptCount}, {lastAttemptAt}, {null}, {deadLetteredAt});
+                ({id}, {occurredAt}, {type}, {payload}, {processedAt}, {error}, {attemptCount}, {lastAttemptAt}, {nextAttemptAt}, {deadLetteredAt});
             """, ct);
     }
 }
