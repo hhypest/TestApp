@@ -9,13 +9,21 @@ namespace TestApp.Application.Queries;
 
 public sealed record AnswerOptionEditorView(AnswerOptionId Id, string Text, bool IsCorrect, int Order);
 public sealed record QuestionEditorView(QuestionId Id, string Text, QuestionType Type, decimal Points, int Order, IReadOnlyList<AnswerOptionEditorView> Options);
-public sealed record TestEditorView(TestId Id, string Title, TestStatus Status, IReadOnlyList<QuestionEditorView> Questions);
+public sealed record TestEditorView(
+    TestId Id,
+    string Title,
+    TestStatus Status,
+    decimal PassingPercentage,
+    int? TimeLimitMinutes,
+    IReadOnlyList<QuestionEditorView> Questions);
 
 public sealed record AssignmentSummary(
     TestAssignmentId Id,
     PublishedTestRevisionId RevisionId,
     string TestTitle,
     int RevisionVersion,
+    decimal PassingPercentage,
+    int? TimeLimitMinutes,
     DateTimeOffset AvailableFrom,
     DateTimeOffset? AvailableUntil,
     int? AttemptLimit,
@@ -28,17 +36,21 @@ public sealed record AttemptView(
     PublishedTestRevisionId RevisionId,
     AttemptStatus Status,
     DateTimeOffset StartedAt,
+    DateTimeOffset? DeadlineAt,
     DateTimeOffset? CompletedAt,
+    AttemptOutcome? Outcome,
     IReadOnlyList<QuestionResponseView> Responses);
 
 public sealed record AttemptResultView(
     TestAttemptId Id,
     PublishedTestRevisionId RevisionId,
     AttemptStatus Status,
+    AttemptOutcome? Outcome,
     decimal? Earned,
     decimal? Maximum,
     decimal? Percentage,
     DateTimeOffset StartedAt,
+    DateTimeOffset? DeadlineAt,
     DateTimeOffset? CompletedAt);
 
 public sealed record GetTestEditorViewQuery(TestId TestId) : IQuery<TestEditorView?>;
