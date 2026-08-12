@@ -82,6 +82,7 @@ public sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<Id
         b.Property(x => x.ResultType).HasMaxLength(512).IsRequired();
         b.Property(x => x.ResultJson).IsRequired();
         b.HasIndex(x => new { x.Operation, x.ActorId, x.RequestId }).IsUnique();
+        b.HasIndex(x => x.CreatedAt);
     }
 }
 
