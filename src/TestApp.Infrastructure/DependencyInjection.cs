@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<ITestAttemptRepository, TestAttemptRepository>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<IReadModelQueries, ReadModelQueries>();
+        services.AddScoped<ITestCatalogQueries, TestCatalogQueries>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ICurrentActor, HttpCurrentActor>();
         services.AddScoped<OutboxMonitor>();
