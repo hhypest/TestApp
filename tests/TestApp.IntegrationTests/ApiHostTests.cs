@@ -47,6 +47,19 @@ public sealed class ApiHostTests
         var wrongOptionId = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("A database table", false, 2), ct);
         var revisionId = await PostValue<PublishedTestRevisionId>(client, $"/api/tests/{testId.Value}/publish", new PublishRequest(Guid.NewGuid()), ct);
 
+        var catalog = await client.GetFromJsonAsync<PagedResult<TestCatalogItem>>("/api/tests?status=Published&search=fundamentals&page=1&pageSize=20", ct);
+        Assert.NotNull(catalog);
+        var catalogItem = Assert.Single(catalog.Items);
+        Assert.Equal(testId, catalogItem.Id);
+        Assert.Equal(1, catalogItem.QuestionCount);
+        Assert.Equal(1, catalogItem.PublishedRevisionCount);
+        Assert.Equal(1, catalogItem.LatestRevisionVersion);
+
+        var revisions = await client.GetFromJsonAsync<PublishedRevisionSummary[]>($"/api/tests/{testId.Value}/revisions", ct);
+        var revision = Assert.Single(Assert.IsType<PublishedRevisionSummary[]>(revisions));
+        Assert.Equal(revisionId, revision.Id);
+        Assert.Equal(1, revision.Version);
+
         Authenticate(client, "admin-1", "test-admin");
         var assignmentId = await PostValue<TestAssignmentId>(client, "/api/assignments", new AssignRequest(
             revisionId.Value,
