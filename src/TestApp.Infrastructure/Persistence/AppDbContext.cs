@@ -28,7 +28,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             b.HasKey(x => x.Id);
             b.Property(x => x.Type).HasMaxLength(512).IsRequired();
             b.Property(x => x.Payload).IsRequired();
-            b.HasIndex(x => new { x.ProcessedAt, x.OccurredAt });
+            b.HasIndex(x => new { x.ProcessedAt, x.DeadLetteredAt, x.NextAttemptAt, x.OccurredAt });
         });
     }
 
@@ -71,6 +71,10 @@ public sealed class OutboxMessage
     public string Type { get; private set; } = string.Empty;
     public string Payload { get; private set; } = string.Empty;
     public DateTimeOffset? ProcessedAt { get; private set; }
+    public int AttemptCount { get; private set; }
+    public DateTimeOffset? LastAttemptAt { get; private set; }
+    public DateTimeOffset? NextAttemptAt { get; private set; }
+    public DateTimeOffset? DeadLetteredAt { get; private set; }
     public string? Error { get; private set; }
 
     private OutboxMessage() { }
@@ -83,11 +87,30 @@ public sealed class OutboxMessage
         Payload = JsonSerializer.Serialize(e, e.GetType())
     };
 
+    public bool IsDueAt(DateTimeOffset now) =>
+        ProcessedAt is null && DeadLetteredAt is null && (NextAttemptAt is null || NextAttemptAt <= now);
+
     public void MarkProcessed(DateTimeOffset at)
     {
         ProcessedAt = at;
+        LastAttemptAt = at;
+        NextAttemptAt = null;
         Error = null;
     }
 
-    public void MarkFailed(string error) => Error = error;
+    public void MarkFailed(DateTimeOffset at, string error, DateTimeOffset? nextAttemptAt, int maxAttempts)
+    {
+        AttemptCount++;
+        LastAttemptAt = at;
+        Error = string.IsNullOrWhiteSpace(error) ? "Unknown outbox publishing error." : error;
+
+        if (AttemptCount >= maxAttempts)
+        {
+            DeadLetteredAt = at;
+            NextAttemptAt = null;
+            return;
+        }
+
+        NextAttemptAt = nextAttemptAt;
+    }
 }
