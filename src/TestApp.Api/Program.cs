@@ -63,6 +63,8 @@ builder.Services.AddScoped<AnswerQuestionCommandHandler>();
 builder.Services.AddScoped<ClearAnswerCommandHandler>();
 builder.Services.AddScoped<SubmitAttemptCommandHandler>();
 builder.Services.AddScoped<TimeoutAttemptCommandHandler>();
+builder.Services.AddScoped<GetTestsQueryHandler>();
+builder.Services.AddScoped<GetTestRevisionsQueryHandler>();
 builder.Services.AddScoped<GetTestEditorViewQueryHandler>();
 builder.Services.AddScoped<GetMyAssignmentsQueryHandler>();
 builder.Services.AddScoped<GetMyAttemptsQueryHandler>();
@@ -85,6 +87,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 var tests = app.MapGroup("/api/tests").RequireAuthorization();
+tests.MapGet("/", async (int? page, int? pageSize, TestStatus? status, string? search, GetTestsQueryHandler h, CancellationToken ct) =>
+    Results.Ok(await h.Handle(new GetTestsQuery(page ?? 1, pageSize ?? 20, status, search), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPost("/", async (CreateTestRequest r, CreateTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CreateTestCommand(r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPatch("/{id:guid}/title", async (Guid id, RenameTestRequest r, RenameTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RenameTestCommand(new TestId(id), r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPatch("/{id:guid}/settings", async (Guid id, TestSettingsRequest r, ChangeTestSettingsCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeTestSettingsCommand(new TestId(id), r.PassingPercentage, r.TimeLimitMinutes), ct))).RequireAuthorization(Permissions.TestsWrite);
@@ -99,6 +103,8 @@ tests.MapPatch("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}/o
 tests.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest r, PublishTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new PublishTestCommand(new TestId(id), r.IdempotencyKey), ct))).RequireAuthorization(Permissions.TestsPublish);
 tests.MapPost("/{id:guid}/archive", async (Guid id, ArchiveTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ArchiveTestCommand(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapGet("/{id:guid}/editor", async (Guid id, GetTestEditorViewQueryHandler h, CancellationToken ct) => await h.Handle(new GetTestEditorViewQuery(new TestId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsWrite);
+tests.MapGet("/{id:guid}/revisions", async (Guid id, GetTestRevisionsQueryHandler h, CancellationToken ct) =>
+    Results.Ok(await h.Handle(new GetTestRevisionsQuery(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
 
 var assignments = app.MapGroup("/api/assignments").RequireAuthorization();
 assignments.MapPost("/", async (AssignRequest r, AssignTestCommandHandler h, CancellationToken ct) =>
