@@ -29,15 +29,15 @@ public sealed class TestOwnershipTests
 
         Authenticate(client, "author-b", "test-author");
         var testB = await PostValue<TestId>(client, "/api/v1/tests", new CreateTestRequest("Author B test"), ct);
-        var questionId = await PostValue<QuestionId>(client, $"/api/v1/tests/{testB.Value}/questions",
+        var questionId = await PostTestValue<QuestionId>(client, testB, $"/api/v1/tests/{testB.Value}/questions",
             new QuestionWriteRequest("Pick correct", QuestionType.SingleChoice, 1m, 1), ct);
-        var correctOptionId = await PostValue<AnswerOptionId>(client,
+        var correctOptionId = await PostTestValue<AnswerOptionId>(client, testB,
             $"/api/v1/tests/{testB.Value}/questions/{questionId.Value}/options",
             new AnswerOptionWriteRequest("Correct", true, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client,
+        _ = await PostTestValue<AnswerOptionId>(client, testB,
             $"/api/v1/tests/{testB.Value}/questions/{questionId.Value}/options",
             new AnswerOptionWriteRequest("Wrong", false, 2), ct);
-        var revisionB = await PostValue<PublishedTestRevisionId>(client, $"/api/v1/tests/{testB.Value}/publish",
+        var revisionB = await PostTestValue<PublishedTestRevisionId>(client, testB, $"/api/v1/tests/{testB.Value}/publish",
             new PublishRequest(Guid.NewGuid()), ct);
 
         Authenticate(client, "author-a", "test-author");
@@ -49,8 +49,15 @@ public sealed class TestOwnershipTests
         using (var editorB = await client.GetAsync($"/api/v1/tests/{testB.Value}/editor", ct))
             Assert.Equal(HttpStatusCode.NotFound, editorB.StatusCode);
 
-        using (var renameB = await client.PatchAsJsonAsync($"/api/v1/tests/{testB.Value}/title", new RenameTestRequest("Hijacked"), ct))
-            Assert.Equal(HttpStatusCode.Forbidden, renameB.StatusCode);
+        using (var renameB = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/tests/{testB.Value}/title")
+        {
+            Content = JsonContent.Create(new RenameTestRequest("Hijacked"))
+        })
+        {
+            renameB.Headers.TryAddWithoutValidation("If-Match", "\"0\"");
+            using var renameResponse = await client.SendAsync(renameB, ct);
+            Assert.Equal(HttpStatusCode.Forbidden, renameResponse.StatusCode);
+        }
 
         var foreignRevisions = await client.GetFromJsonAsync<PublishedRevisionSummary[]>($"/api/v1/tests/{testB.Value}/revisions", ct);
         Assert.Empty(Assert.IsType<PublishedRevisionSummary[]>(foreignRevisions));
@@ -140,5 +147,27 @@ public sealed class TestOwnershipTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct);
         return Assert.IsType<T>(value);
+    }
+
+    private static async Task<T> PostTestValue<T>(HttpClient client, TestId testId, string uri, object body, CancellationToken ct)
+    {
+        var etag = await GetTestEtagAsync(client, testId, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, uri)
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+        using var response = await client.SendAsync(request, ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct);
+        return Assert.IsType<T>(value);
+    }
+
+    private static async Task<string> GetTestEtagAsync(HttpClient client, TestId testId, CancellationToken ct)
+    {
+        using var response = await client.GetAsync($"/api/v1/tests/{testId.Value}/editor", ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return response.Headers.ETag?.ToString()
+            ?? throw new Xunit.Sdk.XunitException("Test editor response did not contain ETag.");
     }
 }
