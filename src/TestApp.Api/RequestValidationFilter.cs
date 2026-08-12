@@ -8,7 +8,9 @@ namespace TestApp.Api;
 /// Marker for public HTTP request DTOs that participate in transport validation.
 /// Domain/application validation remains authoritative for business invariants.
 /// </summary>
-public interface IApiRequest;
+public interface IApiRequest
+{
+}
 
 public sealed class RequestValidationFilter : IEndpointFilter
 {
@@ -67,7 +69,9 @@ public sealed class RequestValidationFilter : IEndpointFilter
         foreach (var result in validationResults)
         {
             var message = result.ErrorMessage ?? "The value is invalid.";
-            var members = result.MemberNames.Any() ? result.MemberNames : [string.Empty];
+            var members = result.MemberNames.Any()
+                ? result.MemberNames
+                : new[] { string.Empty };
             foreach (var member in members)
                 AddError(errors, Combine(path, ToJsonName(member)), message);
         }
@@ -94,7 +98,7 @@ public sealed class RequestValidationFilter : IEndpointFilter
                 continue;
             }
 
-            if (value is IEnumerable enumerable and not string)
+            if (value is IEnumerable enumerable && value is not string)
             {
                 var itemIndex = 0;
                 foreach (var item in enumerable)
