@@ -66,7 +66,7 @@ public sealed class ApiBoundaryContractTests
             ct);
 
         Assert.NotNull(audit);
-        var entry = Assert.Single(audit.Items.Where(x => x.CorrelationId == correlationId));
+        var entry = Assert.Single(audit.Items, x => x.CorrelationId == correlationId);
         Assert.Equal("author-1", entry.ActorId);
         Assert.Equal("POST", entry.Method);
         Assert.Equal("/api/v1/tests", entry.Route);
