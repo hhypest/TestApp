@@ -39,6 +39,23 @@ public sealed record AttemptSummary(
     DateTimeOffset? DeadlineAt,
     DateTimeOffset? CompletedAt);
 
+public sealed record ReviewerResultSummary(
+    TestAttemptId AttemptId,
+    TestAssignmentId AssignmentId,
+    PublishedTestRevisionId RevisionId,
+    TestId TestId,
+    string TestTitle,
+    int RevisionVersion,
+    ExternalUserId UserId,
+    AttemptStatus Status,
+    AttemptOutcome? Outcome,
+    decimal? Earned,
+    decimal? Maximum,
+    decimal? Percentage,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? DeadlineAt,
+    DateTimeOffset? CompletedAt);
+
 public sealed record QuestionResponseView(QuestionId QuestionId, IReadOnlyList<AnswerOptionId> SelectedOptionIds, DateTimeOffset? AnsweredAt);
 public sealed record AttemptView(
     TestAttemptId Id,
@@ -66,6 +83,7 @@ public sealed record AttemptResultView(
 public sealed record GetTestEditorViewQuery(TestId TestId) : IQuery<TestEditorView?>;
 public sealed record GetMyAssignmentsQuery(int Page = 1, int PageSize = 20, AssignmentStatus? Status = null) : IQuery<PagedResult<AssignmentSummary>>;
 public sealed record GetMyAttemptsQuery(int Page = 1, int PageSize = 20, AttemptStatus? Status = null) : IQuery<PagedResult<AttemptSummary>>;
+public sealed record GetReviewerResultsQuery(TestId? TestId = null, PublishedTestRevisionId? RevisionId = null, AttemptOutcome? Outcome = null, int Page = 1, int PageSize = 20) : IQuery<PagedResult<ReviewerResultSummary>>;
 public sealed record GetAttemptQuery(TestAttemptId AttemptId) : IQuery<AttemptView?>;
 public sealed record GetAttemptResultQuery(TestAttemptId AttemptId) : IQuery<AttemptResultView?>;
 
@@ -74,6 +92,7 @@ public interface IReadModelQueries
     Task<TestEditorView?> GetTestEditorViewAsync(TestId testId, CancellationToken ct);
     Task<PagedResult<AssignmentSummary>> GetAssignmentsAsync(ExternalUserId userId, IReadOnlySet<ExternalGroupId> groups, int page, int pageSize, AssignmentStatus? status, CancellationToken ct);
     Task<PagedResult<AttemptSummary>> GetAttemptsAsync(ExternalUserId userId, int page, int pageSize, AttemptStatus? status, CancellationToken ct);
+    Task<PagedResult<ReviewerResultSummary>> GetReviewerResultsAsync(TestId? testId, PublishedTestRevisionId? revisionId, AttemptOutcome? outcome, int page, int pageSize, CancellationToken ct);
     Task<AttemptView?> GetAttemptAsync(TestAttemptId attemptId, ExternalUserId userId, CancellationToken ct);
     Task<AttemptResultView?> GetAttemptResultAsync(TestAttemptId attemptId, ExternalUserId userId, CancellationToken ct);
 }
@@ -107,6 +126,16 @@ public sealed class GetMyAttemptsQueryHandler(IReadModelQueries queries, TestApp
     {
         var (page, size) = Paging.Normalize(query.Page, query.PageSize);
         return queries.GetAttemptsAsync(actor.UserId, page, size, query.Status, ct);
+    }
+}
+
+public sealed class GetReviewerResultsQueryHandler(IReadModelQueries queries)
+    : IQueryHandler<GetReviewerResultsQuery, PagedResult<ReviewerResultSummary>>
+{
+    public Task<PagedResult<ReviewerResultSummary>> Handle(GetReviewerResultsQuery query, CancellationToken ct)
+    {
+        var (page, size) = Paging.Normalize(query.Page, query.PageSize);
+        return queries.GetReviewerResultsAsync(query.TestId, query.RevisionId, query.Outcome, page, size, ct);
     }
 }
 
