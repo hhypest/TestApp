@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TestApp.Domain.Identity;
+using TestApp.Infrastructure.Observability;
 using TestApp.Infrastructure.Persistence;
 
 namespace TestApp.Infrastructure.Outbox;
@@ -104,7 +105,8 @@ public sealed record OutboxDeadLetterCommandResult(
 
 public sealed class OutboxDeadLetterManager(
     AppDbContext db,
-    TimeProvider time)
+    TimeProvider time,
+    OperationalMetrics metrics)
 {
     private const int LockTimeoutSeconds = 5;
 
@@ -191,6 +193,7 @@ public sealed class OutboxDeadLetterManager(
             now,
             correlationId));
         await db.SaveChangesAsync(ct);
+        metrics.RecordDeadLetterAction(action == OutboxDeadLetterActionType.Requeued ? "requeue" : "discard");
 
         return new OutboxDeadLetterCommandResult(
             OutboxDeadLetterCommandStatus.Success,
