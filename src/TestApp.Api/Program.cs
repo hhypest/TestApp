@@ -55,6 +55,7 @@ builder.Services.AddScoped<ReorderAnswerOptionCommandHandler>();
 builder.Services.AddScoped<ArchiveTestCommandHandler>();
 builder.Services.AddScoped<PublishTestCommandHandler>();
 builder.Services.AddScoped<AssignTestCommandHandler>();
+builder.Services.AddScoped<BulkAssignTestsCommandHandler>();
 builder.Services.AddScoped<CancelAssignmentCommandHandler>();
 builder.Services.AddScoped<ChangeAssignmentWindowCommandHandler>();
 builder.Services.AddScoped<ChangeAssignmentAttemptLimitCommandHandler>();
@@ -66,6 +67,9 @@ builder.Services.AddScoped<TimeoutAttemptCommandHandler>();
 builder.Services.AddScoped<GetTestsQueryHandler>();
 builder.Services.AddScoped<GetTestRevisionsQueryHandler>();
 builder.Services.AddScoped<GetTestEditorViewQueryHandler>();
+builder.Services.AddScoped<GetAdminAssignmentsQueryHandler>();
+builder.Services.AddScoped<GetAdminAssignmentQueryHandler>();
+builder.Services.AddScoped<GetAdminAssignmentAttemptsQueryHandler>();
 builder.Services.AddScoped<GetMyAssignmentsQueryHandler>();
 builder.Services.AddScoped<GetMyAttemptsQueryHandler>();
 builder.Services.AddScoped<GetAttemptQueryHandler>();
@@ -107,11 +111,37 @@ tests.MapGet("/{id:guid}/revisions", async (Guid id, GetTestRevisionsQueryHandle
     Results.Ok(await h.Handle(new GetTestRevisionsQuery(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
 
 var assignments = app.MapGroup("/api/assignments").RequireAuthorization();
+assignments.MapGet("/", async (Guid? testId, Guid? revisionId, AssignmentTargetType? targetType, string? targetId, AssignmentStatus? status, int? page, int? pageSize, GetAdminAssignmentsQueryHandler h, CancellationToken ct) =>
+    Results.Ok(await h.Handle(new GetAdminAssignmentsQuery(
+        testId is null ? null : new TestId(testId.Value),
+        revisionId is null ? null : new PublishedTestRevisionId(revisionId.Value),
+        targetType,
+        targetId,
+        status,
+        page ?? 1,
+        pageSize ?? 20), ct))).RequireAuthorization(Permissions.TestsAssign);
+assignments.MapGet("/{id:guid}", async (Guid id, GetAdminAssignmentQueryHandler h, CancellationToken ct) =>
+    await h.Handle(new GetAdminAssignmentQuery(new TestAssignmentId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsAssign);
+assignments.MapGet("/{id:guid}/attempts", async (Guid id, AttemptStatus? status, AttemptOutcome? outcome, int? page, int? pageSize, GetAdminAssignmentAttemptsQueryHandler h, CancellationToken ct) =>
+    await h.Handle(new GetAdminAssignmentAttemptsQuery(new TestAssignmentId(id), status, outcome, page ?? 1, pageSize ?? 20), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsAssign);
 assignments.MapPost("/", async (AssignRequest r, AssignTestCommandHandler h, CancellationToken ct) =>
 {
     ExternalUserId? user = string.IsNullOrWhiteSpace(r.UserId) ? null : ExternalUserId.FromSubject(r.UserId);
     ExternalGroupId? group = string.IsNullOrWhiteSpace(r.GroupId) ? null : ExternalGroupId.FromExternalId(r.GroupId);
     return ToHttp(await h.Handle(new AssignTestCommand(new PublishedTestRevisionId(r.RevisionId), user, group, r.AvailableFrom, r.AvailableUntil, r.AttemptLimit, r.IdempotencyKey), ct));
+}).RequireAuthorization(Permissions.TestsAssign);
+assignments.MapPost("/bulk", async (BulkAssignRequest r, BulkAssignTestsCommandHandler h, CancellationToken ct) =>
+{
+    var targets = r.Targets.Select(x => new BulkAssignmentTarget(
+        string.IsNullOrWhiteSpace(x.UserId) ? null : ExternalUserId.FromSubject(x.UserId),
+        string.IsNullOrWhiteSpace(x.GroupId) ? null : ExternalGroupId.FromExternalId(x.GroupId))).ToArray();
+    return ToHttp(await h.Handle(new BulkAssignTestsCommand(
+        new PublishedTestRevisionId(r.RevisionId),
+        targets,
+        r.AvailableFrom,
+        r.AvailableUntil,
+        r.AttemptLimit,
+        r.IdempotencyKey), ct));
 }).RequireAuthorization(Permissions.TestsAssign);
 assignments.MapPatch("/{id:guid}/window", async (Guid id, AssignmentWindowRequest r, ChangeAssignmentWindowCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeAssignmentWindowCommand(new TestAssignmentId(id), r.AvailableFrom, r.AvailableUntil), ct))).RequireAuthorization(Permissions.TestsAssign);
 assignments.MapPatch("/{id:guid}/attempt-limit", async (Guid id, AttemptLimitRequest r, ChangeAssignmentAttemptLimitCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeAssignmentAttemptLimitCommand(new TestAssignmentId(id), r.AttemptLimit), ct))).RequireAuthorization(Permissions.TestsAssign);
@@ -162,6 +192,8 @@ public sealed record AnswerOptionUpdateRequest(string Text, bool IsCorrect);
 public sealed record OrderRequest(int Order);
 public sealed record PublishRequest(Guid IdempotencyKey);
 public sealed record AssignRequest(Guid RevisionId, string? UserId, string? GroupId, DateTimeOffset AvailableFrom, DateTimeOffset? AvailableUntil, int? AttemptLimit, Guid IdempotencyKey);
+public sealed record BulkAssignmentTargetRequest(string? UserId, string? GroupId);
+public sealed record BulkAssignRequest(Guid RevisionId, IReadOnlyCollection<BulkAssignmentTargetRequest> Targets, DateTimeOffset AvailableFrom, DateTimeOffset? AvailableUntil, int? AttemptLimit, Guid IdempotencyKey);
 public sealed record AssignmentWindowRequest(DateTimeOffset AvailableFrom, DateTimeOffset? AvailableUntil);
 public sealed record AttemptLimitRequest(int? AttemptLimit);
 public sealed record CancelAssignmentRequest(string? Reason);
