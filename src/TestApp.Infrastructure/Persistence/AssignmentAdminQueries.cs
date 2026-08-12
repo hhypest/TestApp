@@ -58,15 +58,25 @@ public sealed class AssignmentAdminQueries(AppDbContext db) : IAssignmentAdminQu
                 InProgressCount = g.Count(x => x.Status == AttemptStatus.InProgress),
                 CompletedCount = g.Count(x => x.Status != AttemptStatus.InProgress),
                 PassedCount = g.Count(x => x.Outcome == AttemptOutcome.Passed),
-                FailedCount = g.Count(x => x.Outcome == AttemptOutcome.Failed),
-                AveragePercentage = g.Where(x => x.Score != null).Select(x => (decimal?)x.Score!.Percentage).Average()
+                FailedCount = g.Count(x => x.Outcome == AttemptOutcome.Failed)
             })
             .ToDictionaryAsync(x => x.AssignmentId, ct);
+
+        var scoreRows = await db.Attempts.AsNoTracking()
+            .Where(x => assignmentIds.Contains(x.AssignmentId) && x.Score != null)
+            .Select(x => new { x.AssignmentId, x.Score!.Earned, x.Score.Maximum })
+            .ToListAsync(ct);
+        var scoreStats = scoreRows
+            .GroupBy(x => x.AssignmentId)
+            .ToDictionary(
+                g => g.Key,
+                g => (decimal?)Math.Round(g.Average(x => Percentage(x.Earned, x.Maximum)), 2));
 
         var items = assignments.Where(x => revisionMap.ContainsKey(x.RevisionId)).Select(assignment =>
         {
             var revision = revisionMap[assignment.RevisionId];
             attemptStats.TryGetValue(assignment.Id, out var stats);
+            scoreStats.TryGetValue(assignment.Id, out var averagePercentage);
             return new AdminAssignmentSummary(
                 assignment.Id,
                 assignment.RevisionId,
@@ -86,7 +96,7 @@ public sealed class AssignmentAdminQueries(AppDbContext db) : IAssignmentAdminQu
                 stats?.CompletedCount ?? 0,
                 stats?.PassedCount ?? 0,
                 stats?.FailedCount ?? 0,
-                stats?.AveragePercentage);
+                averagePercentage);
         }).ToArray();
 
         return new PagedResult<AdminAssignmentSummary>(items, page, pageSize, totalCount);
@@ -107,9 +117,13 @@ public sealed class AssignmentAdminQueries(AppDbContext db) : IAssignmentAdminQu
         var timedOutCount = await attempts.CountAsync(x => x.Status == AttemptStatus.TimedOut, ct);
         var passedCount = await attempts.CountAsync(x => x.Outcome == AttemptOutcome.Passed, ct);
         var failedCount = await attempts.CountAsync(x => x.Outcome == AttemptOutcome.Failed, ct);
-        var scored = attempts.Where(x => x.Score != null).Select(x => (decimal?)x.Score!.Percentage);
-        var averagePercentage = await scored.AverageAsync(ct);
-        var bestPercentage = await scored.MaxAsync(ct);
+        var scoreRows = await attempts
+            .Where(x => x.Score != null)
+            .Select(x => new { x.Score!.Earned, x.Score.Maximum })
+            .ToListAsync(ct);
+        var percentages = scoreRows.Select(x => Percentage(x.Earned, x.Maximum)).ToArray();
+        decimal? averagePercentage = percentages.Length == 0 ? null : Math.Round(percentages.Average(), 2);
+        decimal? bestPercentage = percentages.Length == 0 ? null : percentages.Max();
 
         return new AdminAssignmentDetail(
             assignment.Id,
@@ -176,4 +190,7 @@ public sealed class AssignmentAdminQueries(AppDbContext db) : IAssignmentAdminQu
 
         return new PagedResult<AdminAssignmentAttemptSummary>(items, page, pageSize, totalCount);
     }
+
+    private static decimal Percentage(decimal earned, decimal maximum) =>
+        maximum <= 0 ? 0 : Math.Round(earned / maximum * 100m, 2);
 }
