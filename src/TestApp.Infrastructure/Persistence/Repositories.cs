@@ -17,12 +17,8 @@ public sealed class TestRepository(AppDbContext db) : ITestRepository
 
 public sealed class PublishedTestRevisionRepository(AppDbContext db) : IPublishedTestRevisionRepository
 {
-    public Task<PublishedTestRevision?> GetAsync(PublishedTestRevisionId id, CancellationToken ct = default) =>
-        db.Revisions.SingleOrDefaultAsync(x => x.Id == id, ct);
-
-    public async Task<int> GetNextVersionAsync(TestId testId, CancellationToken ct = default) =>
-        (await db.Revisions.Where(x => x.TestId == testId).MaxAsync(x => (int?)x.Version, ct) ?? 0) + 1;
-
+    public Task<PublishedTestRevision?> GetAsync(PublishedTestRevisionId id, CancellationToken ct = default) => db.Revisions.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public async Task<int> GetNextVersionAsync(TestId testId, CancellationToken ct = default) => (await db.Revisions.Where(x => x.TestId == testId).MaxAsync(x => (int?)x.Version, ct) ?? 0) + 1;
     public async Task AddAsync(PublishedTestRevision revision, CancellationToken ct = default) => await db.Revisions.AddAsync(revision, ct);
 }
 
@@ -34,34 +30,38 @@ public sealed class TestAssignmentRepository(AppDbContext db) : ITestAssignmentR
 
 public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptRepository
 {
-    public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) =>
-        db.Attempts.SingleOrDefaultAsync(x => x.Id == id, ct);
-
-    public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) =>
-        db.Attempts.CountAsync(x => x.AssignmentId == assignmentId && x.UserId == userId, ct);
-
+    public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) => db.Attempts.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) => db.Attempts.CountAsync(x => x.AssignmentId == assignmentId && x.UserId == userId, ct);
     public async Task AddAsync(TestAttempt attempt, CancellationToken ct = default) => await db.Attempts.AddAsync(attempt, ct);
 
-    public async Task<bool> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
+    public async Task<TestAttemptId?> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
+        var existingId = await db.Attempts
+            .Where(x => x.AssignmentId == attempt.AssignmentId && x.UserId == attempt.UserId && x.StartRequestId == attempt.StartRequestId)
+            .Select(x => (TestAttemptId?)x.Id)
+            .SingleOrDefaultAsync(ct);
+
+        if (existingId is not null)
+        {
+            await transaction.CommitAsync(ct);
+            return existingId;
+        }
+
         if (attemptLimit is { } limit)
         {
-            var count = await db.Attempts.CountAsync(
-                x => x.AssignmentId == attempt.AssignmentId && x.UserId == attempt.UserId,
-                ct);
-
+            var count = await db.Attempts.CountAsync(x => x.AssignmentId == attempt.AssignmentId && x.UserId == attempt.UserId, ct);
             if (count >= limit)
             {
                 await transaction.RollbackAsync(ct);
-                return false;
+                return null;
             }
         }
 
         await db.Attempts.AddAsync(attempt, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return true;
+        return attempt.Id;
     }
 }
