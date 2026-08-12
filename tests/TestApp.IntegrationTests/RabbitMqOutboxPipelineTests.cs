@@ -40,6 +40,7 @@ public sealed class RabbitMqOutboxPipelineTests
         await brokerChannel.QueueBindAsync(queue.QueueName, exchange, "#", cancellationToken: ct);
 
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddDbContext<AppDbContext>(o => o.UseMySql(
             database.ConnectionString,
             new MariaDbServerVersion(new Version(11, 4, 0))));
