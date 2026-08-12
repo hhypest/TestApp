@@ -202,7 +202,8 @@ public sealed class ApiContractOperationTransformer : IOpenApiOperationTransform
         path.Contains("{id}", StringComparison.Ordinal) ||
         path.Contains("{attemptId}", StringComparison.Ordinal) ||
         path.Contains("{questionId}", StringComparison.Ordinal) ||
-        path.Contains("{optionId}", StringComparison.Ordinal);
+        path.Contains("{optionId}", StringComparison.Ordinal) ||
+        path.Contains("{eventId}", StringComparison.Ordinal);
 
     private static bool MayReturnConflict(string method, string path) =>
         method is "POST" or "PUT" or "PATCH" or "DELETE";
@@ -254,6 +255,9 @@ public sealed class ApiContractOperationTransformer : IOpenApiOperationTransform
             C("GET", "/api/v1/results", "Results_List", "List reviewer results", "Returns owner-scoped reviewer results for authors and global results for administrators."),
             C("GET", "/api/v1/results/{attemptId}", "Results_Get", "Get reviewer result", "Returns reviewer-only correctness breakdown for one attempt."),
             C("GET", "/api/v1/operations/outbox", "Operations_GetOutbox", "Get Outbox status", "Returns safe operational delivery metadata without event payloads."),
+            C("GET", "/api/v1/operations/outbox/dead-letters/{eventId}", "OutboxDeadLetters_Get", "Get Outbox dead letter", "Returns safe administrator-only dead-letter metadata without the event payload."),
+            C("POST", "/api/v1/operations/outbox/dead-letters/{eventId}/requeue", "OutboxDeadLetters_Requeue", "Requeue Outbox dead letter", "Requeues an active dead letter after an explicit administrator reason and records an immutable management audit action."),
+            C("POST", "/api/v1/operations/outbox/dead-letters/{eventId}/discard", "OutboxDeadLetters_Discard", "Discard Outbox dead letter", "Marks an active dead letter as terminally discarded without deleting its operational record and records an immutable management audit action."),
             C("GET", "/api/v1/operations/audit", "Operations_GetAudit", "Query audit trail", "Returns paged state-changing request audit metadata."),
             C("PUT", "/api/v1/attempts/{id}/answers/{questionId}", "Attempts_Answer", "Save answer", "Stores selected option identifiers for one question in an in-progress owned attempt."),
             C("DELETE", "/api/v1/attempts/{id}/answers/{questionId}", "Attempts_ClearAnswer", "Clear answer", "Removes the saved response for one question."),
@@ -295,6 +299,9 @@ public sealed class ApiExampleSchemaTransformer : IOpenApiSchemaTransformer
                 break;
             case "AnswerQuestionRequest":
                 schema.Example = JsonNode.Parse("""{"optionIds":["018f42d7-55b7-7b66-bdb6-7f0b1ef00c01"]}""");
+                break;
+            case "DeadLetterActionRequest":
+                schema.Example = JsonNode.Parse("""{"reason":"Dependency fixed; retry delivery."}""");
                 break;
             case "QuestionType":
                 schema.Description = "Question type. 1 = SingleChoice, 2 = MultipleChoice.";
