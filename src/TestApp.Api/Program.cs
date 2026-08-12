@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using TestApp.Api;
 using TestApp.Application.Assignments;
 using TestApp.Application.Attempts;
@@ -15,6 +16,7 @@ using TestApp.Infrastructure;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
 
+var migrateOnly = args.Any(x => string.Equals(x, "--migrate", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
@@ -24,6 +26,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     o.Authority = builder.Configuration["Keycloak:Authority"];
     o.Audience = builder.Configuration["Keycloak:Audience"];
     o.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+    o.MapInboundClaims = false;
+    o.TokenValidationParameters = new TokenValidationParameters
+    {
+        NameClaimType = "sub",
+        RoleClaimType = "roles"
+    };
 });
 
 builder.Services.AddAuthorization(o =>
@@ -79,11 +87,18 @@ builder.Services.AddScoped<GetReviewerAttemptResultQueryHandler>();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+var applyMigrationsOnStartup = builder.Configuration.GetValue<bool?>("Database:ApplyMigrationsOnStartup")
+    ?? app.Environment.IsDevelopment();
+
+if (migrateOnly || applyMigrationsOnStartup)
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 }
+
+if (migrateOnly)
+    return;
 
 app.UseMiddleware<RequestTelemetryMiddleware>();
 app.UseExceptionHandler();
