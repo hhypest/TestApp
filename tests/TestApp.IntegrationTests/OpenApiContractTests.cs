@@ -82,7 +82,9 @@ public sealed class OpenApiContractTests
             candidate =>
                 string.Equals(candidate.GetProperty("in").GetString(), "header", StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(candidate.GetProperty("name").GetString(), name, StringComparison.OrdinalIgnoreCase));
-        Assert.Equal(required, parameter.GetProperty("required").GetBoolean());
+
+        var actualRequired = parameter.TryGetProperty("required", out var requiredProperty) && requiredProperty.GetBoolean();
+        Assert.Equal(required, actualRequired);
         Assert.False(string.IsNullOrWhiteSpace(parameter.GetProperty("description").GetString()));
     }
 
