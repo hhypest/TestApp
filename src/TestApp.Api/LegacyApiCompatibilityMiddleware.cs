@@ -41,8 +41,8 @@ public sealed class LegacyApiCompatibilityMiddleware(
 
     internal static void AddLifecycleHeaders(HttpResponse response, ApiLifecycleRuntimeOptions options)
     {
-        response.Headers.Deprecation = $"@{options.LegacyDeprecationAt.ToUnixTimeSeconds()}";
+        response.Headers["Deprecation"] = $"@{options.LegacyDeprecationAt.ToUnixTimeSeconds()}";
         if (options.LegacySunsetAt is { } sunset)
-            response.Headers.Sunset = sunset.UtcDateTime.ToString("R", CultureInfo.InvariantCulture);
+            response.Headers["Sunset"] = sunset.UtcDateTime.ToString("R", CultureInfo.InvariantCulture);
     }
 }
