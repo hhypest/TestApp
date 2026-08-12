@@ -72,26 +72,16 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<TestAssig
         b.Property(x => x.RevisionId).HasConversion(x => x.Value, x => new PublishedTestRevisionId(x));
         b.Property(x => x.AssignedBy).HasConversion(x => x.Value, x => new ExternalUserId(x));
         b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
+        b.Property(x => x.TargetType).IsRequired();
+        b.Property(x => x.TargetId).HasMaxLength(256).IsRequired();
         b.Property(x => x.CancelledBy)
             .HasConversion(x => x.HasValue ? x.Value.Value : null, x => x == null ? (ExternalUserId?)null : new ExternalUserId(x));
         b.Property(x => x.CancelReason).HasMaxLength(1000);
-        b.Property(x => x.Target).HasConversion(v => SerializeTarget(v), v => DeserializeTarget(v)).HasColumnName("target").HasMaxLength(512);
+        b.Ignore(x => x.Target);
         b.Ignore(x => x.DomainEvents);
+        b.HasIndex(x => new { x.TargetType, x.TargetId, x.Status });
+        b.HasIndex(x => x.RevisionId);
     }
-
-    private static string SerializeTarget(AssignmentTarget target) => target switch
-    {
-        AssignmentTarget.User u => $"user:{u.UserId.Value}",
-        AssignmentTarget.Group g => $"group:{g.GroupId.Value}",
-        _ => throw new InvalidOperationException()
-    };
-
-    private static AssignmentTarget DeserializeTarget(string value) =>
-        value.StartsWith("user:", StringComparison.Ordinal)
-            ? new AssignmentTarget.User(ExternalUserId.FromSubject(value[5..]))
-            : value.StartsWith("group:", StringComparison.Ordinal)
-                ? new AssignmentTarget.Group(ExternalGroupId.FromExternalId(value[6..]))
-                : throw new InvalidOperationException("Unknown assignment target.");
 }
 
 public sealed class AttemptConfiguration : IEntityTypeConfiguration<TestAttempt>
@@ -131,5 +121,6 @@ public sealed class AttemptConfiguration : IEntityTypeConfiguration<TestAttempt>
         b.Ignore(x => x.DomainEvents);
         b.HasIndex(x => new { x.AssignmentId, x.UserId });
         b.HasIndex(x => new { x.AssignmentId, x.UserId, x.StartRequestId }).IsUnique();
+        b.HasIndex(x => new { x.RevisionId, x.Status, x.Outcome });
     }
 }
