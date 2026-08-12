@@ -21,7 +21,7 @@ trap 'rm -f "$tmp"' EXIT
 
 echo "Creating logical backup for database '$MARIADB_DATABASE'..."
 docker run --rm --network host \
-  -e MARIADB_PWD="$MARIADB_PASSWORD" \
+  -e MYSQL_PWD="$MARIADB_PASSWORD" \
   "$MARIADB_IMAGE" \
   mariadb-dump \
     --host="$MARIADB_HOST" \
