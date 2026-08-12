@@ -24,7 +24,7 @@ public sealed class OverdueAttemptExpirationTests
         await using var database = await MariaDbTestDatabase.CreateAsync(ct);
         var now = DateTimeOffset.Parse("2026-08-12T14:00:00Z");
 
-        var test = Test.Create("Expiration test");
+        var test = Test.Create("Expiration test", ExternalUserId.FromSubject("author-1"));
         _ = test.ChangeSettings(50m, 1);
         var revision = PublishedTestRevision.From(test, PublishedTestRevisionId.New(), 1, now.AddMinutes(-10));
         var userId = ExternalUserId.FromSubject("student-expired");
