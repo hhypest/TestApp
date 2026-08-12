@@ -66,6 +66,7 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
     public PublishedTestRevisionId RevisionId { get; private set; }
     public AssignmentTargetType TargetType { get; private set; }
     public string TargetId { get; private set; }
+    public string LegacyTarget { get; private set; }
     public AssignmentTarget Target => TargetType switch
     {
         AssignmentTargetType.User => new AssignmentTarget.User(ExternalUserId.FromSubject(TargetId)),
@@ -82,7 +83,11 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
     public DateTimeOffset? CancelledAt { get; private set; }
     public string? CancelReason { get; private set; }
 
-    private TestAssignment() { TargetId = string.Empty; }
+    private TestAssignment()
+    {
+        TargetId = string.Empty;
+        LegacyTarget = string.Empty;
+    }
 
     private TestAssignment(
         TestAssignmentId id,
@@ -100,10 +105,10 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
             throw new ArgumentOutOfRangeException(nameof(attemptLimit));
 
         RevisionId = revisionId;
-        (TargetType, TargetId) = target switch
+        (TargetType, TargetId, LegacyTarget) = target switch
         {
-            AssignmentTarget.User user => (AssignmentTargetType.User, user.UserId.Value),
-            AssignmentTarget.Group group => (AssignmentTargetType.Group, group.GroupId.Value),
+            AssignmentTarget.User user => (AssignmentTargetType.User, user.UserId.Value, $"user:{user.UserId.Value}"),
+            AssignmentTarget.Group group => (AssignmentTargetType.Group, group.GroupId.Value, $"group:{group.GroupId.Value}"),
             _ => throw new ArgumentOutOfRangeException(nameof(target))
         };
         AssignedBy = assignedBy;
