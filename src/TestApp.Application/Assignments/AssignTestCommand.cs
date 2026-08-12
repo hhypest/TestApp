@@ -33,13 +33,21 @@ public sealed class AssignTestCommandHandler(
         if (command.RequestId == Guid.Empty)
             return Error.Validation("idempotency.request_id", "A non-empty idempotency key is required.");
 
-        var cached = await idempotency.GetResultAsync<TestAssignmentId>(Operation, actor.UserId, command.RequestId, ct);
+        var fingerprint = IdempotencyFingerprint.Create(
+            IdempotencyFingerprint.Guid(command.RevisionId.Value),
+            command.UserId?.Value,
+            command.GroupId?.Value,
+            IdempotencyFingerprint.Instant(command.AvailableFrom),
+            IdempotencyFingerprint.OptionalInstant(command.AvailableUntil),
+            IdempotencyFingerprint.OptionalInt(command.AttemptLimit));
+
+        var cached = await idempotency.GetResultAsync<TestAssignmentId>(Operation, actor.UserId, command.RequestId, fingerprint, ct);
         if (cached is { } cachedAssignmentId)
             return cachedAssignmentId;
 
         await using var lease = await idempotency.AcquireAsync(Operation, actor.UserId, command.RequestId, ct);
 
-        cached = await idempotency.GetResultAsync<TestAssignmentId>(Operation, actor.UserId, command.RequestId, ct);
+        cached = await idempotency.GetResultAsync<TestAssignmentId>(Operation, actor.UserId, command.RequestId, fingerprint, ct);
         if (cached is { } leasedCachedAssignmentId)
             return leasedCachedAssignmentId;
 
@@ -63,7 +71,7 @@ public sealed class AssignTestCommandHandler(
         var assignment = TestAssignment.Create(id, revision.Id, target, actor.UserId, now, command.AvailableFrom, command.AvailableUntil, command.AttemptLimit);
 
         await assignments.AddAsync(assignment, ct);
-        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, id, now, ct);
+        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, fingerprint, id, now, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return id;
     }
