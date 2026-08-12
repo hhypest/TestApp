@@ -15,6 +15,7 @@ public sealed record OutboxOperationalStatus(
     int PendingCount,
     int RetryScheduledCount,
     int DeadLetterCount,
+    int DiscardedCount,
     DateTimeOffset? OldestPendingOccurredAt,
     IReadOnlyList<OutboxDeadLetterItem> RecentDeadLetters);
 
@@ -24,14 +25,20 @@ public sealed class OutboxMonitor(AppDbContext db)
     {
         deadLetterLimit = Math.Clamp(deadLetterLimit, 1, 100);
 
-        var pending = db.OutboxMessages.AsNoTracking().Where(x => x.ProcessedAt == null && x.DeadLetteredAt == null);
+        var pending = db.OutboxMessages.AsNoTracking().Where(x =>
+            x.ProcessedAt == null &&
+            x.DeadLetteredAt == null &&
+            x.DiscardedAt == null);
         var pendingCount = await pending.CountAsync(ct);
         var retryScheduledCount = await pending.CountAsync(x => x.NextAttemptAt != null, ct);
         var oldestPending = await pending.OrderBy(x => x.OccurredAt).Select(x => (DateTimeOffset?)x.OccurredAt).FirstOrDefaultAsync(ct);
 
-        var deadLetterCount = await db.OutboxMessages.AsNoTracking().CountAsync(x => x.DeadLetteredAt != null, ct);
+        var deadLetterCount = await db.OutboxMessages.AsNoTracking()
+            .CountAsync(x => x.DeadLetteredAt != null && x.DiscardedAt == null, ct);
+        var discardedCount = await db.OutboxMessages.AsNoTracking()
+            .CountAsync(x => x.DiscardedAt != null, ct);
         var recentDeadLetters = await db.OutboxMessages.AsNoTracking()
-            .Where(x => x.DeadLetteredAt != null)
+            .Where(x => x.DeadLetteredAt != null && x.DiscardedAt == null)
             .OrderByDescending(x => x.DeadLetteredAt)
             .Take(deadLetterLimit)
             .Select(x => new OutboxDeadLetterItem(
@@ -47,6 +54,7 @@ public sealed class OutboxMonitor(AppDbContext db)
             pendingCount,
             retryScheduledCount,
             deadLetterCount,
+            discardedCount,
             oldestPending,
             recentDeadLetters);
     }
