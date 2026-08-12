@@ -128,7 +128,7 @@ public sealed class MariaDbBaseline : Migration
                 `Id` char(36) NOT NULL,
                 `AnsweredAt` datetime(6) NULL,
                 CONSTRAINT `PK_question_responses` PRIMARY KEY (`TestAttemptId`, `Id`),
-                CONSTRAINT `FK_question_responses_test_attempts_TestAttemptId` FOREIGN KEY (`TestAttemptId`) REFERENCES `test_attempts` (`Id`) ON DELETE CASCADE
+                CONSTRAINT `FK_question_responses_attempts` FOREIGN KEY (`TestAttemptId`) REFERENCES `test_attempts` (`Id`) ON DELETE CASCADE
             ) CHARACTER SET utf8mb4;
             """);
 
@@ -141,7 +141,7 @@ public sealed class MariaDbBaseline : Migration
                 `Order` int NOT NULL,
                 CONSTRAINT `PK_answer_options` PRIMARY KEY (`Id`),
                 KEY `IX_answer_options_QuestionId` (`QuestionId`),
-                CONSTRAINT `FK_answer_options_questions_QuestionId` FOREIGN KEY (`QuestionId`) REFERENCES `questions` (`Id`) ON DELETE CASCADE
+                CONSTRAINT `FK_answer_options_questions` FOREIGN KEY (`QuestionId`) REFERENCES `questions` (`Id`) ON DELETE CASCADE
             ) CHARACTER SET utf8mb4;
             """);
 
@@ -151,7 +151,7 @@ public sealed class MariaDbBaseline : Migration
                 `QuestionId` char(36) NOT NULL,
                 `OptionId` char(36) NOT NULL,
                 CONSTRAINT `PK_selected_answer_options` PRIMARY KEY (`TestAttemptId`, `QuestionId`, `OptionId`),
-                CONSTRAINT `FK_selected_answer_options_question_responses_TestAttemptId_QuestionId`
+                CONSTRAINT `FK_selected_options_responses`
                     FOREIGN KEY (`TestAttemptId`, `QuestionId`)
                     REFERENCES `question_responses` (`TestAttemptId`, `Id`) ON DELETE CASCADE
             ) CHARACTER SET utf8mb4;
