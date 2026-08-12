@@ -23,13 +23,14 @@ public sealed class PublishTestCommandHandler(
             return Error.Validation("idempotency.request_id", "A non-empty idempotency key is required.");
 
         var operation = $"tests.publish:{command.TestId.Value:N}";
-        var cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(operation, actor.UserId, command.RequestId, ct);
+        var fingerprint = IdempotencyFingerprint.Create(IdempotencyFingerprint.Guid(command.TestId.Value));
+        var cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(operation, actor.UserId, command.RequestId, fingerprint, ct);
         if (cached is { } cachedRevisionId)
             return cachedRevisionId;
 
         await using var lease = await idempotency.AcquireAsync(operation, actor.UserId, command.RequestId, ct);
 
-        cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(operation, actor.UserId, command.RequestId, ct);
+        cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(operation, actor.UserId, command.RequestId, fingerprint, ct);
         if (cached is { } leasedCachedRevisionId)
             return leasedCachedRevisionId;
 
@@ -53,7 +54,7 @@ public sealed class PublishTestCommandHandler(
         var revisionId = PublishedTestRevisionId.New();
         var revision = PublishedTestRevision.From(test, revisionId, version, now);
         await revisions.AddAsync(revision, ct);
-        await idempotency.AddResultAsync(operation, actor.UserId, command.RequestId, revisionId, now, ct);
+        await idempotency.AddResultAsync(operation, actor.UserId, command.RequestId, fingerprint, revisionId, now, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return revisionId;
     }
