@@ -7,7 +7,7 @@ using TestApp.Messaging.Abstractions;
 
 namespace TestApp.Application.Attempts;
 
-public sealed record StartAttemptCommand(TestAssignmentId AssignmentId) : ICommand<Result<TestAttemptId, Error>>;
+public sealed record StartAttemptCommand(TestAssignmentId AssignmentId, Guid StartRequestId) : ICommand<Result<TestAttemptId, Error>>;
 
 public sealed class StartAttemptCommandHandler(
     ITestAssignmentRepository assignments,
@@ -18,6 +18,9 @@ public sealed class StartAttemptCommandHandler(
 {
     public async Task<Result<TestAttemptId, Error>> Handle(StartAttemptCommand command, CancellationToken ct)
     {
+        if (command.StartRequestId == Guid.Empty)
+            return Error.Validation("attempt.start_request_id", "A non-empty idempotency key is required.");
+
         var assignment = await assignments.GetAsync(command.AssignmentId, ct);
         if (assignment is null)
             return Error.NotFound("assignment.not_found", "Test assignment was not found.");
@@ -39,19 +42,19 @@ public sealed class StartAttemptCommandHandler(
         if (revision is null)
             return Error.NotFound("revision.not_found", "Published test revision was not found.");
 
-        var id = TestAttemptId.New();
         var attempt = TestAttempt.Start(
-            id,
+            TestAttemptId.New(),
             assignment.Id,
             revision.Id,
             actor.UserId,
+            command.StartRequestId,
             now,
             revision.Questions.Select(q => q.Id));
 
-        var added = await attempts.TryAddWithinLimitAsync(attempt, assignment.AttemptLimit, ct);
-        if (!added)
+        var persistedId = await attempts.TryAddWithinLimitAsync(attempt, assignment.AttemptLimit, ct);
+        if (persistedId is null)
             return Error.Conflict("assignment.attempt_limit_reached", "The attempt limit has been reached.");
 
-        return id;
+        return persistedId.Value;
     }
 }
