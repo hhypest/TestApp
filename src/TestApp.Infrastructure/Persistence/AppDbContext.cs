@@ -8,6 +8,7 @@ using TestApp.Domain.Entities;
 using TestApp.Domain.Events;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
+using TestApp.Infrastructure.Outbox;
 
 namespace TestApp.Infrastructure.Persistence;
 
@@ -18,6 +19,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TestAssignment> Assignments => Set<TestAssignment>();
     public DbSet<TestAttempt> Attempts => Set<TestAttempt>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<OutboxDeadLetterAction> OutboxDeadLetterActions => Set<OutboxDeadLetterAction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,7 +30,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             b.HasKey(x => x.Id);
             b.Property(x => x.Type).HasMaxLength(512).IsRequired();
             b.Property(x => x.Payload).IsRequired();
-            b.HasIndex(x => new { x.ProcessedAt, x.DeadLetteredAt, x.NextAttemptAt, x.OccurredAt });
+            b.HasIndex(x => new { x.ProcessedAt, x.DeadLetteredAt, x.DiscardedAt, x.NextAttemptAt, x.OccurredAt });
         });
     }
 
@@ -75,6 +77,7 @@ public sealed class OutboxMessage
     public DateTimeOffset? LastAttemptAt { get; private set; }
     public DateTimeOffset? NextAttemptAt { get; private set; }
     public DateTimeOffset? DeadLetteredAt { get; private set; }
+    public DateTimeOffset? DiscardedAt { get; private set; }
     public string? Error { get; private set; }
 
     private OutboxMessage() { }
@@ -88,10 +91,16 @@ public sealed class OutboxMessage
     };
 
     public bool IsDueAt(DateTimeOffset now) =>
-        ProcessedAt is null && DeadLetteredAt is null && (NextAttemptAt is null || NextAttemptAt <= now);
+        ProcessedAt is null &&
+        DeadLetteredAt is null &&
+        DiscardedAt is null &&
+        (NextAttemptAt is null || NextAttemptAt <= now);
 
     public void MarkProcessed(DateTimeOffset at)
     {
+        if (DiscardedAt is not null)
+            throw new InvalidOperationException("Discarded Outbox messages cannot be marked as processed.");
+
         ProcessedAt = at;
         LastAttemptAt = at;
         NextAttemptAt = null;
@@ -100,6 +109,9 @@ public sealed class OutboxMessage
 
     public void MarkFailed(DateTimeOffset at, string error, DateTimeOffset? nextAttemptAt, int maxAttempts)
     {
+        if (DiscardedAt is not null)
+            throw new InvalidOperationException("Discarded Outbox messages cannot be retried.");
+
         AttemptCount++;
         LastAttemptAt = at;
         Error = string.IsNullOrWhiteSpace(error) ? "Unknown outbox publishing error." : error;
@@ -112,5 +124,31 @@ public sealed class OutboxMessage
         }
 
         NextAttemptAt = nextAttemptAt;
+    }
+
+    public void RequeueDeadLetter(DateTimeOffset at)
+    {
+        EnsureManageableDeadLetter();
+        AttemptCount = 0;
+        DeadLetteredAt = null;
+        NextAttemptAt = at;
+        Error = null;
+    }
+
+    public void DiscardDeadLetter(DateTimeOffset at)
+    {
+        EnsureManageableDeadLetter();
+        DiscardedAt = at;
+        NextAttemptAt = null;
+    }
+
+    private void EnsureManageableDeadLetter()
+    {
+        if (ProcessedAt is not null)
+            throw new InvalidOperationException("Processed Outbox messages are not dead letters.");
+        if (DeadLetteredAt is null)
+            throw new InvalidOperationException("Only dead-lettered Outbox messages can be managed.");
+        if (DiscardedAt is not null)
+            throw new InvalidOperationException("Discarded Outbox messages cannot be managed again.");
     }
 }
