@@ -152,18 +152,23 @@ Assignment administration остаётся global `test-admin` policy до по�
 
 ## C3. Validation normalization
 
-**Status: NEXT.**
+**Status: DONE.**
 
-Единый transport validation strategy:
+Реализовано:
 
-- malformed UUID/enums;
-- required fields;
-- max lengths;
-- body model validation;
-- stable error codes;
-- generic framework binding errors не должны становиться нестабильным публичным контрактом.
+- malformed route/query/body binding переводится в стабильный `400 request.invalid` без framework-specific detail;
+- typed Minimal API binding использует единый exception path через `ThrowOnBadRequest`;
+- endpoint filter валидирует public request DTO через DataAnnotations и undefined numeric enums через `Enum.IsDefined`;
+- semantic transport validation возвращает `400 request.validation` + структурированный `errors` + `traceId`;
+- max lengths для title/question/answer option/external identity/cancel reason совпадают с persistence limits и защищены до MariaDB;
+- unsupported `QuestionType` дополнительно защищён Domain-инвариантом;
+- malformed UUID/enum/JSON, required/max-length и no-mutation scenarios покрыты HTTP/domain regression tests.
+
+**Gate: PASSED** — full CI `#316`, production image и migration smoke зелёные.
 
 ## C4. OpenAPI quality
+
+**Status: NEXT.**
 
 Добавить:
 
