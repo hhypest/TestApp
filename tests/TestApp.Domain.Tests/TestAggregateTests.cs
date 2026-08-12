@@ -9,10 +9,21 @@ namespace TestApp.Domain.Tests.Unit;
 
 public sealed class TestAggregateTests
 {
+    private static readonly ExternalUserId Owner = ExternalUserId.FromSubject("author-1");
+
+    [Fact]
+    public void Created_test_has_immutable_owner()
+    {
+        var test = Test.Create("DDD", Owner);
+        Assert.Equal(Owner, test.OwnerId);
+        Assert.True(test.IsOwnedBy(Owner));
+        Assert.False(test.IsOwnedBy(ExternalUserId.FromSubject("author-2")));
+    }
+
     [Fact]
     public void Publish_requires_questions()
     {
-        var test = Test.Create("DDD");
+        var test = Test.Create("DDD", Owner);
         var result = test.Publish(DateTimeOffset.UtcNow);
         Assert.False(result.Match(_ => true, _ => false));
         Assert.Equal(TestStatus.Draft, test.Status);
@@ -35,7 +46,7 @@ public sealed class TestAggregateTests
     [Fact]
     public void Single_choice_requires_exactly_one_correct_answer()
     {
-        var test = Test.Create("DDD");
+        var test = Test.Create("DDD", Owner);
         var question = test.AddQuestion("Choose", QuestionType.SingleChoice, 1, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
         test.AddAnswerOption(question, "A", false, 1);
@@ -48,7 +59,7 @@ public sealed class TestAggregateTests
     [Fact]
     public void Archived_test_cannot_be_edited()
     {
-        var test = Test.Create("DDD");
+        var test = Test.Create("DDD", Owner);
         Assert.True(test.Archive().Match(_ => true, _ => false));
         var result = test.Rename("New title");
         Assert.False(result.Match(_ => true, _ => false));
@@ -100,7 +111,7 @@ public sealed class TestAggregateTests
 
     private static Test CreatePublishableTest()
     {
-        var test = Test.Create("DDD");
+        var test = Test.Create("DDD", Owner);
         var question = test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
         test.AddAnswerOption(question, "Consistency boundary", true, 1);
