@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TestApp.Application.Assignments;
 using TestApp.Application.Queries;
 using TestApp.Domain.Assignments;
 using TestApp.Domain.Attempts;
@@ -132,6 +133,66 @@ public sealed class ApiHostTests
 
         using var authorOperations = await client.GetAsync("/api/operations/outbox", ct);
         Assert.Equal(HttpStatusCode.Forbidden, authorOperations.StatusCode);
+    }
+
+    [Fact]
+    public async Task Bulk_assignment_is_idempotent_and_admin_queries_expose_statistics()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var factory = CreateFactory(database.ConnectionString);
+        using var client = factory.CreateClient();
+
+        Authenticate(client, "author-1", "test-author");
+        var testId = await PostValue<TestId>(client, "/api/tests", new CreateTestRequest("Bulk assignment test"), ct);
+        var questionId = await PostValue<QuestionId>(client, $"/api/tests/{testId.Value}/questions", new QuestionWriteRequest("Pick one", QuestionType.SingleChoice, 1m, 1), ct);
+        _ = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Correct", true, 1), ct);
+        _ = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Wrong", false, 2), ct);
+        var revisionId = await PostValue<PublishedTestRevisionId>(client, $"/api/tests/{testId.Value}/publish", new PublishRequest(Guid.NewGuid()), ct);
+
+        Authenticate(client, "admin-1", "test-admin");
+        var idempotencyKey = Guid.NewGuid();
+        var request = new BulkAssignRequest(
+            revisionId.Value,
+            [
+                new BulkAssignmentTargetRequest("student-1", null),
+                new BulkAssignmentTargetRequest("student-2", null),
+                new BulkAssignmentTargetRequest(null, "group-a")
+            ],
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            DateTimeOffset.UtcNow.AddHours(2),
+            2,
+            idempotencyKey);
+
+        var first = await PostValue<BulkAssignTestsResult>(client, "/api/assignments/bulk", request, ct);
+        var retry = await PostValue<BulkAssignTestsResult>(client, "/api/assignments/bulk", request, ct);
+        Assert.Equal(3, first.CreatedCount);
+        Assert.Equal(first.AssignmentIds, retry.AssignmentIds);
+
+        var users = await client.GetFromJsonAsync<PagedResult<AdminAssignmentSummary>>(
+            $"/api/assignments?testId={testId.Value}&targetType={AssignmentTargetType.User}&page=1&pageSize=20",
+            ct);
+        Assert.NotNull(users);
+        Assert.Equal(2, users.TotalCount);
+        Assert.All(users.Items, x => Assert.Equal(0, x.AttemptCount));
+
+        var detail = await client.GetFromJsonAsync<AdminAssignmentDetail>($"/api/assignments/{first.AssignmentIds[0].Value}", ct);
+        Assert.NotNull(detail);
+        Assert.Equal(testId, detail.TestId);
+        Assert.Equal(AssignmentTargetType.User, detail.TargetType);
+        Assert.Equal(0, detail.AttemptCount);
+
+        var attempts = await client.GetFromJsonAsync<PagedResult<AdminAssignmentAttemptSummary>>(
+            $"/api/assignments/{first.AssignmentIds[0].Value}/attempts?page=1&pageSize=20",
+            ct);
+        Assert.NotNull(attempts);
+        Assert.Equal(0, attempts.TotalCount);
+
+        Authenticate(client, "author-1", "test-author");
+        using var forbiddenList = await client.GetAsync("/api/assignments", ct);
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenList.StatusCode);
+        using var forbiddenBulk = await client.PostAsJsonAsync("/api/assignments/bulk", request, ct);
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenBulk.StatusCode);
     }
 
     [Fact]
