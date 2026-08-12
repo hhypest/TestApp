@@ -8,6 +8,7 @@ namespace TestApp.Application.Tests;
 
 public sealed record CreateTestCommand(string Title) : ICommand<Result<TestId, Error>>;
 public sealed record RenameTestCommand(TestId TestId, string Title) : ICommand<Result<TestId, Error>>;
+public sealed record ChangeTestSettingsCommand(TestId TestId, decimal PassingPercentage, int? TimeLimitMinutes) : ICommand<Result<TestId, Error>>;
 public sealed record AddQuestionCommand(TestId TestId, string Text, QuestionType Type, decimal Points, int Order) : ICommand<Result<QuestionId, Error>>;
 public sealed record UpdateQuestionCommand(TestId TestId, QuestionId QuestionId, string Text, QuestionType Type, decimal Points) : ICommand<Result<TestId, Error>>;
 public sealed record RemoveQuestionCommand(TestId TestId, QuestionId QuestionId) : ICommand<Result<TestId, Error>>;
@@ -46,6 +47,21 @@ public sealed class RenameTestCommandHandler(ITestRepository tests, IUnitOfWork 
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         try { return await TestCommandResult.Save(test.Rename(command.Title), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.title", ex.Message); }
+    }
+}
+
+public sealed class ChangeTestSettingsCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+    : ICommandHandler<ChangeTestSettingsCommand, Result<TestId, Error>>
+{
+    public async Task<Result<TestId, Error>> Handle(ChangeTestSettingsCommand command, CancellationToken ct)
+    {
+        var test = await tests.GetAsync(command.TestId, ct);
+        if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        return await TestCommandResult.Save(
+            test.ChangeSettings(command.PassingPercentage, command.TimeLimitMinutes),
+            test.Id,
+            unitOfWork,
+            ct);
     }
 }
 
