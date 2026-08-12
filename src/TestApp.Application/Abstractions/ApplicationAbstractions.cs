@@ -47,6 +47,7 @@ public interface ITestAttemptRepository
 
 public interface IIdempotencyStore
 {
+    Task<IAsyncDisposable> AcquireAsync(string operation, ExternalUserId actorId, Guid requestId, CancellationToken cancellationToken = default);
     Task<T?> GetResultAsync<T>(string operation, ExternalUserId actorId, Guid requestId, CancellationToken cancellationToken = default) where T : struct;
     Task AddResultAsync<T>(string operation, ExternalUserId actorId, Guid requestId, T result, DateTimeOffset createdAt, CancellationToken cancellationToken = default) where T : struct;
 }
