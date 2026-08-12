@@ -40,6 +40,7 @@ public interface ITestAssignmentRepository
 public interface ITestAttemptRepository
 {
     Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<TestAttemptId>> GetExpiredInProgressIdsAsync(DateTimeOffset now, int limit, CancellationToken cancellationToken = default);
     Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken cancellationToken = default);
     Task AddAsync(TestAttempt attempt, CancellationToken cancellationToken = default);
     Task<TestAttemptId?> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken cancellationToken = default);
