@@ -1,6 +1,7 @@
 using TestApp.Core.Monads;
 using TestApp.Domain.Common;
 using TestApp.Domain.Entities;
+using TestApp.Domain.Identity;
 
 namespace TestApp.Domain.Tests;
 
@@ -9,18 +10,22 @@ public sealed class Test : AggregateRoot<TestId>
     private readonly List<Question> _questions = [];
 
     private Test() { Title = string.Empty; Settings = TestSettings.Default(); }
-    private Test(TestId id, string title) : base(id)
+    private Test(TestId id, string title, ExternalUserId ownerId) : base(id)
     {
         Title = Normalize(title, nameof(title));
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId.Value, nameof(ownerId));
+        OwnerId = ownerId;
         Settings = TestSettings.Default();
     }
 
     public string Title { get; private set; }
+    public ExternalUserId OwnerId { get; private set; }
     public TestStatus Status { get; private set; } = TestStatus.Draft;
     public TestSettings Settings { get; private set; }
     public IReadOnlyCollection<Question> Questions => _questions.AsReadOnly();
 
-    public static Test Create(string title) => new(TestId.New(), title);
+    public static Test Create(string title, ExternalUserId ownerId) => new(TestId.New(), title, ownerId);
+    public bool IsOwnedBy(ExternalUserId userId) => OwnerId == userId;
 
     public Result<Test, DomainError> Rename(string title)
     {
