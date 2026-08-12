@@ -27,11 +27,11 @@ public sealed class EdgeSecurityTests
         });
         using var client = factory.CreateClient();
 
-        using var first = new HttpRequestMessage(HttpMethod.Get, "/health/live");
+        using var first = new HttpRequestMessage(HttpMethod.Get, "/openapi/v1.json");
         first.Headers.Add("X-Forwarded-For", "198.51.100.10");
         using var firstResponse = await client.SendAsync(first, ct);
 
-        using var second = new HttpRequestMessage(HttpMethod.Get, "/health/live");
+        using var second = new HttpRequestMessage(HttpMethod.Get, "/openapi/v1.json");
         second.Headers.Add("X-Forwarded-For", "203.0.113.20");
         using var secondResponse = await client.SendAsync(second, ct);
 
