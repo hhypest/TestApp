@@ -1,9 +1,12 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace TestApp.Infrastructure.Persistence.Migrations;
 
+[DbContext(typeof(AppDbContext))]
+[Migration("20260812101500_AddConcurrencyAndAttemptIdempotency")]
 public partial class AddConcurrencyAndAttemptIdempotency : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
