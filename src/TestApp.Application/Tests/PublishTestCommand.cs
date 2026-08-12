@@ -7,16 +7,27 @@ using TestApp.Messaging.Abstractions;
 
 namespace TestApp.Application.Tests;
 
-public sealed record PublishTestCommand(TestId TestId) : ICommand<Result<PublishedTestRevisionId, Error>>;
+public sealed record PublishTestCommand(TestId TestId, Guid RequestId) : ICommand<Result<PublishedTestRevisionId, Error>>;
 
 public sealed class PublishTestCommandHandler(
     ITestRepository tests,
     IPublishedTestRevisionRepository revisions,
+    ICurrentActor actor,
+    IIdempotencyStore idempotency,
     IClock clock,
     IUnitOfWork unitOfWork) : ICommandHandler<PublishTestCommand, Result<PublishedTestRevisionId, Error>>
 {
+    private const string Operation = "tests.publish";
+
     public async Task<Result<PublishedTestRevisionId, Error>> Handle(PublishTestCommand command, CancellationToken ct)
     {
+        if (command.RequestId == Guid.Empty)
+            return Error.Validation("idempotency.request_id", "A non-empty idempotency key is required.");
+
+        var cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(Operation, actor.UserId, command.RequestId, ct);
+        if (cached is { } cachedRevisionId)
+            return cachedRevisionId;
+
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null)
             return Error.NotFound("test.not_found", "Test was not found.");
@@ -35,6 +46,7 @@ public sealed class PublishTestCommandHandler(
         var revisionId = PublishedTestRevisionId.New();
         var revision = PublishedTestRevision.From(test, revisionId, version, now);
         await revisions.AddAsync(revision, ct);
+        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, revisionId, now, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return revisionId;
     }
