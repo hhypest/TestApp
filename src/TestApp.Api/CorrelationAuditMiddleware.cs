@@ -6,12 +6,11 @@ namespace TestApp.Api;
 
 public sealed class CorrelationAuditMiddleware(
     RequestDelegate next,
-    AuditTrail auditTrail,
     ILogger<CorrelationAuditMiddleware> logger)
 {
     public const string CorrelationHeader = "X-Correlation-ID";
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(HttpContext context, AuditTrail auditTrail)
     {
         var correlationId = ResolveCorrelationId(context);
         context.TraceIdentifier = correlationId;
