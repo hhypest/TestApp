@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using TestApp.Api;
 using TestApp.Application.Assignments;
 using TestApp.Application.Attempts;
 using TestApp.Application.Common;
@@ -16,6 +17,7 @@ using TestApp.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
 {
     o.Authority = builder.Configuration["Keycloak:Authority"];
