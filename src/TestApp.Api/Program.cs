@@ -33,8 +33,11 @@ builder.Services.AddAuthorization(o =>
     o.AddPolicy(Permissions.ResultsReview, p => p.RequireRole("test-author", "test-admin"));
 });
 
+var connectionString = builder.Configuration.GetConnectionString("Database")
+    ?? "Server=localhost;Port=3306;Database=testapp;User=testapp;Password=testapp;";
+
 builder.Services.AddInfrastructure(o =>
-    o.UseSqlite(builder.Configuration.GetConnectionString("Database") ?? "Data Source=testapp.db"));
+    o.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
 builder.Services.AddScoped<CreateTestCommandHandler>();
 builder.Services.AddScoped<RenameTestCommandHandler>();
@@ -61,9 +64,9 @@ builder.Services.AddScoped<TimeoutAttemptCommandHandler>();
 builder.Services.AddScoped<GetTestEditorViewQueryHandler>();
 builder.Services.AddScoped<GetMyAssignmentsQueryHandler>();
 builder.Services.AddScoped<GetMyAttemptsQueryHandler>();
-builder.Services.AddScoped<GetReviewerResultsQueryHandler>();
 builder.Services.AddScoped<GetAttemptQueryHandler>();
 builder.Services.AddScoped<GetAttemptResultQueryHandler>();
+builder.Services.AddScoped<GetResultsQueryHandler>();
 
 var app = builder.Build();
 
@@ -90,7 +93,7 @@ tests.MapPost("/{id:guid}/questions/{questionId:guid}/options", async (Guid id, 
 tests.MapPut("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}", async (Guid id, Guid questionId, Guid optionId, AnswerOptionUpdateRequest r, UpdateAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new UpdateAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId), r.Text, r.IsCorrect), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapDelete("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}", async (Guid id, Guid questionId, Guid optionId, RemoveAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RemoveAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId)), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPatch("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}/order", async (Guid id, Guid questionId, Guid optionId, OrderRequest r, ReorderAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ReorderAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId), r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
-tests.MapPost("/{id:guid}/publish", async (Guid id, IdempotentRequest r, PublishTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new PublishTestCommand(new TestId(id), r.IdempotencyKey), ct))).RequireAuthorization(Permissions.TestsPublish);
+tests.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest r, PublishTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new PublishTestCommand(new TestId(id), r.IdempotencyKey), ct))).RequireAuthorization(Permissions.TestsPublish);
 tests.MapPost("/{id:guid}/archive", async (Guid id, ArchiveTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ArchiveTestCommand(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapGet("/{id:guid}/editor", async (Guid id, GetTestEditorViewQueryHandler h, CancellationToken ct) => await h.Handle(new GetTestEditorViewQuery(new TestId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsWrite);
 
@@ -110,13 +113,8 @@ app.MapGet("/api/me/assignments", async (int? page, int? pageSize, AssignmentSta
     Results.Ok(await h.Handle(new GetMyAssignmentsQuery(page ?? 1, pageSize ?? 20, status), ct))).RequireAuthorization();
 app.MapGet("/api/me/attempts", async (int? page, int? pageSize, AttemptStatus? status, GetMyAttemptsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetMyAttemptsQuery(page ?? 1, pageSize ?? 20, status), ct))).RequireAuthorization();
-app.MapGet("/api/results", async (Guid? testId, Guid? revisionId, AttemptOutcome? outcome, int? page, int? pageSize, GetReviewerResultsQueryHandler h, CancellationToken ct) =>
-    Results.Ok(await h.Handle(new GetReviewerResultsQuery(
-        testId is null ? null : new TestId(testId.Value),
-        revisionId is null ? null : new PublishedTestRevisionId(revisionId.Value),
-        outcome,
-        page ?? 1,
-        pageSize ?? 20), ct))).RequireAuthorization(Permissions.ResultsReview);
+app.MapGet("/api/results", async (Guid? testId, Guid? revisionId, AttemptOutcome? outcome, int? page, int? pageSize, GetResultsQueryHandler h, CancellationToken ct) =>
+    Results.Ok(await h.Handle(new GetResultsQuery(testId is null ? null : new TestId(testId.Value), revisionId is null ? null : new PublishedTestRevisionId(revisionId.Value), outcome, page ?? 1, pageSize ?? 20), ct))).RequireAuthorization(Permissions.ResultsReview);
 
 var attempts = app.MapGroup("/api/attempts").RequireAuthorization();
 attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct)));
@@ -142,13 +140,13 @@ public static class Permissions
 
 public sealed record CreateTestRequest(string Title);
 public sealed record RenameTestRequest(string Title);
-public sealed record IdempotentRequest(Guid IdempotencyKey);
 public sealed record TestSettingsRequest(decimal PassingPercentage, int? TimeLimitMinutes);
 public sealed record QuestionWriteRequest(string Text, QuestionType Type, decimal Points, int Order);
 public sealed record QuestionUpdateRequest(string Text, QuestionType Type, decimal Points);
 public sealed record AnswerOptionWriteRequest(string Text, bool IsCorrect, int Order);
 public sealed record AnswerOptionUpdateRequest(string Text, bool IsCorrect);
 public sealed record OrderRequest(int Order);
+public sealed record PublishRequest(Guid IdempotencyKey);
 public sealed record AssignRequest(Guid RevisionId, string? UserId, string? GroupId, DateTimeOffset AvailableFrom, DateTimeOffset? AvailableUntil, int? AttemptLimit, Guid IdempotencyKey);
 public sealed record AssignmentWindowRequest(DateTimeOffset AvailableFrom, DateTimeOffset? AvailableUntil);
 public sealed record AttemptLimitRequest(int? AttemptLimit);
