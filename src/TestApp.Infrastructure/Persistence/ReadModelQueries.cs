@@ -39,14 +39,17 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
                 .ToArray());
     }
 
-    public async Task<IReadOnlyList<AssignmentSummary>> GetAssignmentsAsync(
+    public async Task<PagedResult<AssignmentSummary>> GetAssignmentsAsync(
         ExternalUserId userId,
         IReadOnlySet<ExternalGroupId> groups,
+        int page,
+        int pageSize,
+        AssignmentStatus? status,
         CancellationToken ct)
     {
         var assignments = await db.Assignments
             .AsNoTracking()
-            .Where(x => x.Status == AssignmentStatus.Active)
+            .Where(x => status == null || x.Status == status)
             .ToListAsync(ct);
 
         var visible = assignments.Where(a => a.Target switch
@@ -54,17 +57,18 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
             AssignmentTarget.User user => user.UserId == userId,
             AssignmentTarget.Group group => groups.Contains(group.GroupId),
             _ => false
-        }).ToArray();
+        }).OrderByDescending(a => a.AssignedAt).ToArray();
 
-        var revisionIds = visible.Select(x => x.RevisionId).Distinct().ToArray();
+        var totalCount = visible.Length;
+        var pageItems = visible.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
+        var revisionIds = pageItems.Select(x => x.RevisionId).Distinct().ToArray();
         var revisions = await db.Revisions
             .AsNoTracking()
             .Where(x => revisionIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
 
-        return visible
+        var items = pageItems
             .Where(a => revisions.ContainsKey(a.RevisionId))
-            .OrderBy(a => a.AvailableFrom)
             .Select(a =>
             {
                 var revision = revisions[a.RevisionId];
@@ -81,6 +85,40 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
                     a.Status);
             })
             .ToArray();
+
+        return new PagedResult<AssignmentSummary>(items, page, pageSize, totalCount);
+    }
+
+    public async Task<PagedResult<AttemptSummary>> GetAttemptsAsync(
+        ExternalUserId userId,
+        int page,
+        int pageSize,
+        AttemptStatus? status,
+        CancellationToken ct)
+    {
+        var query = db.Attempts.AsNoTracking().Where(x => x.UserId == userId);
+        if (status is { } value)
+            query = query.Where(x => x.Status == value);
+
+        var totalCount = await query.CountAsync(ct);
+        var rows = await query
+            .OrderByDescending(x => x.StartedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        var items = rows.Select(attempt => new AttemptSummary(
+            attempt.Id,
+            attempt.AssignmentId,
+            attempt.RevisionId,
+            attempt.Status,
+            attempt.Outcome,
+            attempt.Score?.Percentage,
+            attempt.StartedAt,
+            attempt.DeadlineAt,
+            attempt.CompletedAt)).ToArray();
+
+        return new PagedResult<AttemptSummary>(items, page, pageSize, totalCount);
     }
 
     public async Task<AttemptView?> GetAttemptAsync(TestAttemptId attemptId, ExternalUserId userId, CancellationToken ct)
