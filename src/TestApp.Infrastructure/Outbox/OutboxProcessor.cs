@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MySqlConnector;
 using TestApp.Infrastructure.Persistence;
 
 namespace TestApp.Infrastructure.Outbox;
@@ -61,7 +60,11 @@ public sealed class OutboxProcessor(
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             ids = await db.OutboxMessages
                 .AsNoTracking()
-                .Where(x => x.ProcessedAt == null && x.DeadLetteredAt == null && (x.NextAttemptAt == null || x.NextAttemptAt <= now))
+                .Where(x =>
+                    x.ProcessedAt == null &&
+                    x.DeadLetteredAt == null &&
+                    x.DiscardedAt == null &&
+                    (x.NextAttemptAt == null || x.NextAttemptAt <= now))
                 .OrderBy(x => x.OccurredAt)
                 .Select(x => x.Id)
                 .Take(_options.BatchSize)
@@ -84,52 +87,44 @@ public sealed class OutboxProcessor(
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var publisher = scope.ServiceProvider.GetRequiredService<IOutboxPublisher>();
-        var connectionString = db.Database.GetConnectionString()
-            ?? throw new InvalidOperationException("Database connection string is not configured.");
 
-        await using var lockConnection = new MySqlConnection(connectionString);
-        await lockConnection.OpenAsync(ct);
-        var lockName = $"testapp:outbox:{id:N}";
+        await using var lease = await OutboxAdvisoryLock.TryAcquireAsync(
+            db,
+            id,
+            _options.AdvisoryLockTimeoutSeconds,
+            ct);
+        if (lease is null)
+            return false;
 
-        if (!await TryAcquireLockAsync(lockConnection, lockName, ct))
+        var message = await db.OutboxMessages.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (message is null || !message.IsDueAt(time.GetUtcNow()))
             return false;
 
         try
         {
-            var message = await db.OutboxMessages.SingleOrDefaultAsync(x => x.Id == id, ct);
-            if (message is null || !message.IsDueAt(time.GetUtcNow()))
-                return false;
-
-            try
-            {
-                await publisher.Publish(message.Id, message.Type, message.Payload, ct);
-                message.MarkProcessed(time.GetUtcNow());
-                await db.SaveChangesAsync(ct);
-                return true;
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                var failedAt = time.GetUtcNow();
-                var nextAttemptNumber = message.AttemptCount + 1;
-                var delay = CalculateRetryDelay(nextAttemptNumber);
-                message.MarkFailed(failedAt, ex.Message, failedAt.Add(delay), _options.MaxAttempts);
-                await db.SaveChangesAsync(ct);
-
-                if (message.DeadLetteredAt is not null)
-                    logger.LogError(ex, "Outbox message {OutboxMessageId} moved to dead letter after {AttemptCount} failed attempts", message.Id, message.AttemptCount);
-                else
-                    logger.LogWarning(ex, "Failed to publish outbox message {OutboxMessageId}; attempt {AttemptCount}, next retry at {NextAttemptAt}", message.Id, message.AttemptCount, message.NextAttemptAt);
-
-                return false;
-            }
+            await publisher.Publish(message.Id, message.Type, message.Payload, ct);
+            message.MarkProcessed(time.GetUtcNow());
+            await db.SaveChangesAsync(ct);
+            return true;
         }
-        finally
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            await ReleaseLockAsync(lockConnection, lockName);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var failedAt = time.GetUtcNow();
+            var nextAttemptNumber = message.AttemptCount + 1;
+            var delay = CalculateRetryDelay(nextAttemptNumber);
+            message.MarkFailed(failedAt, ex.Message, failedAt.Add(delay), _options.MaxAttempts);
+            await db.SaveChangesAsync(ct);
+
+            if (message.DeadLetteredAt is not null)
+                logger.LogError(ex, "Outbox message {OutboxMessageId} moved to dead letter after {AttemptCount} failed attempts", message.Id, message.AttemptCount);
+            else
+                logger.LogWarning(ex, "Failed to publish outbox message {OutboxMessageId}; attempt {AttemptCount}, next retry at {NextAttemptAt}", message.Id, message.AttemptCount, message.NextAttemptAt);
+
+            return false;
         }
     }
 
@@ -139,26 +134,5 @@ public sealed class OutboxProcessor(
         var multiplier = Math.Pow(2, exponent);
         var milliseconds = Math.Min(_options.BaseRetryDelay.TotalMilliseconds * multiplier, _options.MaxRetryDelay.TotalMilliseconds);
         return TimeSpan.FromMilliseconds(milliseconds);
-    }
-
-    private async Task<bool> TryAcquireLockAsync(MySqlConnection connection, string lockName, CancellationToken ct)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT GET_LOCK(@name, @timeoutSeconds);";
-        command.Parameters.AddWithValue("@name", lockName);
-        command.Parameters.AddWithValue("@timeoutSeconds", _options.AdvisoryLockTimeoutSeconds);
-        var result = await command.ExecuteScalarAsync(ct);
-        return result is not null && result is not DBNull && Convert.ToInt32(result) == 1;
-    }
-
-    private static async Task ReleaseLockAsync(MySqlConnection connection, string lockName)
-    {
-        if (connection.State != System.Data.ConnectionState.Open)
-            return;
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT RELEASE_LOCK(@name);";
-        command.Parameters.AddWithValue("@name", lockName);
-        await command.ExecuteScalarAsync();
     }
 }
