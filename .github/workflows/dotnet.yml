@@ -68,3 +68,24 @@ jobs:
           -e Keycloak__Authority=http://127.0.0.1:8081/realms/testapp
           -e Keycloak__Audience=testapp-api
           testapp-api:ci --migrate
+      - name: Seed backup restore probe
+        run: |
+          docker run --rm --network host \
+            -e MARIADB_PWD=root \
+            mariadb:12.3 \
+            mariadb \
+              --host=127.0.0.1 \
+              --port=3306 \
+              --user=root \
+              --database=testapp \
+              --execute="INSERT INTO idempotency_records (Id, Operation, ActorId, RequestId, ResultType, ResultJson, CreatedAt, RequestFingerprint) VALUES ('00000000-0000-0000-0000-000000000101', 'ci.backup.restore', 'ci', '00000000-0000-0000-0000-000000000102', 'System.String', '\"probe\"', NOW(6), REPEAT('0', 64));"
+      - name: Create and verify MariaDB backup
+        env:
+          MARIADB_PASSWORD: root
+          MARIADB_ADMIN_PASSWORD: root
+          VERIFY_QUERY: SELECT COUNT(*) FROM idempotency_records WHERE Operation = 'ci.backup.restore';
+          VERIFY_EXPECTED: '1'
+        run: |
+          bash scripts/mariadb-backup.sh /tmp/testapp-ci.sql.gz
+          MARIADB_SOURCE_DATABASE=testapp \
+            bash scripts/mariadb-restore-verify.sh /tmp/testapp-ci.sql.gz testapp_restore_verify
