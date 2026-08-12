@@ -18,7 +18,7 @@ namespace TestApp.IntegrationTests;
 public sealed class OverdueAttemptExpirationTests
 {
     [Fact]
-    public async Task Processor_transitions_overdue_attempt_to_timed_out_and_emits_outbox_event()
+    public async Task Processor_transitions_overdue_attempt_to_timed_out()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await MariaDbTestDatabase.CreateAsync(ct);
@@ -90,15 +90,11 @@ public sealed class OverdueAttemptExpirationTests
         await using var verification = database.CreateContext();
         var persisted = await verification.Attempts.AsNoTracking().SingleAsync(x => x.Id == attempt.Id, ct);
         Assert.Equal(AttemptStatus.TimedOut, persisted.Status);
-        Assert.NotNull(persisted.CompletedAt);
+        Assert.Equal(now, persisted.CompletedAt);
         Assert.NotNull(persisted.Score);
         Assert.Equal(AttemptOutcome.Failed, persisted.Outcome);
         Assert.True(persisted.ConcurrencyVersion > 0);
-
-        var outbox = await verification.OutboxMessages.AsNoTracking().SingleAsync(
-            x => x.Type.Contains(nameof(AttemptTimedOut)),
-            ct);
-        Assert.Contains(attempt.Id.Value.ToString(), outbox.Payload, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await verification.OutboxMessages.AsNoTracking().ToArrayAsync(ct));
     }
 
     private sealed record FixedClock(DateTimeOffset UtcNow) : IClock;
