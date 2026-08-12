@@ -107,6 +107,12 @@ public sealed class SubmitAttemptCommandHandler(
         if (cached is { } cachedScore)
             return cachedScore.ToDomain();
 
+        await using var lease = await idempotency.AcquireAsync(operation, actor.UserId, command.IdempotencyKey, ct);
+
+        cached = await idempotency.GetResultAsync<CachedAttemptScore>(operation, actor.UserId, command.IdempotencyKey, ct);
+        if (cached is { } leasedCachedScore)
+            return leasedCachedScore.ToDomain();
+
         var attempt = await attempts.GetAsync(command.AttemptId, ct);
         if (attempt is null) return Error.NotFound("attempt.not_found", "Attempt was not found.");
         if (attempt.UserId != actor.UserId) return Error.Forbidden("attempt.forbidden", "Attempt belongs to another user.");
