@@ -76,6 +76,8 @@ public sealed class StartAttemptTests
     {
         public TestAttempt? Value;
         public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) => Task.FromResult(Value?.Id == id ? Value : null);
+        public Task<IReadOnlyCollection<TestAttemptId>> GetExpiredInProgressIdsAsync(DateTimeOffset now, int limit, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyCollection<TestAttemptId>>(Array.Empty<TestAttemptId>());
         public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) => Task.FromResult(Value is null ? 0 : 1);
         public Task AddAsync(TestAttempt attempt, CancellationToken ct = default) { Value = attempt; return Task.CompletedTask; }
         public Task<TestAttemptId?> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
