@@ -43,7 +43,7 @@ public sealed class ApiHostTests
         var testId = await PostValue<TestId>(client, "/api/tests", new CreateTestRequest("DDD fundamentals"), ct);
         var questionId = await PostValue<QuestionId>(client, $"/api/tests/{testId.Value}/questions", new QuestionWriteRequest("What is an aggregate?", QuestionType.SingleChoice, 1m, 1), ct);
         var correctOptionId = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Consistency boundary", true, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("A database table", false, 2), ct);
+        var wrongOptionId = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("A database table", false, 2), ct);
         var revisionId = await PostValue<PublishedTestRevisionId>(client, $"/api/tests/{testId.Value}/publish", new PublishRequest(Guid.NewGuid()), ct);
 
         Authenticate(client, "admin-1", "test-admin");
@@ -86,6 +86,9 @@ public sealed class ApiHostTests
         Assert.Equal(AttemptOutcome.Passed, result.Outcome);
         Assert.Equal(100m, result.Percentage);
 
+        using (var forbiddenReviewerDetail = await client.GetAsync($"/api/results/{attemptId.Value}", ct))
+            Assert.Equal(HttpStatusCode.Forbidden, forbiddenReviewerDetail.StatusCode);
+
         Authenticate(client, "author-1", "test-author");
         var reviewed = await client.GetFromJsonAsync<PagedResult<ReviewerResultSummary>>(
             $"/api/results?testId={testId.Value}&outcome={AttemptOutcome.Passed}&page=1&pageSize=20",
@@ -94,6 +97,18 @@ public sealed class ApiHostTests
         Assert.Single(reviewed.Items);
         Assert.Equal(attemptId, reviewed.Items[0].AttemptId);
         Assert.Equal("student-1", reviewed.Items[0].UserId.Value);
+
+        var detail = await client.GetFromJsonAsync<ReviewerAttemptResultView>($"/api/results/{attemptId.Value}", ct);
+        Assert.NotNull(detail);
+        Assert.Equal(testId, detail.TestId);
+        Assert.Equal(attemptId, detail.AttemptId);
+        Assert.Equal("student-1", detail.UserId.Value);
+        Assert.Single(detail.Questions);
+        var reviewedQuestion = detail.Questions[0];
+        Assert.Equal(questionId, reviewedQuestion.Id);
+        Assert.Equal(1m, reviewedQuestion.EarnedPoints);
+        Assert.Contains(reviewedQuestion.Options, x => x.Id == correctOptionId && x.IsCorrect && x.IsSelected);
+        Assert.Contains(reviewedQuestion.Options, x => x.Id == wrongOptionId && !x.IsCorrect && !x.IsSelected);
     }
 
     [Fact]
@@ -120,11 +135,11 @@ public sealed class ApiHostTests
             {
                 services.AddAuthentication(options =>
                     {
-                        options.DefaultAuthenticateScheme = TestAuthenticationHandler.Scheme;
-                        options.DefaultChallengeScheme = TestAuthenticationHandler.Scheme;
-                        options.DefaultScheme = TestAuthenticationHandler.Scheme;
+                        options.DefaultAuthenticateScheme = TestAuthenticationHandler.TestScheme;
+                        options.DefaultChallengeScheme = TestAuthenticationHandler.TestScheme;
+                        options.DefaultScheme = TestAuthenticationHandler.TestScheme;
                     })
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.Scheme, _ => { });
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.TestScheme, _ => { });
             });
         });
 
@@ -152,7 +167,7 @@ internal sealed class TestAuthenticationHandler(
     UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
-    public const string Scheme = "Test";
+    public const string TestScheme = "Test";
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -166,8 +181,8 @@ internal sealed class TestAuthenticationHandler(
                 claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
-        var identity = new ClaimsIdentity(claims, Scheme, "sub", ClaimTypes.Role);
+        var identity = new ClaimsIdentity(claims, TestScheme, "sub", ClaimTypes.Role);
         var principal = new ClaimsPrincipal(identity);
-        return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme)));
+        return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, TestScheme)));
     }
 }
