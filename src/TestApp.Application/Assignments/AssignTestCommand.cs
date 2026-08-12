@@ -14,18 +14,29 @@ public sealed record AssignTestCommand(
     ExternalGroupId? GroupId,
     DateTimeOffset AvailableFrom,
     DateTimeOffset? AvailableUntil,
-    int? AttemptLimit) : ICommand<Result<TestAssignmentId, Error>>;
+    int? AttemptLimit,
+    Guid RequestId) : ICommand<Result<TestAssignmentId, Error>>;
 
 public sealed class AssignTestCommandHandler(
     ITestAssignmentRepository assignments,
     IPublishedTestRevisionRepository revisions,
     ICurrentActor actor,
+    IIdempotencyStore idempotency,
     IUnitOfWork unitOfWork,
     IClock clock)
     : ICommandHandler<AssignTestCommand, Result<TestAssignmentId, Error>>
 {
+    private const string Operation = "assignments.create";
+
     public async Task<Result<TestAssignmentId, Error>> Handle(AssignTestCommand command, CancellationToken ct)
     {
+        if (command.RequestId == Guid.Empty)
+            return Error.Validation("idempotency.request_id", "A non-empty idempotency key is required.");
+
+        var cached = await idempotency.GetResultAsync<TestAssignmentId>(Operation, actor.UserId, command.RequestId, ct);
+        if (cached is { } cachedAssignmentId)
+            return cachedAssignmentId;
+
         if ((command.UserId is null) == (command.GroupId is null))
             return Error.Validation("assignment.target", "Specify exactly one assignment target: user or group.");
         if (command.AvailableUntil is not null && command.AvailableUntil <= command.AvailableFrom)
@@ -43,17 +54,10 @@ public sealed class AssignTestCommandHandler(
 
         var now = clock.UtcNow;
         var id = TestAssignmentId.New();
-        var assignment = TestAssignment.Create(
-            id,
-            revision.Id,
-            target,
-            actor.UserId,
-            now,
-            command.AvailableFrom,
-            command.AvailableUntil,
-            command.AttemptLimit);
+        var assignment = TestAssignment.Create(id, revision.Id, target, actor.UserId, now, command.AvailableFrom, command.AvailableUntil, command.AttemptLimit);
 
         await assignments.AddAsync(assignment, ct);
+        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, id, now, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return id;
     }
