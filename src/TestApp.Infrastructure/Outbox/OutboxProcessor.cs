@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TestApp.Infrastructure.Observability;
 using TestApp.Infrastructure.Persistence;
 
 namespace TestApp.Infrastructure.Outbox;
@@ -36,6 +37,7 @@ public sealed class OutboxProcessor(
     IServiceScopeFactory scopes,
     TimeProvider time,
     IOptions<OutboxDeliveryOptions> options,
+    OperationalMetrics metrics,
     ILogger<OutboxProcessor> logger) : BackgroundService
 {
     private readonly OutboxDeliveryOptions _options = options.Value;
@@ -103,8 +105,10 @@ public sealed class OutboxProcessor(
         try
         {
             await publisher.Publish(message.Id, message.Type, message.Payload, ct);
-            message.MarkProcessed(time.GetUtcNow());
+            var processedAt = time.GetUtcNow();
+            message.MarkProcessed(processedAt);
             await db.SaveChangesAsync(ct);
+            metrics.RecordOutboxPublish(success: true, deadLettered: false, processedAt - message.OccurredAt);
             return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -118,6 +122,7 @@ public sealed class OutboxProcessor(
             var delay = CalculateRetryDelay(nextAttemptNumber);
             message.MarkFailed(failedAt, ex.Message, failedAt.Add(delay), _options.MaxAttempts);
             await db.SaveChangesAsync(ct);
+            metrics.RecordOutboxPublish(success: false, deadLettered: message.DeadLetteredAt is not null);
 
             if (message.DeadLetteredAt is not null)
                 logger.LogError(ex, "Outbox message {OutboxMessageId} moved to dead letter after {AttemptCount} failed attempts", message.Id, message.AttemptCount);
