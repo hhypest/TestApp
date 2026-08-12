@@ -20,66 +20,94 @@ using TestApp.Infrastructure.Persistence;
 var migrateOnly = args.Any(x => string.Equals(x, "--migrate", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(args);
 
+var databaseOptions = RuntimeConfiguration.LoadDatabase(builder.Configuration, builder.Environment);
+var keycloakOptions = migrateOnly ? null : RuntimeConfiguration.LoadKeycloak(builder.Configuration, builder.Environment);
+var rabbitMqOptions = RuntimeConfiguration.LoadRabbitMq(builder.Configuration);
+var rateLimitingOptions = RuntimeConfiguration.LoadRateLimiting(builder.Configuration);
+var openApiOptions = RuntimeConfiguration.LoadOpenApi(builder.Configuration, builder.Environment);
+var reverseProxyOptions = RuntimeConfiguration.LoadReverseProxy(builder.Configuration);
+
+RuntimeConfiguration.RegisterTypedOptions(
+    builder.Services,
+    databaseOptions,
+    keycloakOptions,
+    rabbitMqOptions,
+    rateLimitingOptions,
+    openApiOptions,
+    reverseProxyOptions);
+RuntimeConfiguration.ConfigureForwardedHeaders(builder.Services, reverseProxyOptions);
+
 builder.Services.AddProblemDetails();
-builder.Services.AddOpenApi();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
+
+if (!migrateOnly)
 {
-    o.Authority = builder.Configuration["Keycloak:Authority"];
-    o.Audience = builder.Configuration["Keycloak:Audience"];
-    o.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-    o.MapInboundClaims = false;
-    o.TokenValidationParameters = new TokenValidationParameters
+    builder.Services.AddOpenApi();
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
     {
-        NameClaimType = "sub",
-        RoleClaimType = "roles"
-    };
-});
-
-builder.Services.AddAuthorization(o =>
-{
-    o.AddPolicy(Permissions.TestsWrite, p => p.RequireRole("test-author", "test-admin"));
-    o.AddPolicy(Permissions.TestsPublish, p => p.RequireRole("test-author", "test-admin"));
-    o.AddPolicy(Permissions.TestsAssign, p => p.RequireRole("test-admin"));
-    o.AddPolicy(Permissions.ResultsReview, p => p.RequireRole("test-author", "test-admin"));
-    o.AddPolicy(Permissions.OperationsRead, p => p.RequireRole("test-admin"));
-});
-
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-    {
-        var partitionKey = context.User.FindFirst("sub")?.Value
-            ?? context.Connection.RemoteIpAddress?.ToString()
-            ?? "anonymous";
-
-        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        o.Authority = keycloakOptions!.Authority;
+        o.Audience = keycloakOptions.Audience;
+        o.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
+        o.MapInboundClaims = false;
+        o.TokenValidationParameters = new TokenValidationParameters
         {
-            PermitLimit = 120,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0,
-            AutoReplenishment = true
+            NameClaimType = "sub",
+            RoleClaimType = "roles"
+        };
+    });
+
+    builder.Services.AddAuthorization(o =>
+    {
+        o.AddPolicy(Permissions.TestsWrite, p => p.RequireRole("test-author", "test-admin"));
+        o.AddPolicy(Permissions.TestsPublish, p => p.RequireRole("test-author", "test-admin"));
+        o.AddPolicy(Permissions.TestsAssign, p => p.RequireRole("test-admin"));
+        o.AddPolicy(Permissions.ResultsReview, p => p.RequireRole("test-author", "test-admin"));
+        o.AddPolicy(Permissions.OperationsRead, p => p.RequireRole("test-admin"));
+    });
+
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        {
+            var partitionKey = context.User.FindFirst("sub")?.Value
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "anonymous";
+
+            return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitingOptions.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimitingOptions.WindowSeconds),
+                QueueLimit = rateLimitingOptions.QueueLimit,
+                AutoReplenishment = true
+            });
         });
     });
-});
-
-var connectionString = builder.Configuration.GetConnectionString("Database")
-    ?? "Server=localhost;Port=3306;Database=testapp;User=testapp;Password=testapp;";
+}
 
 builder.Services.AddInfrastructure(o =>
-    o.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    o.UseMySql(databaseOptions.ConnectionString, ServerVersion.AutoDetect(databaseOptions.ConnectionString)));
 
-if (builder.Configuration.GetValue<bool>("RabbitMq:Enabled"))
+if (!migrateOnly && rabbitMqOptions.Enabled)
 {
-    builder.Services.AddRabbitMqOutboxDelivery(options =>
-    {
-        options.Enabled = true;
-        options.ConnectionString = builder.Configuration["RabbitMq:ConnectionString"] ?? string.Empty;
-        options.Exchange = builder.Configuration["RabbitMq:Exchange"] ?? "testapp.events";
-        options.RoutingKeyPrefix = builder.Configuration["RabbitMq:RoutingKeyPrefix"] ?? "testapp";
-        options.ClientProvidedName = builder.Configuration["RabbitMq:ClientProvidedName"] ?? "TestApp.Outbox";
-    });
+    builder.Services.AddRabbitMqOutboxDelivery(
+        options =>
+        {
+            options.Enabled = true;
+            options.ConnectionString = rabbitMqOptions.ConnectionString;
+            options.Exchange = rabbitMqOptions.Exchange;
+            options.RoutingKeyPrefix = rabbitMqOptions.RoutingKeyPrefix;
+            options.ClientProvidedName = rabbitMqOptions.ClientProvidedName;
+        },
+        options =>
+        {
+            options.BatchSize = rabbitMqOptions.BatchSize;
+            options.MaxAttempts = rabbitMqOptions.MaxAttempts;
+            options.PollInterval = TimeSpan.FromSeconds(rabbitMqOptions.PollIntervalSeconds);
+            options.BaseRetryDelay = TimeSpan.FromSeconds(rabbitMqOptions.BaseRetryDelaySeconds);
+            options.MaxRetryDelay = TimeSpan.FromSeconds(rabbitMqOptions.MaxRetryDelaySeconds);
+            options.AdvisoryLockTimeoutSeconds = rabbitMqOptions.AdvisoryLockTimeoutSeconds;
+        });
 }
 
 builder.Services.AddScoped<CreateTestCommandHandler>();
@@ -120,10 +148,7 @@ builder.Services.AddScoped<GetReviewerAttemptResultQueryHandler>();
 
 var app = builder.Build();
 
-var applyMigrationsOnStartup = builder.Configuration.GetValue<bool?>("Database:ApplyMigrationsOnStartup")
-    ?? app.Environment.IsDevelopment();
-
-if (migrateOnly || applyMigrationsOnStartup)
+if (migrateOnly || databaseOptions.ApplyMigrationsOnStartup)
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -132,6 +157,9 @@ if (migrateOnly || applyMigrationsOnStartup)
 
 if (migrateOnly)
     return;
+
+if (reverseProxyOptions.Enabled)
+    app.UseForwardedHeaders();
 
 app.Use(async (context, next) =>
 {
@@ -152,7 +180,14 @@ app.UseMiddleware<CorrelationAuditMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 
-app.MapOpenApi("/openapi/v1.json").AllowAnonymous();
+if (openApiOptions.Enabled)
+{
+    var openApiEndpoint = app.MapOpenApi("/openapi/v1.json");
+    if (openApiOptions.AllowAnonymous)
+        openApiEndpoint.AllowAnonymous();
+    else
+        openApiEndpoint.RequireAuthorization(Permissions.OperationsRead);
+}
 
 var tests = app.MapGroup("/api/v1/tests").RequireAuthorization();
 tests.MapGet("/", async (int? page, int? pageSize, TestStatus? status, string? search, GetTestsQueryHandler h, CancellationToken ct) =>
