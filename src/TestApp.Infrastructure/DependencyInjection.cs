@@ -54,6 +54,23 @@ public static class DependencyInjection
         return services;
     }
 
+    public static IServiceCollection AddRabbitMqOutboxDelivery(
+        this IServiceCollection services,
+        Action<RabbitMqOutboxOptions> configureRabbitMq,
+        Action<OutboxDeliveryOptions>? configureDelivery = null)
+    {
+        services.Configure(configureRabbitMq);
+        if (configureDelivery is not null)
+            services.Configure(configureDelivery);
+        else
+            services.Configure<OutboxDeliveryOptions>(_ => { });
+
+        services.AddSingleton<RabbitMqOutboxPublisher>();
+        services.AddSingleton<IOutboxPublisher>(sp => sp.GetRequiredService<RabbitMqOutboxPublisher>());
+        services.AddHostedService<OutboxProcessor>();
+        return services;
+    }
+
     private static void AddObservability(IServiceCollection services)
     {
         var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "TestApp.Api";
