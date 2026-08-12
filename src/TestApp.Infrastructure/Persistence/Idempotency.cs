@@ -1,6 +1,9 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using MySqlConnector;
 using TestApp.Application.Abstractions;
 using TestApp.Domain.Identity;
 
@@ -57,6 +60,48 @@ public sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<Id
 
 public sealed class IdempotencyStore(AppDbContext db) : IIdempotencyStore
 {
+    private const int LockTimeoutSeconds = 30;
+
+    public async Task<IAsyncDisposable> AcquireAsync(
+        string operation,
+        ExternalUserId actorId,
+        Guid requestId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(operation))
+            throw new ArgumentException("Operation is required.", nameof(operation));
+        if (requestId == Guid.Empty)
+            throw new ArgumentException("Request id cannot be empty.", nameof(requestId));
+
+        var connectionString = db.Database.GetConnectionString()
+            ?? throw new InvalidOperationException("Database connection string is not configured.");
+        var connection = new MySqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        var material = $"{connection.Database}|{operation}|{actorId.Value}|{requestId:D}";
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant();
+        var lockName = $"testapp:idem:{hash[..50]}";
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT GET_LOCK(@name, @timeoutSeconds);";
+            command.Parameters.AddWithValue("@name", lockName);
+            command.Parameters.AddWithValue("@timeoutSeconds", LockTimeoutSeconds);
+
+            var value = await command.ExecuteScalarAsync(cancellationToken);
+            if (value is null || value is DBNull || Convert.ToInt32(value) != 1)
+                throw new TimeoutException($"Could not acquire idempotency lease for operation '{operation}'.");
+
+            return new MariaDbAdvisoryLockLease(connection, lockName);
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
     public async Task<T?> GetResultAsync<T>(string operation, ExternalUserId actorId, Guid requestId, CancellationToken cancellationToken = default) where T : struct
     {
         var record = await db.Set<IdempotencyRecord>()
@@ -69,5 +114,29 @@ public sealed class IdempotencyStore(AppDbContext db) : IIdempotencyStore
     public async Task AddResultAsync<T>(string operation, ExternalUserId actorId, Guid requestId, T result, DateTimeOffset createdAt, CancellationToken cancellationToken = default) where T : struct
     {
         await db.Set<IdempotencyRecord>().AddAsync(IdempotencyRecord.Create(operation, actorId, requestId, result, createdAt), cancellationToken);
+    }
+
+    private sealed class MariaDbAdvisoryLockLease(MySqlConnection connection, string lockName) : IAsyncDisposable
+    {
+        private MySqlConnection? _connection = connection;
+
+        public async ValueTask DisposeAsync()
+        {
+            var current = Interlocked.Exchange(ref _connection, null);
+            if (current is null)
+                return;
+
+            try
+            {
+                await using var command = current.CreateCommand();
+                command.CommandText = "SELECT RELEASE_LOCK(@name);";
+                command.Parameters.AddWithValue("@name", lockName);
+                await command.ExecuteScalarAsync();
+            }
+            finally
+            {
+                await current.DisposeAsync();
+            }
+        }
     }
 }
