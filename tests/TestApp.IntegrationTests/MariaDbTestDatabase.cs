@@ -8,6 +8,9 @@ internal sealed class MariaDbTestDatabase : IAsyncDisposable
 {
     private readonly string _rootConnectionString;
 
+    internal static ServerVersion EfServerVersion { get; } =
+        new MariaDbServerVersion(new Version(12, 3, 0));
+
     public string DatabaseName { get; }
     public string ConnectionString { get; }
 
@@ -39,7 +42,7 @@ internal sealed class MariaDbTestDatabase : IAsyncDisposable
     public AppDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseMySql(ConnectionString, new MariaDbServerVersion(new Version(11, 4, 0)))
+            .UseMySql(ConnectionString, EfServerVersion)
             .Options;
         return new AppDbContext(options);
     }
