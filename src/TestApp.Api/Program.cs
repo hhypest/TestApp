@@ -132,6 +132,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseRouting();
 app.UseMiddleware<RequestTelemetryMiddleware>();
 app.UseExceptionHandler();
 app.UseAuthentication();
