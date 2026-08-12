@@ -25,6 +25,8 @@ public static class DependencyInjection
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IOutboxPublisher, NullOutboxPublisher>();
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
         services.AddHostedService<OutboxProcessor>();
         return services;
     }
