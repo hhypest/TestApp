@@ -28,18 +28,20 @@ public sealed record AttemptScore(decimal Earned, decimal Maximum)
 
 public sealed record AttemptStarted : DomainEvent
 {
-    public AttemptStarted(TestAttemptId attemptId, TestAssignmentId assignmentId, PublishedTestRevisionId revisionId, ExternalUserId userId, DateTimeOffset occurredAt) : base(occurredAt)
+    public AttemptStarted(TestAttemptId attemptId, TestAssignmentId assignmentId, PublishedTestRevisionId revisionId, ExternalUserId userId, Guid startRequestId, DateTimeOffset occurredAt) : base(occurredAt)
     {
         AttemptId = attemptId;
         AssignmentId = assignmentId;
         RevisionId = revisionId;
         UserId = userId;
+        StartRequestId = startRequestId;
     }
 
     public TestAttemptId AttemptId { get; }
     public TestAssignmentId AssignmentId { get; }
     public PublishedTestRevisionId RevisionId { get; }
     public ExternalUserId UserId { get; }
+    public Guid StartRequestId { get; }
 }
 
 public sealed record AttemptSubmitted : DomainEvent
@@ -67,6 +69,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     public TestAssignmentId AssignmentId { get; private set; }
     public PublishedTestRevisionId RevisionId { get; private set; }
     public ExternalUserId UserId { get; private set; }
+    public Guid StartRequestId { get; private set; }
     public AttemptStatus Status { get; private set; }
     public DateTimeOffset StartedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -80,12 +83,17 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
         TestAssignmentId assignmentId,
         PublishedTestRevisionId revisionId,
         ExternalUserId userId,
+        Guid startRequestId,
         DateTimeOffset startedAt,
         IEnumerable<QuestionId> questionIds) : base(id)
     {
+        if (startRequestId == Guid.Empty)
+            throw new ArgumentException("Start request id cannot be empty.", nameof(startRequestId));
+
         AssignmentId = assignmentId;
         RevisionId = revisionId;
         UserId = userId;
+        StartRequestId = startRequestId;
         Status = AttemptStatus.InProgress;
         StartedAt = startedAt;
         _responses.AddRange(questionIds.Distinct().Select(QuestionResponse.Create));
@@ -96,12 +104,13 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
         TestAssignmentId assignmentId,
         PublishedTestRevisionId revisionId,
         ExternalUserId userId,
+        Guid startRequestId,
         DateTimeOffset startedAt,
         IEnumerable<QuestionId> questionIds)
     {
         ArgumentNullException.ThrowIfNull(questionIds);
-        var attempt = new TestAttempt(id, assignmentId, revisionId, userId, startedAt, questionIds);
-        attempt.Raise(new AttemptStarted(id, assignmentId, revisionId, userId, startedAt));
+        var attempt = new TestAttempt(id, assignmentId, revisionId, userId, startRequestId, startedAt, questionIds);
+        attempt.Raise(new AttemptStarted(id, assignmentId, revisionId, userId, startRequestId, startedAt));
         return attempt;
     }
 
@@ -121,6 +130,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
             return DomainError.NotFound("attempt.question.not_found", "Question is not part of this attempt.");
 
         response.Answer(selected, answeredAt);
+        Touch();
         return this;
     }
 
@@ -135,6 +145,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
             return DomainError.NotFound("attempt.question.not_found", "Question is not part of this attempt.");
 
         response.Clear();
+        Touch();
         return this;
     }
 
@@ -149,6 +160,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
         Status = AttemptStatus.Submitted;
         CompletedAt = submittedAt;
         Score = score;
+        Touch();
         Raise(new AttemptSubmitted(Id, score, submittedAt));
         return this;
     }
@@ -163,6 +175,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
 
         Status = AttemptStatus.TimedOut;
         CompletedAt = timedOutAt;
+        Touch();
         Raise(new AttemptTimedOut(Id, timedOutAt));
         return this;
     }
