@@ -102,14 +102,15 @@ public sealed class SubmitAttemptCommandHandler(
         if (command.IdempotencyKey == Guid.Empty)
             return Error.Validation("idempotency.key", "Idempotency key is required.");
 
-        var operation = $"attempt.submit:{command.AttemptId.Value}";
-        var cached = await idempotency.GetResultAsync<CachedAttemptScore>(operation, actor.UserId, command.IdempotencyKey, ct);
+        var operation = $"attempt.submit:{command.AttemptId.Value:N}";
+        var fingerprint = IdempotencyFingerprint.Create(IdempotencyFingerprint.Guid(command.AttemptId.Value));
+        var cached = await idempotency.GetResultAsync<CachedAttemptScore>(operation, actor.UserId, command.IdempotencyKey, fingerprint, ct);
         if (cached is { } cachedScore)
             return cachedScore.ToDomain();
 
         await using var lease = await idempotency.AcquireAsync(operation, actor.UserId, command.IdempotencyKey, ct);
 
-        cached = await idempotency.GetResultAsync<CachedAttemptScore>(operation, actor.UserId, command.IdempotencyKey, ct);
+        cached = await idempotency.GetResultAsync<CachedAttemptScore>(operation, actor.UserId, command.IdempotencyKey, fingerprint, ct);
         if (cached is { } leasedCachedScore)
             return leasedCachedScore.ToDomain();
 
@@ -126,7 +127,14 @@ public sealed class SubmitAttemptCommandHandler(
         var error = result.Match<Error?>(_ => null, e => e.ToApplicationError());
         if (error is not null) return error;
 
-        await idempotency.AddResultAsync(operation, actor.UserId, command.IdempotencyKey, CachedAttemptScore.FromDomain(score), now, ct);
+        await idempotency.AddResultAsync(
+            operation,
+            actor.UserId,
+            command.IdempotencyKey,
+            fingerprint,
+            CachedAttemptScore.FromDomain(score),
+            now,
+            ct);
         await unitOfWork.SaveChangesAsync(ct);
         return score;
     }
