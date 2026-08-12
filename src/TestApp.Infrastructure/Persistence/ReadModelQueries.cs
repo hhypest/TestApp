@@ -23,6 +23,8 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
             test.Id,
             test.Title,
             test.Status,
+            test.Settings.PassingPercentage,
+            test.Settings.TimeLimitMinutes,
             test.Questions
                 .OrderBy(q => q.Order)
                 .Select(q => new QuestionEditorView(
@@ -31,8 +33,7 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
                     q.Type,
                     q.Points,
                     q.Order,
-                    q.Options
-                        .OrderBy(o => o.Order)
+                    q.Options.OrderBy(o => o.Order)
                         .Select(o => new AnswerOptionEditorView(o.Id, o.Text, o.IsCorrect, o.Order))
                         .ToArray()))
                 .ToArray());
@@ -72,6 +73,8 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
                     a.RevisionId,
                     revision.Title,
                     revision.Version,
+                    revision.PassingPercentage,
+                    revision.TimeLimitMinutes,
                     a.AvailableFrom,
                     a.AvailableUntil,
                     a.AttemptLimit,
@@ -96,7 +99,9 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
             attempt.RevisionId,
             attempt.Status,
             attempt.StartedAt,
+            attempt.DeadlineAt,
             attempt.CompletedAt,
+            attempt.Outcome,
             attempt.Responses
                 .Select(r => new QuestionResponseView(
                     r.Id,
@@ -117,10 +122,12 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
             attempt.Id,
             attempt.RevisionId,
             attempt.Status,
+            attempt.Outcome,
             attempt.Score?.Earned,
             attempt.Score?.Maximum,
             attempt.Score?.Percentage,
             attempt.StartedAt,
+            attempt.DeadlineAt,
             attempt.CompletedAt);
     }
 }
