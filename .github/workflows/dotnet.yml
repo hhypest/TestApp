@@ -24,9 +24,22 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
+      rabbitmq:
+        image: rabbitmq:4.3.1-management
+        env:
+          RABBITMQ_DEFAULT_USER: testapp
+          RABBITMQ_DEFAULT_PASS: testapp
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     env:
       TESTAPP_MARIADB_ROOT: Server=127.0.0.1;Port=3306;User=root;Password=root;
       ConnectionStrings__Database: Server=127.0.0.1;Port=3306;Database=testapp;User=testapp;Password=testapp;
+      TESTAPP_RABBITMQ: amqp://testapp:testapp@127.0.0.1:5672/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
