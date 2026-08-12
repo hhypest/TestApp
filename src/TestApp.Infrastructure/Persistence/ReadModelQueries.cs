@@ -10,9 +10,16 @@ namespace TestApp.Infrastructure.Persistence;
 
 public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
 {
-    public async Task<TestEditorView?> GetTestEditorViewAsync(TestId testId, CancellationToken ct)
+    public async Task<TestEditorView?> GetTestEditorViewAsync(TestId testId, ExternalUserId? ownerId, CancellationToken ct)
     {
-        var test = await db.Tests.AsNoTracking().Include(x => x.Questions).ThenInclude(x => x.Options).SingleOrDefaultAsync(x => x.Id == testId, ct);
+        var query = db.Tests.AsNoTracking()
+            .Include(x => x.Questions)
+            .ThenInclude(x => x.Options)
+            .Where(x => x.Id == testId);
+        if (ownerId is { } owner)
+            query = query.Where(x => x.OwnerId == owner);
+
+        var test = await query.SingleOrDefaultAsync(ct);
         if (test is null) return null;
 
         return new TestEditorView(
@@ -95,11 +102,14 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
         TestId? testId,
         PublishedTestRevisionId? revisionId,
         AttemptOutcome? outcome,
+        ExternalUserId? ownerId,
         int page,
         int pageSize,
         CancellationToken ct)
     {
-        var revisionQuery = db.Revisions.AsNoTracking();
+        var revisionQuery = db.Revisions.AsNoTracking().AsQueryable();
+        if (ownerId is { } owner)
+            revisionQuery = revisionQuery.Where(r => db.Tests.Any(t => t.Id == r.TestId && t.OwnerId == owner));
         if (testId is { } testValue)
             revisionQuery = revisionQuery.Where(x => x.TestId == testValue);
         if (revisionId is { } revisionValue)
@@ -139,7 +149,10 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
         return new PagedResult<ReviewerResultSummary>(items, page, pageSize, totalCount);
     }
 
-    public async Task<ReviewerAttemptResultView?> GetReviewerAttemptResultAsync(TestAttemptId attemptId, CancellationToken ct)
+    public async Task<ReviewerAttemptResultView?> GetReviewerAttemptResultAsync(
+        TestAttemptId attemptId,
+        ExternalUserId? ownerId,
+        CancellationToken ct)
     {
         var attempt = await db.Attempts.AsNoTracking()
             .Include(x => x.Responses)
@@ -147,7 +160,10 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
             .SingleOrDefaultAsync(x => x.Id == attemptId, ct);
         if (attempt is null) return null;
 
-        var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == attempt.RevisionId, ct);
+        var revisionQuery = db.Revisions.AsNoTracking().Where(x => x.Id == attempt.RevisionId);
+        if (ownerId is { } owner)
+            revisionQuery = revisionQuery.Where(r => db.Tests.Any(t => t.Id == r.TestId && t.OwnerId == owner));
+        var revision = await revisionQuery.SingleOrDefaultAsync(ct);
         if (revision is null) return null;
 
         var responses = attempt.Responses.ToDictionary(x => x.Id);
