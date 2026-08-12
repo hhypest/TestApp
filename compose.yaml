@@ -23,6 +23,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: bootstrap-admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: bootstrap-admin
       KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
     ports:
@@ -37,14 +38,11 @@ services:
       dockerfile: Dockerfile
     command: ["--migrate"]
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Database: Server=mariadb;Port=3306;Database=testapp;User=testapp;Password=testapp;
       Database__ApplyMigrationsOnStartup: "false"
-      Keycloak__Authority: http://localhost:8081/realms/testapp
-      Keycloak__MetadataAddress: http://keycloak:8080/realms/testapp/.well-known/openid-configuration
-      Keycloak__Issuer: http://localhost:8081/realms/testapp
+      Keycloak__Authority: http://keycloak:8080/realms/testapp
       Keycloak__Audience: testapp-api
-      Keycloak__RequireHttpsMetadata: "false"
     depends_on:
       mariadb:
         condition: service_healthy
@@ -56,15 +54,12 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__Database: Server=mariadb;Port=3306;Database=testapp;User=testapp;Password=testapp;
       Database__ApplyMigrationsOnStartup: "false"
-      Keycloak__Authority: http://localhost:8081/realms/testapp
-      Keycloak__MetadataAddress: http://keycloak:8080/realms/testapp/.well-known/openid-configuration
-      Keycloak__Issuer: http://localhost:8081/realms/testapp
+      Keycloak__Authority: http://keycloak:8080/realms/testapp
       Keycloak__Audience: testapp-api
-      Keycloak__RequireHttpsMetadata: "false"
     ports:
       - "8080:8080"
     depends_on:
