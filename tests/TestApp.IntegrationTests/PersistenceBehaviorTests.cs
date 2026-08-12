@@ -101,4 +101,37 @@ public sealed class PersistenceBehaviorTests
         Assert.Equal(firstId, secondId);
         Assert.Equal(1, await db.Attempts.CountAsync(TestContext.Current.CancellationToken));
     }
+
+    [Fact]
+    public async Task Idempotency_lease_serializes_competing_MariaDB_contexts()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using (var migration = database.CreateContext())
+            await migration.Database.MigrateAsync(ct);
+
+        await using var firstDb = database.CreateContext();
+        await using var secondDb = database.CreateContext();
+        var firstStore = new IdempotencyStore(firstDb);
+        var secondStore = new IdempotencyStore(secondDb);
+        var actor = ExternalUserId.FromSubject("admin-1");
+        var requestId = Guid.NewGuid();
+        const string operation = "tests.publish";
+        var expected = PublishedTestRevisionId.New();
+
+        await using (var firstLease = await firstStore.AcquireAsync(operation, actor, requestId, ct))
+        {
+            var competingAcquire = secondStore.AcquireAsync(operation, actor, requestId, ct);
+            await Task.Delay(150, ct);
+            Assert.False(competingAcquire.IsCompleted);
+
+            await firstStore.AddResultAsync(operation, actor, requestId, expected, DateTimeOffset.UtcNow, ct);
+            await firstDb.SaveChangesAsync(ct);
+        }
+
+        await using var secondLease = await secondStore.AcquireAsync(operation, actor, requestId, ct);
+        var observed = await secondStore.GetResultAsync<PublishedTestRevisionId>(operation, actor, requestId, ct);
+
+        Assert.Equal(expected, observed);
+    }
 }
