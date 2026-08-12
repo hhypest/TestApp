@@ -91,7 +91,7 @@ public sealed class OutboxDeadLetterManagementTests
             x.CorrelationId == "corr-discard");
 
         var monitor = new OutboxMonitor(verify);
-        var status = await monitor.GetStatusAsync(cancellationToken: ct);
+        var status = await monitor.GetStatusAsync(ct: ct);
         Assert.Equal(1, status.PendingCount);
         Assert.Equal(1, status.RetryScheduledCount);
         Assert.Equal(0, status.DeadLetterCount);
