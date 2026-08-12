@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TestApp.Domain.Identity;
+using TestApp.Infrastructure.Observability;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
 using Xunit;
@@ -13,6 +14,7 @@ public sealed class OutboxDeadLetterManagementTests
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        using var metrics = new OperationalMetrics();
         var requeueId = Guid.NewGuid();
         var discardId = Guid.NewGuid();
         var actor = ExternalUserId.FromSubject("admin-dead-letter");
@@ -26,7 +28,7 @@ public sealed class OutboxDeadLetterManagementTests
 
         await using (var db = database.CreateContext())
         {
-            var manager = new OutboxDeadLetterManager(db, TimeProvider.System);
+            var manager = new OutboxDeadLetterManager(db, TimeProvider.System, metrics);
 
             var requeued = await manager.RequeueAsync(
                 requeueId,
