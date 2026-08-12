@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentActor, HttpCurrentActor>();
         services.AddScoped<ExpireAttemptCommandHandler>();
         services.AddScoped<OutboxMonitor>();
+        services.AddScoped<OutboxDeadLetterManager>();
         services.AddScoped<AuditTrail>();
         services.AddScoped<OperationalRetentionCleaner>();
         services.AddSingleton<IClock, SystemClock>();
