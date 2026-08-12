@@ -3,16 +3,30 @@ on:
   push:
     branches:
       - beta-ddd
-      - beta-ddd-architecture-refactor
-      - 'beta-ddd-*'
   pull_request:
     branches:
       - beta-ddd
-      - beta-ddd-architecture-refactor
-      - 'beta-ddd-*'
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: testapp
+          MARIADB_USER: testapp
+          MARIADB_PASSWORD: testapp
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      TESTAPP_MARIADB_ROOT: Server=127.0.0.1;Port=3306;User=root;Password=root;
+      ConnectionStrings__Database: Server=127.0.0.1;Port=3306;Database=testapp;User=testapp;Password=testapp;
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
