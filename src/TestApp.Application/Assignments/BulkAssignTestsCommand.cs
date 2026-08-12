@@ -37,13 +37,24 @@ public sealed class BulkAssignTestsCommandHandler(
         if (command.RequestId == Guid.Empty)
             return Error.Validation("idempotency.request_id", "A non-empty idempotency key is required.");
 
-        var cached = await idempotency.GetResultAsync<BulkAssignTestsResult>(Operation, actor.UserId, command.RequestId, ct);
+        var canonicalTargets = command.Targets
+            .Select(target => $"u:{target.UserId?.Value ?? string.Empty}|g:{target.GroupId?.Value ?? string.Empty}")
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToArray();
+        var fingerprint = IdempotencyFingerprint.Create(
+            IdempotencyFingerprint.Guid(command.RevisionId.Value),
+            string.Join("\n", canonicalTargets),
+            IdempotencyFingerprint.Instant(command.AvailableFrom),
+            IdempotencyFingerprint.OptionalInstant(command.AvailableUntil),
+            IdempotencyFingerprint.OptionalInt(command.AttemptLimit));
+
+        var cached = await idempotency.GetResultAsync<BulkAssignTestsResult>(Operation, actor.UserId, command.RequestId, fingerprint, ct);
         if (cached is { } cachedResult)
             return cachedResult;
 
         await using var lease = await idempotency.AcquireAsync(Operation, actor.UserId, command.RequestId, ct);
 
-        cached = await idempotency.GetResultAsync<BulkAssignTestsResult>(Operation, actor.UserId, command.RequestId, ct);
+        cached = await idempotency.GetResultAsync<BulkAssignTestsResult>(Operation, actor.UserId, command.RequestId, fingerprint, ct);
         if (cached is { } leasedCachedResult)
             return leasedCachedResult;
 
@@ -106,7 +117,7 @@ public sealed class BulkAssignTestsCommandHandler(
         }
 
         var result = new BulkAssignTestsResult(ids.Length, ids);
-        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, result, now, ct);
+        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, fingerprint, result, now, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return result;
     }
