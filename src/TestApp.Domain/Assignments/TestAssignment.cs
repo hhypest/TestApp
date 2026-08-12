@@ -7,6 +7,11 @@ using TestApp.Domain.Revisions;
 
 namespace TestApp.Domain.Assignments;
 
+public static class TestAssignmentLimits
+{
+    public const int CancelReasonMaxLength = 1000;
+}
+
 public readonly record struct TestAssignmentId(Guid Value)
 {
     public static TestAssignmentId New() => new(Guid.CreateVersion7());
@@ -102,8 +107,8 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         RevisionId = revisionId;
         (TargetType, TargetId) = target switch
         {
-            AssignmentTarget.User user => (AssignmentTargetType.User, user.UserId.Value),
-            AssignmentTarget.Group group => (AssignmentTargetType.Group, group.GroupId.Value),
+            AssignmentTarget.User user => (AssignmentTargetType.User, ValidateTargetId(user.UserId.Value, nameof(target))),
+            AssignmentTarget.Group group => (AssignmentTargetType.Group, ValidateTargetId(group.GroupId.Value, nameof(target))),
             _ => throw new ArgumentOutOfRangeException(nameof(target))
         };
         AssignedBy = assignedBy;
@@ -173,12 +178,28 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         if (cancelledAt < AssignedAt)
             return DomainError.Validation("assignment.cancelled_at", "Cancellation time cannot be earlier than assignment time.");
 
+        var normalizedReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (normalizedReason?.Length > TestAssignmentLimits.CancelReasonMaxLength)
+            return DomainError.Validation(
+                "assignment.cancel_reason",
+                $"Cancellation reason cannot exceed {TestAssignmentLimits.CancelReasonMaxLength} characters.");
+
         Status = AssignmentStatus.Cancelled;
         CancelledBy = cancelledBy;
         CancelledAt = cancelledAt;
-        CancelReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        CancelReason = normalizedReason;
         Touch();
         Raise(new TestAssignmentCancelled(Id, cancelledBy, CancelReason, cancelledAt));
         return this;
+    }
+
+    private static string ValidateTargetId(string value, string parameter)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameter);
+        if (value.Length > ExternalIdentityLimits.MaxIdentifierLength)
+            throw new ArgumentException(
+                $"Assignment target identifier cannot exceed {ExternalIdentityLimits.MaxIdentifierLength} characters.",
+                parameter);
+        return value;
     }
 }
