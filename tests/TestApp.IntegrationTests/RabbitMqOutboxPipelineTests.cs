@@ -43,7 +43,7 @@ public sealed class RabbitMqOutboxPipelineTests
         services.AddLogging();
         services.AddDbContext<AppDbContext>(o => o.UseMySql(
             database.ConnectionString,
-            new MariaDbServerVersion(new Version(11, 4, 0))));
+            MariaDbTestDatabase.EfServerVersion));
         services.Configure<RabbitMqOutboxOptions>(options =>
         {
             options.Enabled = true;
