@@ -99,7 +99,9 @@ public sealed class AuditTrail(DbContextOptions<AppDbContext> options, TimeProvi
         int pageSize,
         CancellationToken ct = default)
     {
-        (page, pageSize) = Paging.Normalize(page, pageSize);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         await using var db = new AppDbContext(options);
         var query = db.Set<AuditEntry>().AsNoTracking();
 
