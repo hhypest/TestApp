@@ -1,0 +1,99 @@
+{
+  "realm": "testapp",
+  "enabled": true,
+  "displayName": "TestApp Local Development",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "test-author", "description": "Can author and review tests" },
+      { "name": "test-admin", "description": "Can administer assignments and operations" }
+    ]
+  },
+  "groups": [
+    { "name": "students" }
+  ],
+  "clients": [
+    {
+      "clientId": "testapp-api",
+      "name": "TestApp API local client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:*/*"],
+      "webOrigins": ["http://localhost:*"],
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        },
+        {
+          "name": "testapp audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "testapp-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["test-admin"],
+      "credentials": [
+        { "type": "password", "value": "admin", "temporary": false }
+      ]
+    },
+    {
+      "username": "author",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["test-author"],
+      "credentials": [
+        { "type": "password", "value": "author", "temporary": false }
+      ]
+    },
+    {
+      "username": "student",
+      "enabled": true,
+      "emailVerified": true,
+      "groups": ["/students"],
+      "credentials": [
+        { "type": "password", "value": "student", "temporary": false }
+      ]
+    }
+  ]
+}
