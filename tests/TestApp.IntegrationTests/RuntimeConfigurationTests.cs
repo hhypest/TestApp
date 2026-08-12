@@ -11,11 +11,8 @@ public sealed class RuntimeConfigurationTests
     [Fact]
     public void Production_requires_explicit_database_connection_string()
     {
-        var configuration = BuildConfiguration();
-        var environment = Environment(Environments.Production);
-
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            RuntimeConfiguration.LoadDatabase(configuration, environment));
+            RuntimeConfiguration.LoadDatabase(BuildConfiguration(), Environment(Environments.Production)));
 
         Assert.Contains("ConnectionStrings:Database", exception.Message, StringComparison.Ordinal);
     }
@@ -58,36 +55,47 @@ public sealed class RuntimeConfigurationTests
     [Fact]
     public void Enabled_rabbitmq_requires_valid_connection_string()
     {
-        var configuration = BuildConfiguration(("RabbitMq:Enabled", "true"));
-
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            RuntimeConfiguration.LoadRabbitMq(configuration));
+            RuntimeConfiguration.LoadRabbitMq(BuildConfiguration(("RabbitMq:Enabled", "true"))));
 
         Assert.Contains("RabbitMq:ConnectionString", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Rate_limit_values_are_configuration_driven_and_validated()
+    public void Attempt_expiration_is_configuration_driven_and_validated()
+    {
+        var options = RuntimeConfiguration.LoadAttemptExpiration(BuildConfiguration(
+            ("AttemptExpiration:BatchSize", "250"),
+            ("AttemptExpiration:PollIntervalSeconds", "12")));
+
+        Assert.Equal(250, options.BatchSize);
+        Assert.Equal(12, options.PollIntervalSeconds);
+    }
+
+    [Fact]
+    public void Rate_limit_classes_are_configuration_driven()
     {
         var configuration = BuildConfiguration(
-            ("RateLimiting:PermitLimit", "7"),
-            ("RateLimiting:WindowSeconds", "15"),
-            ("RateLimiting:QueueLimit", "2"));
+            ("RateLimiting:General:PermitLimit", "100"),
+            ("RateLimiting:StudentWrite:PermitLimit", "7"),
+            ("RateLimiting:StudentWrite:WindowSeconds", "15"),
+            ("RateLimiting:StudentWrite:QueueLimit", "2"),
+            ("RateLimiting:Operations:PermitLimit", "3"));
 
         var options = RuntimeConfiguration.LoadRateLimiting(configuration);
 
-        Assert.Equal(7, options.PermitLimit);
-        Assert.Equal(15, options.WindowSeconds);
-        Assert.Equal(2, options.QueueLimit);
+        Assert.Equal(100, options.General.PermitLimit);
+        Assert.Equal(7, options.StudentWrite.PermitLimit);
+        Assert.Equal(15, options.StudentWrite.WindowSeconds);
+        Assert.Equal(2, options.StudentWrite.QueueLimit);
+        Assert.Equal(3, options.Operations.PermitLimit);
     }
 
     [Fact]
     public void Reverse_proxy_cannot_be_enabled_without_explicit_trust_boundary()
     {
-        var configuration = BuildConfiguration(("ReverseProxy:Enabled", "true"));
-
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            RuntimeConfiguration.LoadReverseProxy(configuration));
+            RuntimeConfiguration.LoadReverseProxy(BuildConfiguration(("ReverseProxy:Enabled", "true"))));
 
         Assert.Contains("KnownProxies", exception.Message, StringComparison.Ordinal);
     }
@@ -110,6 +118,55 @@ public sealed class RuntimeConfigurationTests
     }
 
     [Fact]
+    public void Cors_requires_explicit_non_wildcard_origin_allow_list()
+    {
+        var missing = Assert.Throws<InvalidOperationException>(() =>
+            RuntimeConfiguration.LoadCors(BuildConfiguration(("Cors:Enabled", "true"))));
+        Assert.Contains("AllowedOrigins", missing.Message, StringComparison.Ordinal);
+
+        var wildcard = Assert.Throws<InvalidOperationException>(() =>
+            RuntimeConfiguration.LoadCors(BuildConfiguration(
+                ("Cors:Enabled", "true"),
+                ("Cors:AllowedOrigins:0", "*"))));
+        Assert.Contains("Wildcard", wildcard.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cors_accepts_explicit_origin_and_credentials_setting()
+    {
+        var options = RuntimeConfiguration.LoadCors(BuildConfiguration(
+            ("Cors:Enabled", "true"),
+            ("Cors:AllowCredentials", "true"),
+            ("Cors:AllowedOrigins:0", "https://frontend.example/")));
+
+        Assert.True(options.Enabled);
+        Assert.True(options.AllowCredentials);
+        Assert.Equal("https://frontend.example", Assert.Single(options.AllowedOrigins));
+    }
+
+    [Fact]
+    public void Production_transport_security_must_be_explicit()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            RuntimeConfiguration.LoadTransportSecurity(BuildConfiguration(), Environment(Environments.Production)));
+
+        Assert.Contains("HttpsRedirectionEnabled", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Production_transport_security_can_explicitly_delegate_tls_to_ingress()
+    {
+        var options = RuntimeConfiguration.LoadTransportSecurity(BuildConfiguration(
+            ("TransportSecurity:HttpsRedirectionEnabled", "false"),
+            ("TransportSecurity:HstsEnabled", "false"),
+            ("TransportSecurity:SecurityHeadersEnabled", "true")), Environment(Environments.Production));
+
+        Assert.False(options.HttpsRedirectionEnabled);
+        Assert.False(options.HstsEnabled);
+        Assert.True(options.SecurityHeadersEnabled);
+    }
+
+    [Fact]
     public void OpenApi_defaults_to_development_only_public_exposure()
     {
         var configuration = BuildConfiguration();
@@ -128,10 +185,7 @@ public sealed class RuntimeConfigurationTests
             .AddInMemoryCollection(values.Select(x => new KeyValuePair<string, string?>(x.Key, x.Value)))
             .Build();
 
-    private static IHostEnvironment Environment(string name) => new TestHostEnvironment
-    {
-        EnvironmentName = name
-    };
+    private static IHostEnvironment Environment(string name) => new TestHostEnvironment { EnvironmentName = name };
 
     private sealed class TestHostEnvironment : IHostEnvironment
     {
