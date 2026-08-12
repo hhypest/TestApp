@@ -10,7 +10,27 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
     {
         ProblemDetails problem;
 
-        if (exception is ConcurrencyConflictException concurrency)
+        if (exception is BadHttpRequestException badRequest)
+        {
+            logger.LogInformation(badRequest,
+                "Invalid HTTP request for {Method} {Path} TraceId={TraceId}",
+                httpContext.Request.Method,
+                httpContext.Request.Path,
+                httpContext.TraceIdentifier);
+
+            var statusCode = badRequest.StatusCode is >= 400 and < 500
+                ? badRequest.StatusCode
+                : StatusCodes.Status400BadRequest;
+            httpContext.Response.StatusCode = statusCode;
+            problem = new ProblemDetails
+            {
+                Status = statusCode,
+                Title = "request.invalid",
+                Detail = "The request could not be parsed or bound to the endpoint contract.",
+                Instance = httpContext.Request.Path
+            };
+        }
+        else if (exception is ConcurrencyConflictException concurrency)
         {
             logger.LogWarning(concurrency, "Optimistic concurrency conflict for {Method} {Path} TraceId={TraceId}",
                 httpContext.Request.Method, httpContext.Request.Path, httpContext.TraceIdentifier);
