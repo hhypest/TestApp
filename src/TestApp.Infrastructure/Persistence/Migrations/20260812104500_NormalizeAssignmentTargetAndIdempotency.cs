@@ -26,10 +26,6 @@ public sealed class NormalizeAssignmentTargetAndIdempotency : Migration
 
         migrationBuilder.Sql("UPDATE test_assignments SET TargetType = CASE WHEN target LIKE 'group:%' THEN 2 ELSE 1 END, TargetId = CASE WHEN instr(target, ':') > 0 THEN substr(target, instr(target, ':') + 1) ELSE target END");
 
-        migrationBuilder.DropColumn(
-            name: "target",
-            table: "test_assignments");
-
         migrationBuilder.CreateIndex(
             name: "IX_test_assignments_TargetType_TargetId_Status",
             table: "test_assignments",
@@ -69,30 +65,9 @@ public sealed class NormalizeAssignmentTargetAndIdempotency : Migration
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.DropTable("idempotency_records");
-
-        migrationBuilder.DropIndex(
-            name: "IX_test_assignments_TargetType_TargetId_Status",
-            table: "test_assignments");
-
-        migrationBuilder.DropIndex(
-            name: "IX_test_assignments_RevisionId",
-            table: "test_assignments");
-
-        migrationBuilder.DropIndex(
-            name: "IX_test_attempts_RevisionId_Status_Outcome",
-            table: "test_attempts");
-
-        migrationBuilder.AddColumn<string>(
-            name: "target",
-            table: "test_assignments",
-            type: "TEXT",
-            maxLength: 512,
-            nullable: false,
-            defaultValue: string.Empty);
-
+        migrationBuilder.DropIndex(name: "IX_test_assignments_TargetType_TargetId_Status", table: "test_assignments");
+        migrationBuilder.DropIndex(name: "IX_test_assignments_RevisionId", table: "test_assignments");
+        migrationBuilder.DropIndex(name: "IX_test_attempts_RevisionId_Status_Outcome", table: "test_attempts");
         migrationBuilder.Sql("UPDATE test_assignments SET target = CASE WHEN TargetType = 2 THEN 'group:' || TargetId ELSE 'user:' || TargetId END");
-
-        migrationBuilder.DropColumn(name: "TargetType", table: "test_assignments");
-        migrationBuilder.DropColumn(name: "TargetId", table: "test_assignments");
     }
 }
