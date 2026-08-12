@@ -124,6 +124,7 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
 
         AvailableFrom = availableFrom;
         AvailableUntil = availableUntil;
+        Touch();
         return this;
     }
 
@@ -135,6 +136,7 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
             return DomainError.Validation("assignment.attempt_limit", "Attempt limit must be greater than zero.");
 
         AttemptLimit = attemptLimit;
+        Touch();
         return this;
     }
 
@@ -149,6 +151,7 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         CancelledBy = cancelledBy;
         CancelledAt = cancelledAt;
         CancelReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        Touch();
         Raise(new TestAssignmentCancelled(Id, cancelledBy, CancelReason, cancelledAt));
         return this;
     }
