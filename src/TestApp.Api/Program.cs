@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -20,6 +21,7 @@ var migrateOnly = args.Any(x => string.Equals(x, "--migrate", StringComparison.O
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
 {
@@ -41,6 +43,25 @@ builder.Services.AddAuthorization(o =>
     o.AddPolicy(Permissions.TestsAssign, p => p.RequireRole("test-admin"));
     o.AddPolicy(Permissions.ResultsReview, p => p.RequireRole("test-author", "test-admin"));
     o.AddPolicy(Permissions.OperationsRead, p => p.RequireRole("test-admin"));
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var partitionKey = context.User.FindFirst("sub")?.Value
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+    });
 });
 
 var connectionString = builder.Configuration.GetConnectionString("Database")
@@ -100,12 +121,27 @@ if (migrateOnly || applyMigrationsOnStartup)
 if (migrateOnly)
     return;
 
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api", out var remaining) &&
+        !context.Request.Path.StartsWithSegments("/api/v1"))
+    {
+        context.Request.Path = "/api/v1" + remaining;
+    }
+
+    await next();
+});
+
 app.UseMiddleware<RequestTelemetryMiddleware>();
 app.UseExceptionHandler();
 app.UseAuthentication();
+app.UseMiddleware<CorrelationAuditMiddleware>();
+app.UseRateLimiter();
 app.UseAuthorization();
 
-var tests = app.MapGroup("/api/tests").RequireAuthorization();
+app.MapOpenApi("/openapi/v1.json").AllowAnonymous();
+
+var tests = app.MapGroup("/api/v1/tests").RequireAuthorization();
 tests.MapGet("/", async (int? page, int? pageSize, TestStatus? status, string? search, GetTestsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetTestsQuery(page ?? 1, pageSize ?? 20, status, search), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPost("/", async (CreateTestRequest r, CreateTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CreateTestCommand(r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
@@ -125,7 +161,7 @@ tests.MapGet("/{id:guid}/editor", async (Guid id, GetTestEditorViewQueryHandler 
 tests.MapGet("/{id:guid}/revisions", async (Guid id, GetTestRevisionsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetTestRevisionsQuery(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
 
-var assignments = app.MapGroup("/api/assignments").RequireAuthorization();
+var assignments = app.MapGroup("/api/v1/assignments").RequireAuthorization();
 assignments.MapGet("/", async (Guid? testId, Guid? revisionId, AssignmentTargetType? targetType, string? targetId, AssignmentStatus? status, int? page, int? pageSize, GetAdminAssignmentsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetAdminAssignmentsQuery(
         testId is null ? null : new TestId(testId.Value),
@@ -163,18 +199,20 @@ assignments.MapPatch("/{id:guid}/attempt-limit", async (Guid id, AttemptLimitReq
 assignments.MapPost("/{id:guid}/cancel", async (Guid id, CancelAssignmentRequest r, CancelAssignmentCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CancelAssignmentCommand(new TestAssignmentId(id), r.Reason), ct))).RequireAuthorization(Permissions.TestsAssign);
 assignments.MapPost("/{id:guid}/attempts", async (Guid id, StartAttemptRequest r, StartAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new StartAttemptCommand(new TestAssignmentId(id), r.IdempotencyKey), ct)));
 
-app.MapGet("/api/me/assignments", async (int? page, int? pageSize, AssignmentStatus? status, GetMyAssignmentsQueryHandler h, CancellationToken ct) =>
+app.MapGet("/api/v1/me/assignments", async (int? page, int? pageSize, AssignmentStatus? status, GetMyAssignmentsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetMyAssignmentsQuery(page ?? 1, pageSize ?? 20, status), ct))).RequireAuthorization();
-app.MapGet("/api/me/attempts", async (int? page, int? pageSize, AttemptStatus? status, GetMyAttemptsQueryHandler h, CancellationToken ct) =>
+app.MapGet("/api/v1/me/attempts", async (int? page, int? pageSize, AttemptStatus? status, GetMyAttemptsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetMyAttemptsQuery(page ?? 1, pageSize ?? 20, status), ct))).RequireAuthorization();
-app.MapGet("/api/results", async (Guid? testId, Guid? revisionId, AttemptOutcome? outcome, int? page, int? pageSize, GetReviewerResultsQueryHandler h, CancellationToken ct) =>
+app.MapGet("/api/v1/results", async (Guid? testId, Guid? revisionId, AttemptOutcome? outcome, int? page, int? pageSize, GetReviewerResultsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetReviewerResultsQuery(testId is null ? null : new TestId(testId.Value), revisionId is null ? null : new PublishedTestRevisionId(revisionId.Value), outcome, page ?? 1, pageSize ?? 20), ct))).RequireAuthorization(Permissions.ResultsReview);
-app.MapGet("/api/results/{attemptId:guid}", async (Guid attemptId, GetReviewerAttemptResultQueryHandler h, CancellationToken ct) =>
+app.MapGet("/api/v1/results/{attemptId:guid}", async (Guid attemptId, GetReviewerAttemptResultQueryHandler h, CancellationToken ct) =>
     await h.Handle(new GetReviewerAttemptResultQuery(new TestAttemptId(attemptId)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.ResultsReview);
-app.MapGet("/api/operations/outbox", async (int? deadLetterLimit, OutboxMonitor monitor, CancellationToken ct) =>
+app.MapGet("/api/v1/operations/outbox", async (int? deadLetterLimit, OutboxMonitor monitor, CancellationToken ct) =>
     Results.Ok(await monitor.GetStatusAsync(deadLetterLimit ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead);
+app.MapGet("/api/v1/operations/audit", async (string? actorId, int? statusCode, DateTimeOffset? from, DateTimeOffset? to, int? page, int? pageSize, AuditTrail audit, CancellationToken ct) =>
+    Results.Ok(await audit.GetAsync(actorId, statusCode, from, to, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead);
 
-var attempts = app.MapGroup("/api/attempts").RequireAuthorization();
+var attempts = app.MapGroup("/api/v1/attempts").RequireAuthorization();
 attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct)));
 attempts.MapDelete("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, ClearAnswerCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ClearAnswerCommand(new TestAttemptId(id), new QuestionId(questionId)), ct)));
 attempts.MapPost("/{id:guid}/submit", async (Guid id, SubmitAttemptRequest r, SubmitAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new SubmitAttemptCommand(new TestAttemptId(id), r.IdempotencyKey), ct)));
