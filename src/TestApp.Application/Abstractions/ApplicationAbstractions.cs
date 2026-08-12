@@ -45,6 +45,12 @@ public interface ITestAttemptRepository
     Task<TestAttemptId?> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken cancellationToken = default);
 }
 
+public interface IIdempotencyStore
+{
+    Task<T?> GetResultAsync<T>(string operation, ExternalUserId actorId, Guid requestId, CancellationToken cancellationToken = default) where T : struct;
+    Task AddResultAsync<T>(string operation, ExternalUserId actorId, Guid requestId, T result, DateTimeOffset createdAt, CancellationToken cancellationToken = default) where T : struct;
+}
+
 public interface IUnitOfWork
 {
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
