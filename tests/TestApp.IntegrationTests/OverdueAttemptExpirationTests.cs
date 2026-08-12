@@ -65,7 +65,7 @@ public sealed class OverdueAttemptExpirationTests
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(o => o.UseMySql(
             database.ConnectionString,
-            new MariaDbServerVersion(new Version(11, 4, 0))));
+            MariaDbTestDatabase.EfServerVersion));
         services.AddScoped<ITestAttemptRepository, TestAttemptRepository>();
         services.AddScoped<IPublishedTestRevisionRepository, PublishedTestRevisionRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
