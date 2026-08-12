@@ -63,10 +63,31 @@ public sealed class OpenApiContractTests
         AssertHeaderParameter(assignment, "Idempotency-Key", required: false);
         AssertBearerSecurity(assignment);
 
+        var deadLetterPath = paths.GetProperty("/api/v1/operations/outbox/dead-letters/{eventId}");
+        var deadLetterDetail = deadLetterPath.GetProperty("get");
+        Assert.Equal("OutboxDeadLetters_Get", deadLetterDetail.GetProperty("operationId").GetString());
+        Assert.Equal("Get Outbox dead letter", deadLetterDetail.GetProperty("summary").GetString());
+        AssertBearerSecurity(deadLetterDetail);
+        AssertResponses(deadLetterDetail, "400", "401", "403", "404", "429");
+
+        var requeue = paths.GetProperty("/api/v1/operations/outbox/dead-letters/{eventId}/requeue").GetProperty("post");
+        Assert.Equal("OutboxDeadLetters_Requeue", requeue.GetProperty("operationId").GetString());
+        AssertBearerSecurity(requeue);
+        AssertResponses(requeue, "400", "401", "403", "404", "409", "429");
+
+        var discard = paths.GetProperty("/api/v1/operations/outbox/dead-letters/{eventId}/discard").GetProperty("post");
+        Assert.Equal("OutboxDeadLetters_Discard", discard.GetProperty("operationId").GetString());
+        AssertBearerSecurity(discard);
+        AssertResponses(discard, "400", "401", "403", "404", "409", "429");
+
         var schemas = root.GetProperty("components").GetProperty("schemas");
         var createTestSchema = FindSchema(schemas, "CreateTestRequest");
         Assert.True(createTestSchema.TryGetProperty("example", out var createExample));
         Assert.Equal("DDD fundamentals", createExample.GetProperty("title").GetString());
+
+        var deadLetterActionSchema = FindSchema(schemas, "DeadLetterActionRequest");
+        Assert.True(deadLetterActionSchema.TryGetProperty("example", out var deadLetterExample));
+        Assert.False(string.IsNullOrWhiteSpace(deadLetterExample.GetProperty("reason").GetString()));
     }
 
     private static void AssertBearerSecurity(JsonElement operation)
