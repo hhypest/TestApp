@@ -37,6 +37,12 @@ public sealed class AssignTestCommandHandler(
         if (cached is { } cachedAssignmentId)
             return cachedAssignmentId;
 
+        await using var lease = await idempotency.AcquireAsync(Operation, actor.UserId, command.RequestId, ct);
+
+        cached = await idempotency.GetResultAsync<TestAssignmentId>(Operation, actor.UserId, command.RequestId, ct);
+        if (cached is { } leasedCachedAssignmentId)
+            return leasedCachedAssignmentId;
+
         if ((command.UserId is null) == (command.GroupId is null))
             return Error.Validation("assignment.target", "Specify exactly one assignment target: user or group.");
         if (command.AvailableUntil is not null && command.AvailableUntil <= command.AvailableFrom)
