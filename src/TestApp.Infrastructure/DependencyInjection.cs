@@ -25,10 +25,23 @@ public static class DependencyInjection
         services.AddScoped<ICurrentActor, HttpCurrentActor>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<IOutboxPublisher, NullOutboxPublisher>();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
         services.AddSingleton<IStartupFilter, HealthEndpointStartupFilter>();
+        return services;
+    }
+
+    public static IServiceCollection AddOutboxDelivery<TPublisher>(
+        this IServiceCollection services,
+        Action<OutboxDeliveryOptions>? configure = null)
+        where TPublisher : class, IOutboxPublisher
+    {
+        if (configure is not null)
+            services.Configure(configure);
+        else
+            services.Configure<OutboxDeliveryOptions>(_ => { });
+
+        services.AddScoped<IOutboxPublisher, TPublisher>();
         services.AddHostedService<OutboxProcessor>();
         return services;
     }
