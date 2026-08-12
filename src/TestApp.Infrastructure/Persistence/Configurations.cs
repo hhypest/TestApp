@@ -18,6 +18,11 @@ public sealed class TestConfiguration : IEntityTypeConfiguration<Test>
         b.Property(x => x.Id).HasConversion(x => x.Value, x => new TestId(x));
         b.Property(x => x.Title).HasMaxLength(300).IsRequired();
         b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
+        b.OwnsOne(x => x.Settings, s =>
+        {
+            s.Property(x => x.PassingPercentage).HasColumnName("passing_percentage");
+            s.Property(x => x.TimeLimitMinutes).HasColumnName("time_limit_minutes");
+        });
         b.OwnsMany(x => x.Questions, q =>
         {
             q.ToTable("questions");
@@ -68,14 +73,9 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<TestAssig
         b.Property(x => x.AssignedBy).HasConversion(x => x.Value, x => new ExternalUserId(x));
         b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
         b.Property(x => x.CancelledBy)
-            .HasConversion(
-                x => x.HasValue ? x.Value.Value : null,
-                x => x == null ? (ExternalUserId?)null : new ExternalUserId(x));
+            .HasConversion(x => x.HasValue ? x.Value.Value : null, x => x == null ? (ExternalUserId?)null : new ExternalUserId(x));
         b.Property(x => x.CancelReason).HasMaxLength(1000);
-        b.Property(x => x.Target)
-            .HasConversion(v => SerializeTarget(v), v => DeserializeTarget(v))
-            .HasColumnName("target")
-            .HasMaxLength(512);
+        b.Property(x => x.Target).HasConversion(v => SerializeTarget(v), v => DeserializeTarget(v)).HasColumnName("target").HasMaxLength(512);
         b.Ignore(x => x.DomainEvents);
     }
 
@@ -112,14 +112,12 @@ public sealed class AttemptConfiguration : IEntityTypeConfiguration<TestAttempt>
             score.Property(x => x.Maximum).HasColumnName("score_maximum");
             score.Ignore(x => x.Percentage);
         });
-
         b.OwnsMany(x => x.Responses, response =>
         {
             response.ToTable("question_responses");
             response.WithOwner().HasForeignKey("TestAttemptId");
             response.Property(x => x.Id).HasConversion(x => x.Value, x => new QuestionId(x));
             response.HasKey("TestAttemptId", nameof(QuestionResponse.Id));
-
             response.OwnsMany(x => x.SelectedOptions, selected =>
             {
                 selected.ToTable("selected_answer_options");
@@ -130,7 +128,6 @@ public sealed class AttemptConfiguration : IEntityTypeConfiguration<TestAttempt>
                 selected.HasKey("TestAttemptId", "QuestionId", nameof(SelectedAnswerOption.OptionId));
             });
         });
-
         b.Ignore(x => x.DomainEvents);
         b.HasIndex(x => new { x.AssignmentId, x.UserId });
         b.HasIndex(x => new { x.AssignmentId, x.UserId, x.StartRequestId }).IsUnique();
