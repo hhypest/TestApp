@@ -36,6 +36,7 @@ builder.Services.AddInfrastructure(o =>
 
 builder.Services.AddScoped<CreateTestCommandHandler>();
 builder.Services.AddScoped<RenameTestCommandHandler>();
+builder.Services.AddScoped<ChangeTestSettingsCommandHandler>();
 builder.Services.AddScoped<AddQuestionCommandHandler>();
 builder.Services.AddScoped<UpdateQuestionCommandHandler>();
 builder.Services.AddScoped<RemoveQuestionCommandHandler>();
@@ -76,6 +77,7 @@ var tests = app.MapGroup("/api/tests").RequireAuthorization();
 
 tests.MapPost("/", async (CreateTestRequest r, CreateTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CreateTestCommand(r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPatch("/{id:guid}/title", async (Guid id, RenameTestRequest r, RenameTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RenameTestCommand(new TestId(id), r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPatch("/{id:guid}/settings", async (Guid id, TestSettingsRequest r, ChangeTestSettingsCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeTestSettingsCommand(new TestId(id), r.PassingPercentage, r.TimeLimitMinutes), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPost("/{id:guid}/questions", async (Guid id, QuestionWriteRequest r, AddQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AddQuestionCommand(new TestId(id), r.Text, r.Type, r.Points, r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPut("/{id:guid}/questions/{questionId:guid}", async (Guid id, Guid questionId, QuestionUpdateRequest r, UpdateQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new UpdateQuestionCommand(new TestId(id), new QuestionId(questionId), r.Text, r.Type, r.Points), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapDelete("/{id:guid}/questions/{questionId:guid}", async (Guid id, Guid questionId, RemoveQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RemoveQuestionCommand(new TestId(id), new QuestionId(questionId)), ct))).RequireAuthorization(Permissions.TestsWrite);
@@ -126,6 +128,7 @@ public static class Permissions
 
 public sealed record CreateTestRequest(string Title);
 public sealed record RenameTestRequest(string Title);
+public sealed record TestSettingsRequest(decimal PassingPercentage, int? TimeLimitMinutes);
 public sealed record QuestionWriteRequest(string Text, QuestionType Type, decimal Points, int Order);
 public sealed record QuestionUpdateRequest(string Text, QuestionType Type, decimal Points);
 public sealed record AnswerOptionWriteRequest(string Text, bool IsCorrect, int Order);
