@@ -118,10 +118,11 @@ public sealed class PersistenceBehaviorTests
         var requestId = Guid.NewGuid();
         const string operation = "tests.publish";
         var expected = PublishedTestRevisionId.New();
+        Task<IAsyncDisposable> competingAcquire;
 
         await using (var firstLease = await firstStore.AcquireAsync(operation, actor, requestId, ct))
         {
-            var competingAcquire = secondStore.AcquireAsync(operation, actor, requestId, ct);
+            competingAcquire = secondStore.AcquireAsync(operation, actor, requestId, ct);
             await Task.Delay(150, ct);
             Assert.False(competingAcquire.IsCompleted);
 
@@ -129,7 +130,7 @@ public sealed class PersistenceBehaviorTests
             await firstDb.SaveChangesAsync(ct);
         }
 
-        await using var secondLease = await secondStore.AcquireAsync(operation, actor, requestId, ct);
+        await using var secondLease = await competingAcquire;
         var observed = await secondStore.GetResultAsync<PublishedTestRevisionId>(operation, actor, requestId, ct);
 
         Assert.Equal(expected, observed);
