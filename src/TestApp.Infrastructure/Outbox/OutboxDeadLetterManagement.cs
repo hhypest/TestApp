@@ -84,7 +84,7 @@ public sealed record OutboxDeadLetterDetail(
     DateTimeOffset OccurredAt,
     int AttemptCount,
     DateTimeOffset? LastAttemptAt,
-    DateTimeOffset DeadLetteredAt,
+    DateTimeOffset? DeadLetteredAt,
     DateTimeOffset? DiscardedAt,
     string? Error);
 
@@ -118,7 +118,7 @@ public sealed class OutboxDeadLetterManager(
                 x.OccurredAt,
                 x.AttemptCount,
                 x.LastAttemptAt,
-                x.DeadLetteredAt!.Value,
+                x.DeadLetteredAt,
                 x.DiscardedAt,
                 x.Error))
             .SingleOrDefaultAsync(ct);
@@ -205,7 +205,7 @@ public sealed class OutboxDeadLetterManager(
         message.OccurredAt,
         message.AttemptCount,
         message.LastAttemptAt,
-        message.DeadLetteredAt ?? throw new InvalidOperationException("Expected a dead-letter timestamp."),
+        message.DeadLetteredAt,
         message.DiscardedAt,
         message.Error);
 }
