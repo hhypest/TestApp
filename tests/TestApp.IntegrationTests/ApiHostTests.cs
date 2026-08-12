@@ -13,7 +13,6 @@ public sealed class ApiHostTests : IClassFixture<WebApplicationFactory<Program>>
         {
             builder.UseSetting("Keycloak:Authority", "https://identity.invalid/realms/testapp");
             builder.UseSetting("Keycloak:Audience", "testapp-api");
-            builder.UseSetting("ConnectionStrings:Database", "Data Source=:memory:");
         });
     }
 
