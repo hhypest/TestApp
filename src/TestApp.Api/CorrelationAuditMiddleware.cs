@@ -32,40 +32,40 @@ public sealed class CorrelationAuditMiddleware(
         }
         finally
         {
-            if (!IsStateChanging(context.Request.Method))
-                return;
+            if (IsStateChanging(context.Request.Method))
+            {
+                var elapsedMs = (decimal)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                var traceId = Activity.Current?.TraceId.ToString() ?? correlationId;
+                var actorId = context.User.FindFirstValue("sub")
+                    ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var statusCode = failure is null
+                    ? context.Response.StatusCode
+                    : StatusCodes.Status500InternalServerError;
 
-            var elapsedMs = (decimal)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
-            var traceId = Activity.Current?.TraceId.ToString() ?? correlationId;
-            var actorId = context.User.FindFirstValue("sub")
-                ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var statusCode = failure is null
-                ? context.Response.StatusCode
-                : StatusCodes.Status500InternalServerError;
-
-            try
-            {
-                await auditTrail.RecordAsync(
-                    actorId,
-                    context.Request.Method,
-                    context.Request.Path.Value ?? "/",
-                    statusCode,
-                    correlationId,
-                    traceId,
-                    elapsedMs,
-                    context.RequestAborted);
-            }
-            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
-            {
-                // Client disconnect must not mask the original request outcome.
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex,
-                    "Failed to persist audit entry for {Method} {Path} CorrelationId={CorrelationId}",
-                    context.Request.Method,
-                    context.Request.Path,
-                    correlationId);
+                try
+                {
+                    await auditTrail.RecordAsync(
+                        actorId,
+                        context.Request.Method,
+                        context.Request.Path.Value ?? "/",
+                        statusCode,
+                        correlationId,
+                        traceId,
+                        elapsedMs,
+                        context.RequestAborted);
+                }
+                catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+                {
+                    // Client disconnect must not mask the original request outcome.
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "Failed to persist audit entry for {Method} {Path} CorrelationId={CorrelationId}",
+                        context.Request.Method,
+                        context.Request.Path,
+                        correlationId);
+                }
             }
         }
     }
