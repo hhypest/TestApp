@@ -49,6 +49,7 @@ public sealed class StartAttemptCommandHandler(
             actor.UserId,
             command.StartRequestId,
             now,
+            revision.CalculateDeadline(now),
             revision.Questions.Select(q => q.Id));
 
         var persistedId = await attempts.TryAddWithinLimitAsync(attempt, assignment.AttemptLimit, ct);
