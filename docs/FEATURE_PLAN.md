@@ -1,0 +1,1075 @@
+# Детальный план фич TestApp
+
+> Этот backlog является рабочим планом. `DONE` означает реализовано в текущем `beta-ddd`; `PLANNED` — согласованный следующий технический шаг; `DECISION` — требуется продуктово-архитектурное решение до реализации.
+
+## Обозначения
+
+Priority:
+
+- **P0** — блокирует production 1.0/security/correctness;
+- **P1** — высокая продуктовая ценность после core safety;
+- **P2** — расширение/оптимизация;
+- **P3** — исследование/дальняя перспектива.
+
+Effort — относительный: `S`, `M`, `L`, `XL`.
+
+---
+
+# A. Уже реализованный core baseline
+
+| ID | Feature | Status | Notes |
+|---|---|---|---|
+| CORE-001 | Test aggregate lifecycle | DONE | Draft/Published/Archived |
+| CORE-002 | Question authoring | DONE | add/update/remove/reorder |
+| CORE-003 | Answer option authoring | DONE | add/update/remove/reorder |
+| CORE-004 | SingleChoice | DONE | exactly one correct on publish |
+| CORE-005 | MultipleChoice | DONE | >=1 correct on publish |
+| CORE-006 | Test settings | DONE | pass percentage + time limit |
+| CORE-007 | Immutable published revision | DONE | JSON snapshot + version |
+| CORE-008 | Exact-set scoring | DONE | full points or zero per question |
+| CORE-009 | Test archive | DONE | terminal authoring state |
+| CAT-001 | Author catalog | DONE | search/status/paging |
+| CAT-002 | Revision list | DONE | immutable metadata |
+| ASSIGN-001 | User assignment | DONE | revision-scoped |
+| ASSIGN-002 | Group assignment | DONE | dynamic group claim membership |
+| ASSIGN-003 | Availability window | DONE | from/until |
+| ASSIGN-004 | Attempt limit | DONE | DB-safe start |
+| ASSIGN-005 | Cancel assignment | DONE | audit actor/time/reason |
+| ASSIGN-006 | Bulk assignment | DONE | <=500, idempotent |
+| ASSIGN-007 | Admin assignment queries | DONE | filters/detail/statistics |
+| ATT-001 | Start attempt | DONE | target/availability/limit |
+| ATT-002 | Answer/clear response | DONE | ownership + revision validation |
+| ATT-003 | Submit | DONE | scoring + outcome |
+| ATT-004 | Timeout | DONE | score preserved |
+| ATT-005 | Automatic expiration | DONE | background worker |
+| ATT-006 | Own attempt/result reads | DONE | student-safe |
+| RES-001 | Reviewer result list | DONE | test/revision/outcome filters |
+| RES-002 | Reviewer result detail | DONE | correctness breakdown |
+| DB-001 | MariaDB 12.3 | DONE | runtime + CI version assertion |
+| DB-002 | Optimistic concurrency | DONE | aggregate version -> 409 |
+| IDEM-001 | Distributed idempotency store | DONE | MariaDB advisory lease |
+| IDEM-002 | Idempotent publish | DONE | persistent result |
+| IDEM-003 | Idempotent assign/bulk | DONE | persistent result |
+| IDEM-004 | Idempotent submit | DONE | cached score |
+| OUT-001 | Transactional Outbox | DONE | IIntegrationEvent only |
+| OUT-002 | Retry/dead-letter | DONE | exponential backoff |
+| RMQ-001 | RabbitMQ publisher | DONE | confirms/persistent/mandatory |
+| RMQ-002 | RabbitMQ readiness | DONE | connection/channel/exchange |
+| SEC-BASE-001 | Keycloak JWT | DONE | sub/roles/groups |
+| SEC-BASE-002 | Role policies | DONE | author/admin/reviewer/operations |
+| API-BASE-001 | `/api/v1` | DONE | canonical API |
+| API-BASE-002 | legacy `/api/*` rewrite | DONE | compatibility |
+| API-BASE-003 | OpenAPI endpoint | DONE | `/openapi/v1.json` |
+| API-BASE-004 | ProblemDetails | DONE | application + exception errors |
+| OBS-001 | Correlation ID | DONE | `X-Correlation-ID` |
+| OBS-002 | HTTP audit | DONE | state-changing requests |
+| OBS-003 | OpenTelemetry | DONE | ASP.NET/HttpClient/runtime |
+| OPS-001 | Docker image | DONE | multi-stage/non-root |
+| OPS-002 | Compose stack | DONE | DB/RMQ/Keycloak/OTEL/migrate/API |
+| OPS-003 | Migration-only mode | DONE | `--migrate` |
+| TEST-001 | MariaDB integration suite | DONE | real provider |
+| TEST-002 | RabbitMQ integration suite | DONE | real broker |
+| TEST-003 | production image migration CI | DONE | release-path gate |
+
+---
+
+# B. Production hardening backlog
+
+## CFG-001 — Fail-fast Database configuration
+
+- **Priority:** P0
+- **Effort:** S
+- **Status:** PLANNED
+- **Dependencies:** none
+
+### Scope
+
+- убрать production fallback `testapp/testapp`;
+- Development default оставить только явно;
+- validated options/startup check.
+
+### Acceptance
+
+- Production without `ConnectionStrings:Database` fails before serving traffic;
+- secret не логируется;
+- integration test host startup failure.
+
+## CFG-002 — Validate Keycloak configuration
+
+- **Priority:** P0
+- **Effort:** S
+- **Status:** PLANNED
+
+### Acceptance
+
+- Production requires non-empty Authority/Audience;
+- invalid URL rejected;
+- HTTPS metadata remains required outside Development.
+
+## CFG-003 — Typed RabbitMQ/worker options binding
+
+- **Priority:** P1
+- **Effort:** S
+- **Status:** PLANNED
+
+Bind/validate:
+
+- RabbitMQ;
+- Outbox delivery;
+- attempt expiration.
+
+## EDGE-001 — Trusted forwarded headers
+
+- **Priority:** P0
+- **Effort:** M
+- **Status:** PLANNED
+
+### Acceptance
+
+- configured KnownProxies/KnownNetworks;
+- untrusted `X-Forwarded-For` cannot spoof rate-limit partition;
+- scheme/IP tests.
+
+## EDGE-002 — CORS policy
+
+- **Priority:** P0 if browser frontend deployed
+- **Effort:** S
+- **Status:** PLANNED
+
+### Acceptance
+
+- explicit origin allow-list;
+- no `AllowAnyOrigin + credentials`;
+- env-specific config.
+
+## EDGE-003 — HTTPS/HSTS deployment policy
+
+- **Priority:** P0
+- **Effort:** S/M
+- **Status:** PLANNED
+
+Document and test ingress termination behavior.
+
+## EDGE-004 — Configurable rate limits
+
+- **Priority:** P0
+- **Effort:** M
+- **Status:** PLANNED
+
+### Policies
+
+- general;
+- student write;
+- reviewer/admin expensive read;
+- operations.
+
+### Acceptance
+
+- configuration binding;
+- deterministic 429 tests;
+- correlation still returned on rejection.
+
+## API-SEC-001 — Production OpenAPI policy
+
+- **Priority:** P0
+- **Effort:** S
+- **Status:** PLANNED
+
+Configuration decides public/internal/disabled.
+
+## CI-SEC-001 — Dependency vulnerability gate
+
+- **Priority:** P0
+- **Effort:** S/M
+- **Status:** PLANNED
+
+- NuGet vulnerability check;
+- fail on high/critical agreed policy.
+
+## CI-SEC-002 — Container image scan/SBOM
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+---
+
+# C. Ownership и authorization
+
+## AUTHZ-001 — Test ownership model
+
+- **Priority:** P0
+- **Effort:** L
+- **Status:** DECISION -> PLANNED after model choice
+
+### Options
+
+**A. OwnerId only** — проще для single-organization.
+
+**B. Workspace + membership** — правильнее для multi-team/multi-tenant.
+
+### Minimum acceptance
+
+- every Test has non-null ownership scope;
+- creation assigns current actor;
+- migration/backfill existing tests;
+- indexed SQL filters.
+
+## AUTHZ-002 — Author catalog isolation
+
+- **Priority:** P0
+- **Effort:** M
+- **Dependencies:** AUTHZ-001
+
+Author sees only allowed scope; admin behavior explicitly defined.
+
+## AUTHZ-003 — Authoring command ownership
+
+- **Priority:** P0
+- **Effort:** M
+- **Dependencies:** AUTHZ-001
+
+Protect rename/settings/question/option/publish/archive.
+
+## AUTHZ-004 — Revision access isolation
+
+- **Priority:** P0
+- **Effort:** S/M
+- **Dependencies:** AUTHZ-001
+
+## AUTHZ-005 — Reviewer result isolation
+
+- **Priority:** P0
+- **Effort:** M
+- **Dependencies:** AUTHZ-001
+
+Two-author E2E negative test mandatory.
+
+## AUTHZ-006 — Admin scope policy
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** DECISION
+
+Decide global admin vs workspace admin.
+
+## ID-001 — `(Issuer, Subject)` external identity
+
+- **Priority:** P1; P0 if multi-realm production
+- **Effort:** XL
+- **Status:** DECISION/PLANNED
+
+### Migration impact
+
+- assignments;
+- attempts;
+- idempotency;
+- audit;
+- ownership;
+- integration events;
+- indexes.
+
+---
+
+# D. API contract maturity
+
+## API-001 — Standard `Idempotency-Key` header
+
+- **Priority:** P0/P1
+- **Effort:** M
+- **Status:** PLANNED
+
+### Scope
+
+- publish;
+- assign;
+- bulk assign;
+- start attempt;
+- submit.
+
+### Acceptance
+
+- header required for designated commands;
+- body key transitional support;
+- generated OpenAPI;
+- stable validation error.
+
+## API-002 — Idempotency request fingerprint
+
+- **Priority:** P0/P1
+- **Effort:** M
+- **Dependencies:** API-001
+
+Same key + different payload must not silently replay unrelated result.
+
+Store canonical request hash with record.
+
+## API-003 — ETag / `If-Match`
+
+- **Priority:** P1
+- **Effort:** M/L
+- **Status:** PLANNED
+
+Expose aggregate version on mutable author/admin resources.
+
+### Acceptance
+
+- stale If-Match -> 412/409 policy documented;
+- no blind lost update;
+- OpenAPI examples.
+
+## API-004 — Unified request validation
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Length/range/required/enum validation before handler where transport-specific.
+
+## API-005 — OpenAPI enrichment
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+- descriptions;
+- examples;
+- policy/security metadata;
+- ProblemDetails;
+- enum values;
+- pagination;
+- idempotency.
+
+## API-006 — OpenAPI contract snapshot test
+
+- **Priority:** P1
+- **Effort:** S/M
+- **Dependencies:** API-005
+
+Detect accidental breaking changes.
+
+## API-007 — Legacy `/api/*` deprecation
+
+- **Priority:** P2
+- **Effort:** S
+- **Status:** PLANNED
+
+### Steps
+
+1. response deprecation/sunset headers if desired;
+2. client migration;
+3. telemetry of legacy usage;
+4. remove rewrite in next major/version window.
+
+## API-008 — Stable filter/sort conventions
+
+- **Priority:** P2
+- **Effort:** M
+- **Status:** PLANNED
+
+Needed before richer catalogs/reporting.
+
+---
+
+# E. Operational reliability
+
+## OPS-010 — Backup policy
+
+- **Priority:** P0
+- **Effort:** M
+- **Status:** PLANNED
+
+Define RPO/RTO, backup schedule, encrypted retention.
+
+## OPS-011 — Automated restore verification
+
+- **Priority:** P0
+- **Effort:** M/L
+- **Dependencies:** OPS-010
+
+CI/scheduled job restores backup to isolated environment and verifies schema/read.
+
+## OPS-012 — Audit retention cleanup
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Batch delete/archive with index-friendly range.
+
+## OPS-013 — Idempotency retention cleanup
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Retention must exceed maximum retry window/client guarantees.
+
+## OPS-014 — Processed Outbox retention
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Do not delete pending/dead-letter rows blindly.
+
+## OPS-015 — Dead-letter requeue API
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+### Acceptance
+
+- admin-only;
+- audit;
+- only dead-letter rows;
+- reset attempt schedule explicitly;
+- concurrency-safe;
+- no payload edit.
+
+## OPS-016 — Dead-letter acknowledge/drop
+
+- **Priority:** P2
+- **Effort:** M
+- **Status:** DECISION
+
+Needed only if operations requires permanent suppression state.
+
+## OBS-010 — Metrics for Outbox lag
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+## OBS-011 — Attempt expiration lag metric
+
+- **Priority:** P1
+- **Effort:** S/M
+- **Status:** PLANNED
+
+## OBS-012 — API SLO dashboard
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+## OBS-013 — Alerts
+
+- **Priority:** P1
+- **Effort:** M
+- **Dependencies:** OBS-010..012
+
+Alert on:
+
+- readiness;
+- 5xx;
+- latency;
+- dead letters;
+- Outbox lag;
+- DB/RMQ connectivity.
+
+## PERF-001 — Load test baseline
+
+- **Priority:** P0 before sized production launch
+- **Effort:** L
+- **Status:** PLANNED
+
+Scenarios documented in `TESTING.md`.
+
+---
+
+# F. Integration event catalog
+
+## EVT-001 — `TestRevisionPublishedV1`
+
+- **Priority:** P1 when consumer exists
+- **Effort:** M
+- **Status:** DECISION
+
+Must be explicit `IIntegrationEvent`; no raw aggregate serialization.
+
+## EVT-002 — `TestAssignedV1`
+
+- **Priority:** P1 when notification/integration consumer exists
+- **Effort:** M
+- **Status:** DECISION
+
+## EVT-003 — `AttemptCompletedV1`
+
+- **Priority:** P1 for analytics/notifications
+- **Effort:** M
+- **Status:** DECISION
+
+Prefer stable external completion contract rather than exposing internal submitted/timed-out event classes.
+
+## EVT-004 — Integration event schema version policy
+
+- **Priority:** P1 before first external consumer
+- **Effort:** S/M
+- **Status:** PLANNED
+
+## EVT-005 — Consumer dedup reference implementation/test harness
+
+- **Priority:** P2
+- **Effort:** M
+- **Status:** PLANNED
+
+---
+
+# G. Authoring productivity
+
+## AUTHOR-001 — Draft validation endpoint
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Returns publication problems without changing status.
+
+## AUTHOR-002 — Clone test
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Creates new Draft with copied content and new IDs according to explicit policy.
+
+## AUTHOR-003 — Create draft from published revision
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Useful for branching/copying historical version.
+
+## AUTHOR-004 — Tags
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** DECISION/PLANNED
+
+Need normalized tag storage/index/filtering.
+
+## AUTHOR-005 — Category/subject
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** DECISION
+
+## AUTHOR-006 — Rich catalog filters/sort
+
+- **Priority:** P1
+- **Effort:** M
+- **Dependencies:** AUTHOR-004/005 as selected
+
+## AUTHOR-007 — Versioned JSON export
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Do not export internal EF entity schema directly.
+
+## AUTHOR-008 — Versioned JSON import
+
+- **Priority:** P1
+- **Effort:** L
+- **Dependencies:** AUTHOR-007
+
+Full validation before persistence; no partial import.
+
+## AUTHOR-009 — CSV import/export simple-choice
+
+- **Priority:** P2
+- **Effort:** M
+- **Status:** DECISION
+
+Only if business users need spreadsheet workflow.
+
+## AUTHOR-010 — Question bank
+
+- **Priority:** P1/P2
+- **Effort:** XL
+- **Status:** DECISION
+
+Key decision: copy vs live reference. Recommendation: authoring may reference/copy, published revision always snapshots.
+
+---
+
+# H. Assessment behavior
+
+## ASMT-001 — Shuffle answer options
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** DECISION
+
+Presentation order should be deterministic/stored per attempt if result review must reproduce UI.
+
+## ASMT-002 — Shuffle questions
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** DECISION
+
+## ASMT-003 — Question pools
+
+- **Priority:** P1/P2
+- **Effort:** L/XL
+- **Status:** DECISION
+
+Attempt must snapshot selected question IDs.
+
+## ASMT-004 — Partial scoring strategy
+
+- **Priority:** P1
+- **Effort:** L
+- **Status:** DECISION
+
+Revision snapshots scoring strategy/version.
+
+## ASMT-005 — Negative marking
+
+- **Priority:** P2
+- **Effort:** M/L
+- **Status:** DECISION
+
+Requires explicit minimum score/rounding policy.
+
+## ASMT-006 — Numeric answer
+
+- **Priority:** P1
+- **Effort:** L
+- **Status:** DECISION
+
+Need tolerance/normalization rules.
+
+## ASMT-007 — Short text auto-match
+
+- **Priority:** P2
+- **Effort:** L
+- **Status:** DECISION
+
+Normalization/localization complexity.
+
+## ASMT-008 — FreeText manual grading
+
+- **Priority:** P1/P2
+- **Effort:** XL
+- **Status:** DECISION
+
+Requires new attempt grading lifecycle and reviewer write permissions.
+
+## ASMT-009 — Ordering question
+
+- **Priority:** P2
+- **Effort:** L
+- **Status:** DECISION
+
+## ASMT-010 — Matching question
+
+- **Priority:** P2
+- **Effort:** XL
+- **Status:** DECISION
+
+## ASMT-011 — Attachments/images
+
+- **Priority:** P2
+- **Effort:** XL
+- **Status:** DECISION
+
+Requires object storage, scanning, signed access, content security.
+
+## ASMT-012 — Rich text/Markdown
+
+- **Priority:** P1/P2
+- **Effort:** M/L
+- **Status:** DECISION
+
+Requires rendering/sanitization policy in frontend.
+
+---
+
+# I. Attempt UX/lifecycle
+
+## ATT-010 — Attempt presentation DTO
+
+- **Priority:** P1 when frontend starts
+- **Effort:** M
+- **Status:** PLANNED
+
+Current AttemptView focuses on responses, not complete student question presentation. Add student-safe revision/attempt presentation without correctness.
+
+## ATT-011 — Resume active attempt
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Current detail can support basis; define UI/API semantics for finding active attempt.
+
+## ATT-012 — Explicit attempt start metadata
+
+- **Priority:** P2
+- **Effort:** S/M
+- **Status:** DECISION
+
+Client/device metadata only if privacy/business need.
+
+## ATT-013 — Pause/resume clock
+
+- **Priority:** P3
+- **Effort:** XL
+- **Status:** DECISION
+
+Not compatible with current simple deadline semantics without domain redesign.
+
+## ATT-014 — Autosave batching
+
+- **Priority:** P2
+- **Effort:** M
+- **Status:** DECISION
+
+Current per-question PUT is already retryable via aggregate concurrency but not idempotency-keyed.
+
+## ATT-015 — Attempt abandon
+
+- **Priority:** P2
+- **Effort:** M
+- **Status:** DECISION
+
+Need clear impact on attempt limit/result statistics.
+
+---
+
+# J. Assignment features
+
+## ASN-010 — Assignment template
+
+- **Priority:** P1
+- **Effort:** L
+- **Status:** DECISION
+
+Reusable config for revision/window/limit/targets.
+
+## ASN-011 — Campaign/batch entity
+
+- **Priority:** P1/P2
+- **Effort:** L
+- **Status:** DECISION
+
+Useful if bulk assignments need lifecycle/report as one unit.
+
+## ASN-012 — Scheduled future assignments
+
+- **Priority:** P1
+- **Effort:** S/M
+- **Status:** PLANNED
+
+Current `AvailableFrom` already supports future availability; feature mainly adds UX/query/filter/scheduling semantics.
+
+## ASN-013 — Assignment duplicate prevention policy
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** DECISION
+
+Current system allows multiple assignments of same revision/target with distinct IDs. Decide whether that is intentional.
+
+## ASN-014 — Group membership semantics
+
+- **Priority:** P1
+- **Effort:** L
+- **Status:** DECISION
+
+Choose:
+
+- dynamic at access time (current);
+- snapshot membership at assignment time.
+
+## ASN-015 — Reassignment after completion
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** DECISION
+
+Clarify whether new assignment or attempt-limit change is canonical.
+
+## ASN-016 — Assignment reminder metadata
+
+- **Priority:** P2
+- **Effort:** M
+- **Dependencies:** notification integration
+
+---
+
+# K. Reporting/analytics
+
+## REP-010 — Test summary dashboard
+
+- **Priority:** P1
+- **Effort:** L
+- **Status:** PLANNED
+
+Metrics:
+
+- attempts;
+- completion rate;
+- pass rate;
+- average score;
+- average duration.
+
+## REP-011 — Revision comparison
+
+- **Priority:** P2
+- **Effort:** L
+- **Status:** DECISION
+
+Never mix results across revisions without explicit grouping.
+
+## REP-012 — Question difficulty
+
+- **Priority:** P1/P2
+- **Effort:** L
+- **Status:** PLANNED after sufficient data
+
+Group by `(RevisionId, QuestionId)`.
+
+## REP-013 — Answer distribution
+
+- **Priority:** P2
+- **Effort:** L
+- **Status:** PLANNED
+
+Reviewer/admin only; careful correctness exposure.
+
+## REP-014 — CSV result export
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Authorization + audit + streaming response.
+
+## REP-015 — Analytics projection tables
+
+- **Priority:** P2
+- **Effort:** XL
+- **Status:** DECISION
+
+Only after query/load measurements.
+
+## REP-016 — External warehouse
+
+- **Priority:** P3
+- **Effort:** XL
+- **Status:** DECISION
+
+Requires integration event catalog and real analytics scale need.
+
+---
+
+# L. Notifications/integrations
+
+## NOTIF-001 — Assignment-created notification contract
+
+- **Priority:** P1/P2
+- **Effort:** M
+- **Dependencies:** EVT-002
+- **Status:** DECISION
+
+## NOTIF-002 — Deadline reminder scheduler
+
+- **Priority:** P2
+- **Effort:** L
+- **Status:** DECISION
+
+Should produce event/job, not send email inside transaction.
+
+## NOTIF-003 — Completion/result notification
+
+- **Priority:** P2
+- **Effort:** M/L
+- **Dependencies:** EVT-003
+
+## INT-001 — Webhook delivery adapter
+
+- **Priority:** P2
+- **Effort:** XL
+- **Status:** DECISION
+
+Only if external consumers cannot consume RabbitMQ.
+
+## INT-002 — Webhook signatures/retry
+
+- **Priority:** P2
+- **Effort:** L
+- **Dependencies:** INT-001
+
+---
+
+# M. Workspace/multi-tenancy
+
+## TEN-001 — Workspace aggregate
+
+- **Priority:** P1/P2 depending deployment
+- **Effort:** XL
+- **Status:** DECISION
+
+## TEN-002 — Workspace membership
+
+- **Priority:** same
+- **Effort:** XL
+- **Dependencies:** TEN-001, ID-001 likely
+
+## TEN-003 — Workspace-scoped roles
+
+- **Priority:** same
+- **Effort:** L
+
+## TEN-004 — Workspace data isolation
+
+- **Priority:** P0 if multi-tenant
+- **Effort:** XL
+
+Every read/write query must become workspace-aware and indexed.
+
+## TEN-005 — Tenant-aware audit/Outbox
+
+- **Priority:** P1
+- **Effort:** L
+
+---
+
+# N. Frontend/client readiness
+
+## UX-001 — Student test-taking presentation API
+
+- **Priority:** P1
+- **Effort:** M/L
+- **Status:** PLANNED when frontend begins
+
+Needs student-safe question/options DTO + current responses/deadline.
+
+## UX-002 — Author editing API ergonomics
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+May include batch reorder/update to reduce chatty UI.
+
+## UX-003 — Typed client SDK generation
+
+- **Priority:** P2
+- **Effort:** M
+- **Dependencies:** stable enriched OpenAPI
+
+## UX-004 — Frontend application
+
+- **Priority:** product-dependent
+- **Effort:** XL
+- **Status:** DECISION
+
+Not part of current repository baseline.
+
+---
+
+# O. Developer experience
+
+## DEV-001 — Central package management
+
+- **Priority:** P2
+- **Effort:** S/M
+- **Status:** PLANNED
+
+Introduce `Directory.Packages.props` if package count continues growing.
+
+## DEV-002 — Standard EF migration tooling/snapshot
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Create repeatable `dotnet ef` workflow while preserving MariaDB-specific review.
+
+## DEV-003 — Architecture dependency tests
+
+- **Priority:** P1
+- **Effort:** M
+- **Status:** PLANNED
+
+Automate Domain-no-EF/API and layer reference constraints.
+
+## DEV-004 — Formatter/analyzer CI
+
+- **Priority:** P2
+- **Effort:** S/M
+- **Status:** PLANNED
+
+## DEV-005 — Conventional changelog/release notes
+
+- **Priority:** P1 before 1.0
+- **Effort:** S
+- **Status:** PLANNED
+
+---
+
+# P. Recommended implementation order
+
+Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
+
+```text
+1  CFG-001/002 + EDGE-001/003/004 + API-SEC-001
+2  AUTHZ-001 -> AUTHZ-005
+3  API-001 -> API-006
+4  OPS-010/011 + OPS-012/013/014 + OBS-010..013
+5  PERF-001 + CI-SEC-001/002 + DEV-002/003/005
+6  1.0 stabilization
+7  AUTHOR-001/002/003 + tags/catalog
+8  UX-001 + frontend-driven API refinements
+9  REP-010/014
+10 EVT catalog only when first real consumer appears
+11 advanced assessment features selected by product decision
+```
+
+## Почему так
+
+- ownership/security нельзя откладывать после массового product expansion;
+- standard API contracts лучше стабилизировать до SDK/frontend proliferation;
+- backup/restore/retention нужны до real production data;
+- integration events должны появляться от конкретного consumer need;
+- advanced question types существенно расширяют domain и должны строиться на стабильной платформе.
+
+---
+
+# Q. Definition of Ready для feature
+
+Feature можно брать в реализацию, когда известны:
+
+- actor/use case;
+- business outcome;
+- authorization scope;
+- aggregate ownership/state changes;
+- API contract;
+- persistence impact;
+- retry/idempotency/concurrency semantics;
+- sensitive data impact;
+- test plan;
+- migration/backfill plan, если schema меняется.
+
+# R. Definition of Done для feature
+
+- code реализован по layer boundaries;
+- domain invariants unit-tested;
+- MariaDB integration tests при persistence change;
+- HTTP E2E happy + negative auth;
+- concurrency/idempotency test если применимо;
+- student correctness boundary проверен;
+- OpenAPI актуален;
+- `docs/` обновлены;
+- full CI green;
+- production image builds;
+- production image `--migrate` succeeds;
+- feature status в этом файле изменён на `DONE`.
