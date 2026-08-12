@@ -31,6 +31,20 @@ public sealed class TestAssignmentRepository(AppDbContext db) : ITestAssignmentR
 public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptRepository
 {
     public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) => db.Attempts.SingleOrDefaultAsync(x => x.Id == id, ct);
+
+    public async Task<IReadOnlyCollection<TestAttemptId>> GetExpiredInProgressIdsAsync(DateTimeOffset now, int limit, CancellationToken ct = default)
+    {
+        if (limit < 1) return Array.Empty<TestAttemptId>();
+
+        return await db.Attempts
+            .AsNoTracking()
+            .Where(x => x.Status == AttemptStatus.InProgress && x.DeadlineAt != null && x.DeadlineAt <= now)
+            .OrderBy(x => x.DeadlineAt)
+            .Select(x => x.Id)
+            .Take(limit)
+            .ToArrayAsync(ct);
+    }
+
     public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) => db.Attempts.CountAsync(x => x.AssignmentId == assignmentId && x.UserId == userId, ct);
     public async Task AddAsync(TestAttempt attempt, CancellationToken ct = default) => await db.Attempts.AddAsync(attempt, ct);
 
