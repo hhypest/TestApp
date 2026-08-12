@@ -21,6 +21,33 @@ public sealed class TestAggregateTests
     }
 
     [Fact]
+    public void Create_rejects_title_longer_than_persistence_limit()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            Test.Create(new string('x', TestLimits.TitleMaxLength + 1), Owner));
+    }
+
+    [Fact]
+    public void External_identity_rejects_identifier_longer_than_persistence_limit()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            ExternalUserId.FromSubject(new string('u', ExternalIdentityLimits.MaxIdentifierLength + 1)));
+        Assert.Throws<ArgumentException>(() =>
+            ExternalGroupId.FromExternalId(new string('g', ExternalIdentityLimits.MaxIdentifierLength + 1)));
+    }
+
+    [Fact]
+    public void Question_rejects_unknown_type()
+    {
+        var test = Test.Create("DDD", Owner);
+
+        var result = test.AddQuestion("Unknown type", (QuestionType)999, 1m, 1);
+
+        Assert.False(result.Match(_ => true, _ => false));
+        Assert.Empty(test.Questions);
+    }
+
+    [Fact]
     public void Publish_requires_questions()
     {
         var test = Test.Create("DDD", Owner);
