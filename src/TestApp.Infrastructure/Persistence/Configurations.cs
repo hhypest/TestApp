@@ -74,6 +74,7 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<TestAssig
         b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
         b.Property(x => x.TargetType).IsRequired();
         b.Property(x => x.TargetId).HasMaxLength(256).IsRequired();
+        b.Property(x => x.LegacyTarget).HasColumnName("target").HasMaxLength(512).IsRequired();
         b.Property(x => x.CancelledBy)
             .HasConversion(x => x.HasValue ? x.Value.Value : null, x => x == null ? (ExternalUserId?)null : new ExternalUserId(x));
         b.Property(x => x.CancelReason).HasMaxLength(1000);
