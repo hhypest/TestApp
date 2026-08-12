@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using TestApp.Api;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
 using Xunit;
