@@ -19,14 +19,14 @@ public sealed record RemoveAnswerOptionCommand(TestId TestId, QuestionId Questio
 public sealed record ReorderAnswerOptionCommand(TestId TestId, QuestionId QuestionId, AnswerOptionId OptionId, int Order) : ICommand<Result<TestId, Error>>;
 public sealed record ArchiveTestCommand(TestId TestId) : ICommand<Result<TestId, Error>>;
 
-public sealed class CreateTestCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class CreateTestCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<CreateTestCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(CreateTestCommand command, CancellationToken ct)
     {
         try
         {
-            var test = Test.Create(command.Title);
+            var test = Test.Create(command.Title, actor.UserId);
             await tests.AddAsync(test, ct);
             await unitOfWork.SaveChangesAsync(ct);
             return test.Id;
@@ -38,40 +38,39 @@ public sealed class CreateTestCommandHandler(ITestRepository tests, IUnitOfWork 
     }
 }
 
-public sealed class RenameTestCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class RenameTestCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<RenameTestCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(RenameTestCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         try { return await TestCommandResult.Save(test.Rename(command.Title), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.title", ex.Message); }
     }
 }
 
-public sealed class ChangeTestSettingsCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class ChangeTestSettingsCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<ChangeTestSettingsCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(ChangeTestSettingsCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
-        return await TestCommandResult.Save(
-            test.ChangeSettings(command.PassingPercentage, command.TimeLimitMinutes),
-            test.Id,
-            unitOfWork,
-            ct);
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        return await TestCommandResult.Save(test.ChangeSettings(command.PassingPercentage, command.TimeLimitMinutes), test.Id, unitOfWork, ct);
     }
 }
 
-public sealed class AddQuestionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class AddQuestionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<AddQuestionCommand, Result<QuestionId, Error>>
 {
     public async Task<Result<QuestionId, Error>> Handle(AddQuestionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         try
         {
             var result = test.AddQuestion(command.Text, command.Type, command.Points, command.Order);
@@ -86,47 +85,51 @@ public sealed class AddQuestionCommandHandler(ITestRepository tests, IUnitOfWork
     }
 }
 
-public sealed class UpdateQuestionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class UpdateQuestionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<UpdateQuestionCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(UpdateQuestionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         try { return await TestCommandResult.Save(test.UpdateQuestion(command.QuestionId, command.Text, command.Type, command.Points), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.question.text", ex.Message); }
     }
 }
 
-public sealed class RemoveQuestionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class RemoveQuestionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<RemoveQuestionCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(RemoveQuestionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         return await TestCommandResult.Save(test.RemoveQuestion(command.QuestionId), test.Id, unitOfWork, ct);
     }
 }
 
-public sealed class ReorderQuestionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class ReorderQuestionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<ReorderQuestionCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(ReorderQuestionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         return await TestCommandResult.Save(test.ReorderQuestion(command.QuestionId, command.Order), test.Id, unitOfWork, ct);
     }
 }
 
-public sealed class AddAnswerOptionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class AddAnswerOptionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<AddAnswerOptionCommand, Result<AnswerOptionId, Error>>
 {
     public async Task<Result<AnswerOptionId, Error>> Handle(AddAnswerOptionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         try
         {
             var result = test.AddAnswerOption(command.QuestionId, command.Text, command.IsCorrect, command.Order);
@@ -141,47 +144,51 @@ public sealed class AddAnswerOptionCommandHandler(ITestRepository tests, IUnitOf
     }
 }
 
-public sealed class UpdateAnswerOptionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class UpdateAnswerOptionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<UpdateAnswerOptionCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(UpdateAnswerOptionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         try { return await TestCommandResult.Save(test.UpdateAnswerOption(command.QuestionId, command.OptionId, command.Text, command.IsCorrect), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.answer_option.text", ex.Message); }
     }
 }
 
-public sealed class RemoveAnswerOptionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class RemoveAnswerOptionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<RemoveAnswerOptionCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(RemoveAnswerOptionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         return await TestCommandResult.Save(test.RemoveAnswerOption(command.QuestionId, command.OptionId), test.Id, unitOfWork, ct);
     }
 }
 
-public sealed class ReorderAnswerOptionCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class ReorderAnswerOptionCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<ReorderAnswerOptionCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(ReorderAnswerOptionCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         return await TestCommandResult.Save(test.ReorderAnswerOption(command.QuestionId, command.OptionId, command.Order), test.Id, unitOfWork, ct);
     }
 }
 
-public sealed class ArchiveTestCommandHandler(ITestRepository tests, IUnitOfWork unitOfWork)
+public sealed class ArchiveTestCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<ArchiveTestCommand, Result<TestId, Error>>
 {
     public async Task<Result<TestId, Error>> Handle(ArchiveTestCommand command, CancellationToken ct)
     {
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         return await TestCommandResult.Save(test.Archive(), test.Id, unitOfWork, ct);
     }
 }
