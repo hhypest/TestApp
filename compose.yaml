@@ -16,6 +16,22 @@ services:
       timeout: 5s
       retries: 20
 
+  rabbitmq:
+    image: rabbitmq:4.3.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: testapp
+      RABBITMQ_DEFAULT_PASS: testapp
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - testapp-rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.0
     command: ["start-dev", "--import-realm"]
@@ -69,6 +85,10 @@ services:
       Database__ApplyMigrationsOnStartup: "false"
       Keycloak__Authority: http://keycloak:8080/realms/testapp
       Keycloak__Audience: testapp-api
+      RabbitMq__Enabled: "true"
+      RabbitMq__ConnectionString: amqp://testapp:testapp@rabbitmq:5672/
+      RabbitMq__Exchange: testapp.events
+      RabbitMq__RoutingKeyPrefix: testapp
       OTEL_SERVICE_NAME: TestApp.Api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
@@ -76,6 +96,8 @@ services:
       - "8080:8080"
     depends_on:
       mariadb:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -86,3 +108,4 @@ services:
 
 volumes:
   testapp-mariadb:
+  testapp-rabbitmq:
