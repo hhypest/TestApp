@@ -7,7 +7,7 @@ using TestApp.Messaging.Abstractions;
 
 namespace TestApp.Application.Tests;
 
-public sealed record PublishTestCommand(TestId TestId, Guid RequestId) : ICommand<Result<PublishedTestRevisionId, Error>>;
+public sealed record PublishTestCommand(TestId TestId, Guid RequestId, long? ExpectedVersion = null) : ICommand<Result<PublishedTestRevisionId, Error>>;
 
 public sealed class PublishTestCommandHandler(
     ITestRepository tests,
@@ -39,6 +39,8 @@ public sealed class PublishTestCommandHandler(
             return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError)
             return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError)
+            return versionError;
         if (test.Status == TestStatus.Archived)
             return Error.Conflict("test.archived", "Archived tests cannot be published.");
         if (test.Status == TestStatus.Published)
