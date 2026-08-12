@@ -54,7 +54,12 @@ builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(opt
 
 if (!migrateOnly)
 {
-    builder.Services.AddOpenApi();
+    builder.Services.AddOpenApi(options =>
+    {
+        options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+        options.AddOperationTransformer<ApiContractOperationTransformer>();
+        options.AddSchemaTransformer<ApiExampleSchemaTransformer>();
+    });
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
     {
         o.Authority = keycloakOptions!.Authority;
