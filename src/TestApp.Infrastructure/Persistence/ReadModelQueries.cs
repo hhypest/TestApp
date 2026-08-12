@@ -139,6 +139,62 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
         return new PagedResult<ReviewerResultSummary>(items, page, pageSize, totalCount);
     }
 
+    public async Task<ReviewerAttemptResultView?> GetReviewerAttemptResultAsync(TestAttemptId attemptId, CancellationToken ct)
+    {
+        var attempt = await db.Attempts.AsNoTracking()
+            .Include(x => x.Responses)
+            .ThenInclude(x => x.SelectedOptions)
+            .SingleOrDefaultAsync(x => x.Id == attemptId, ct);
+        if (attempt is null) return null;
+
+        var revision = await db.Revisions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == attempt.RevisionId, ct);
+        if (revision is null) return null;
+
+        var responses = attempt.Responses.ToDictionary(x => x.Id);
+        var questions = revision.Questions.OrderBy(x => x.Order).Select(question =>
+        {
+            responses.TryGetValue(question.Id, out var response);
+            var selectedIds = response?.SelectedOptions.Select(x => x.OptionId).ToHashSet() ?? [];
+            var correctIds = question.Options.Where(x => x.IsCorrect).Select(x => x.Id).ToHashSet();
+            var earnedPoints = selectedIds.SetEquals(correctIds) ? question.Points : 0m;
+
+            var options = question.Options.OrderBy(x => x.Order).Select(option => new ReviewerAnswerOptionView(
+                option.Id,
+                option.Text,
+                option.Order,
+                option.IsCorrect,
+                selectedIds.Contains(option.Id))).ToArray();
+
+            return new ReviewerQuestionResultView(
+                question.Id,
+                question.Text,
+                question.Type,
+                question.Points,
+                earnedPoints,
+                question.Order,
+                response?.AnsweredAt,
+                options);
+        }).ToArray();
+
+        return new ReviewerAttemptResultView(
+            attempt.Id,
+            attempt.AssignmentId,
+            attempt.RevisionId,
+            revision.TestId,
+            revision.Title,
+            revision.Version,
+            attempt.UserId,
+            attempt.Status,
+            attempt.Outcome,
+            attempt.Score?.Earned,
+            attempt.Score?.Maximum,
+            attempt.Score?.Percentage,
+            attempt.StartedAt,
+            attempt.DeadlineAt,
+            attempt.CompletedAt,
+            questions);
+    }
+
     public async Task<AttemptView?> GetAttemptAsync(TestAttemptId attemptId, ExternalUserId userId, CancellationToken ct)
     {
         var attempt = await db.Attempts.AsNoTracking().Include(x => x.Responses).ThenInclude(x => x.SelectedOptions).SingleOrDefaultAsync(x => x.Id == attemptId && x.UserId == userId, ct);
