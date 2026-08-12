@@ -15,7 +15,7 @@ public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSi
 
 public sealed record AnswerOptionEditorView(AnswerOptionId Id, string Text, bool IsCorrect, int Order);
 public sealed record QuestionEditorView(QuestionId Id, string Text, QuestionType Type, decimal Points, int Order, IReadOnlyList<AnswerOptionEditorView> Options);
-public sealed record TestEditorView(TestId Id, string Title, TestStatus Status, decimal PassingPercentage, int? TimeLimitMinutes, IReadOnlyList<QuestionEditorView> Questions);
+public sealed record TestEditorView(TestId Id, string Title, TestStatus Status, long ConcurrencyVersion, decimal PassingPercentage, int? TimeLimitMinutes, IReadOnlyList<QuestionEditorView> Questions);
 
 public sealed record AssignmentSummary(
     TestAssignmentId Id,
