@@ -1,3 +1,5 @@
+using TestApp.Application.Abstractions;
+using TestApp.Domain.Identity;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
 using TestApp.Messaging.Abstractions;
@@ -35,29 +37,39 @@ public sealed record GetTestRevisionsQuery(TestId TestId) : IQuery<IReadOnlyList
 public interface ITestCatalogQueries
 {
     Task<PagedResult<TestCatalogItem>> GetTestsAsync(
+        ExternalUserId? ownerId,
         int page,
         int pageSize,
         TestStatus? status,
         string? search,
         CancellationToken ct);
 
-    Task<IReadOnlyList<PublishedRevisionSummary>> GetRevisionsAsync(TestId testId, CancellationToken ct);
+    Task<IReadOnlyList<PublishedRevisionSummary>> GetRevisionsAsync(
+        TestId testId,
+        ExternalUserId? ownerId,
+        CancellationToken ct);
 }
 
-public sealed class GetTestsQueryHandler(ITestCatalogQueries queries)
+public sealed class GetTestsQueryHandler(ITestCatalogQueries queries, ICurrentActor actor)
     : IQueryHandler<GetTestsQuery, PagedResult<TestCatalogItem>>
 {
     public Task<PagedResult<TestCatalogItem>> Handle(GetTestsQuery query, CancellationToken ct)
     {
         var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
         var search = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim();
-        return queries.GetTestsAsync(page, pageSize, query.Status, search, ct);
+        return queries.GetTestsAsync(OwnerFilter(actor), page, pageSize, query.Status, search, ct);
     }
+
+    private static ExternalUserId? OwnerFilter(ICurrentActor actor) => IsAdmin(actor) ? null : actor.UserId;
+    private static bool IsAdmin(ICurrentActor actor) => actor.Roles.Any(x => string.Equals(x, "test-admin", StringComparison.OrdinalIgnoreCase));
 }
 
-public sealed class GetTestRevisionsQueryHandler(ITestCatalogQueries queries)
+public sealed class GetTestRevisionsQueryHandler(ITestCatalogQueries queries, ICurrentActor actor)
     : IQueryHandler<GetTestRevisionsQuery, IReadOnlyList<PublishedRevisionSummary>>
 {
     public Task<IReadOnlyList<PublishedRevisionSummary>> Handle(GetTestRevisionsQuery query, CancellationToken ct) =>
-        queries.GetRevisionsAsync(query.TestId, ct);
+        queries.GetRevisionsAsync(query.TestId, OwnerFilter(actor), ct);
+
+    private static ExternalUserId? OwnerFilter(ICurrentActor actor) =>
+        actor.Roles.Any(x => string.Equals(x, "test-admin", StringComparison.OrdinalIgnoreCase)) ? null : actor.UserId;
 }
