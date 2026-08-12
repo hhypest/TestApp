@@ -78,7 +78,7 @@ Bulk assignment валидирует весь batch до записи, огра�
 
 ## Persistence
 
-Основная СУБД — MariaDB. Infrastructure использует EF Core 9 + Pomelo provider, приложение остаётся на `net10.0`.
+Основная СУБД — **MariaDB 12.3**. Infrastructure использует EF Core 9 + Pomelo provider, приложение остаётся на `net10.0`.
 
 Connection string читается из `ConnectionStrings:Database`. Development fallback:
 
@@ -167,7 +167,7 @@ docker compose up --build
 
 - TestApp API — `http://localhost:8080`;
 - Keycloak — `http://localhost:8081`;
-- MariaDB — `localhost:3306`;
+- MariaDB 12.3 — `localhost:3306`;
 - OTLP gRPC — `localhost:4317`;
 - OTLP HTTP — `localhost:4318`.
 
@@ -185,10 +185,11 @@ Bootstrap admin для локального Keycloak: `bootstrap-admin / bootstr
 
 Realm mapper выдаёт `roles`, `groups` и audience `testapp-api`. Frontend hostname — `localhost:8081`, а dynamic backchannel позволяет API обращаться к Keycloak через приватное имя `keycloak:8080`.
 
-Удалить локальные volumes и начать с чистой базы/realm:
+После перехода с MariaDB 11.4 на 12.3 существующий локальный development volume не следует считать эквивалентом чистой установки. Для воспроизводимого dev-окружения рекомендуется удалить локальные volumes и поднять stack заново:
 
 ```bash
 docker compose down -v
+docker compose up --build
 ```
 
 ## Проверка
@@ -201,6 +202,6 @@ docker compose -f compose.yaml config --quiet
 docker build -t testapp-api:local .
 ```
 
-GitHub Actions поднимает настоящий `mariadb:11.4` service container, выполняет restore/build/test, валидирует Compose, собирает production Docker image и запускает этот image в `--migrate` режиме против MariaDB.
+GitHub Actions поднимает настоящий `mariadb:12.3` service container, выполняет restore/build/test, валидирует Compose, собирает production Docker image и запускает этот image в `--migrate` режиме против MariaDB 12.3.
 
-Integration tests используют отдельные временные databases и проверяют migrations, optimistic concurrency, distributed idempotency/advisory locks, bulk assignments, persistence round-trip, Outbox delivery/dead-letter behavior и защищённый Minimal API end-to-end flow.
+Integration tests используют отдельные временные databases и проверяют фактическую MariaDB version (`12.3+`), migrations, optimistic concurrency, distributed idempotency/advisory locks, bulk assignments, persistence round-trip, Outbox delivery/dead-letter behavior и защищённый Minimal API end-to-end flow.
