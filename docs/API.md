@@ -4,80 +4,72 @@
 
 ## 1. Versioning и compatibility
 
-Canonical endpoints находятся под:
+Canonical endpoints:
 
 ```text
 /api/v1/...
 ```
 
-Для обратной совместимости текущий middleware переписывает legacy path:
+Legacy compatibility middleware временно переписывает:
 
 ```text
 /api/... -> /api/v1/...
 ```
 
-если request ещё не начинается с `/api/v1`.
-
-### Важно
-
-Legacy rewrite — временный compatibility mechanism, а не полноценная lifecycle/versioning policy. Срок deprecation `/api/*` пока не определён.
+Legacy rewrite не является полноценной lifecycle/versioning policy. Формальный срок retirement ещё должен быть определён в Phase C5.
 
 ## 2. OpenAPI
 
-```text
+```http
 GET /openapi/v1.json
 ```
 
-Endpoint anonymous.
+Runtime policy:
 
-Текущий OpenAPI генерируется ASP.NET Core `AddOpenApi/MapOpenApi` из Minimal API metadata. Полные examples/descriptions/error schemas ещё требуют дополнительного hardening.
+- Development: enabled + anonymous по умолчанию;
+- Production: disabled по умолчанию;
+- если `OpenApi:Enabled=true` и `OpenApi:AllowAnonymous=false`, требуется `operations:read`.
+
+Текущий OpenAPI генерируется ASP.NET Core Minimal API metadata. Расширенные examples/error/header schemas относятся к Phase C4.
 
 ## 3. Authentication
 
-API использует JWT Bearer.
+JWT Bearer / Keycloak.
 
 Ожидаемые claims:
 
-- `sub` — external user ID;
+- `sub` — stable external user ID;
 - `roles` — application roles;
 - `groups` — external group membership;
-- `aud` должен соответствовать `Keycloak:Audience`.
+- `aud` — `Keycloak:Audience`.
 
 `MapInboundClaims=false`.
 
-Все `/api/v1/*` endpoints, кроме явно anonymous infrastructure endpoints, требуют authentication напрямую или через authenticated route group.
-
 ## 4. Authorization policies
 
-| Policy | Allowed roles | Назначение |
+| Policy | Roles | Scope |
 |---|---|---|
 | `tests:write` | `test-author`, `test-admin` | authoring/catalog/editor/archive |
-| `tests:publish` | `test-author`, `test-admin` | publication |
+| `tests:publish` | `test-author`, `test-admin` | publish |
 | `tests:assign` | `test-admin` | assignment administration/manual timeout |
-| `results:review` | `test-author`, `test-admin` | reviewer result views |
-| `operations:read` | `test-admin` | audit/outbox operations |
+| `results:review` | `test-author`, `test-admin` | reviewer results |
+| `operations:read` | `test-admin` | audit/outbox/OpenAPI when protected |
 
-### Критическое ограничение
+### Ownership
 
-Role policy пока не дополняется ownership check для `Test`. Любой `test-author`, имеющий TestId, в текущей модели может обращаться к authoring operations этого test.
+Role policy не является единственной защитой.
 
-## 5. Общие HTTP semantics
+`Test.OwnerId` = Keycloak `sub` создавшего test.
 
-### 5.1 Success
+- `test-author` видит/изменяет только свои tests;
+- reviewer author видит результаты только собственных tests;
+- `test-admin` имеет global scope;
+- чужой editor/reviewer detail возвращается как unavailable/not found на read boundary;
+- чужая write command возвращает `403 test.forbidden`.
 
-Command endpoints в основном возвращают:
+## 5. ProblemDetails и status codes
 
-```text
-200 OK
-```
-
-с value/result JSON body.
-
-Read endpoints возвращают `200`, а detail queries — `404`, если read model отсутствует.
-
-### 5.2 Application error mapping
-
-`Result<T, Error>` отображается так:
+Application errors:
 
 | ErrorType | HTTP |
 |---|---:|
@@ -85,71 +77,147 @@ Read endpoints возвращают `200`, а detail queries — `404`, если
 | NotFound | 404 |
 | Conflict | 409 |
 | Forbidden | 403 |
-| Other | 500 |
+| PreconditionFailed | 412 |
 
-ProblemDetails:
+Infrastructure/API contracts дополнительно используют:
 
-- `title` = application error code;
-- `detail` = error message.
-
-### 5.3 Exception mapping
-
-Optimistic concurrency:
-
-```text
-409 Conflict
-Title: concurrency.conflict
-```
+- `428 concurrency.precondition_required`;
+- `400 concurrency.if_match`;
+- `409 concurrency.conflict`;
+- `409 idempotency.key_reused`;
+- `400 idempotency.key_mismatch`;
+- `429 Too Many Requests`.
 
 Unhandled exception:
 
 ```text
-500 Internal Server Error
-Title: internal.error
-Detail: An unexpected error occurred.
+500 internal.error
 ```
 
-Unhandled exception details/stack trace клиенту не раскрываются. `traceId` помещается в ProblemDetails extensions.
+Stack trace/detail internal exception клиенту не выдаётся.
 
 ## 6. Correlation
 
-Header:
+Request/response header:
 
 ```text
 X-Correlation-ID
 ```
 
-Поведение:
+Клиентский ID принимается при длине <=128, иначе генерируется current TraceId/Guid v7. Correlation ID используется в audit/logging/telemetry.
 
-- клиент может передать собственный ID длиной <= 128;
-- иначе используется current Activity TraceId либо Guid v7;
-- ID записывается в `HttpContext.TraceIdentifier`;
-- возвращается в response header;
-- используется audit/logging/telemetry.
+## 7. HTTP optimistic concurrency: ETag / If-Match
 
-## 7. Rate limiting
+Mutable authoring resource `Test` использует strong numeric ETag.
 
-Текущая global policy:
+### 7.1 Получение версии
 
-- Fixed Window;
-- 120 requests;
-- окно 1 minute;
-- queue limit = 0;
-- partition key = authenticated `sub`, иначе remote IP, иначе `anonymous`;
-- reject status = `429 Too Many Requests`.
-
-Policy пока hard-coded и должна стать configuration-driven.
-
-## 8. Pagination
-
-Стандартная read-side pagination:
-
-```text
-page     default 1, minimum 1
-pageSize default 20, clamp 1..100
+```http
+GET /api/v1/tests/{testId}/editor
 ```
 
-`PagedResult<T>`:
+Response содержит:
+
+```text
+ETag: "7"
+```
+
+и body field:
+
+```json
+{
+  "concurrencyVersion": 7
+}
+```
+
+ETag соответствует текущему `Test.ConcurrencyVersion`.
+
+### 7.2 Обязательный If-Match
+
+Все изменения существующего `Test` требуют:
+
+```text
+If-Match: "7"
+```
+
+Это относится к:
+
+- rename;
+- settings;
+- add/update/remove/reorder question;
+- add/update/remove/reorder option;
+- publish;
+- archive.
+
+Semantics:
+
+| Ситуация | HTTP / code |
+|---|---|
+| If-Match отсутствует | 428 `concurrency.precondition_required` |
+| malformed/weak/wildcard | 400 `concurrency.if_match` |
+| версия устарела | 412 `concurrency.precondition_failed` |
+| версия актуальна | command исполняется |
+| race после проверки | 409 `concurrency.conflict` через EF concurrency token |
+
+Weak ETag `W/"7"` и wildcard `*` намеренно не поддерживаются.
+
+## 8. Idempotency-Key
+
+Primary public retry contract:
+
+```text
+Idempotency-Key: 8f85b273-9f45-4b4e-94dd-856f4697e8ad
+```
+
+Используется для:
+
+- publish;
+- single assignment;
+- bulk assignment;
+- start attempt;
+- submit attempt.
+
+### Transitional compatibility
+
+Legacy JSON field:
+
+```json
+{
+  "idempotencyKey": "..."
+}
+```
+
+пока поддерживается.
+
+Правила:
+
+- header-only — supported;
+- body-only — supported transitional;
+- оба одинаковые — supported;
+- оба непустые, но разные -> `400 idempotency.key_mismatch`;
+- invalid/empty required key -> `400 idempotency.key`.
+
+### Request fingerprint
+
+Для common idempotency operations persistence хранит SHA-256 fingerprint канонического логического payload.
+
+Повтор:
+
+```text
+same actor + operation + key + same payload -> previous result replay
+same actor + operation + key + different payload -> 409 idempotency.key_reused
+```
+
+Publish operation дополнительно resource-scoped по TestId.
+
+## 9. Pagination
+
+Read-side convention:
+
+```text
+page     default 1; minimum 1
+pageSize default 20; clamp 1..100
+```
 
 ```json
 {
@@ -161,56 +229,57 @@ pageSize default 20, clamp 1..100
 }
 ```
 
-## 9. Idempotency
+## 10. Rate limiting
 
-Текущий public contract передаёт `Guid idempotencyKey` в JSON body для:
+Configuration-driven classes:
 
-- publish;
-- single assignment;
-- bulk assignment;
-- start attempt;
-- submit attempt.
+- general;
+- student-write;
+- privileged-read;
+- operations.
 
-Empty Guid отклоняется.
+Partition = authenticated `sub`; fallback = trusted effective remote IP.
 
-### Planned
+Rejected request:
 
-Перенести общий HTTP contract на `Idempotency-Key` header с transitional body compatibility.
+```text
+429 Too Many Requests
+```
+
+Correlation middleware выполняется до rate limiter, поэтому response сохраняет `X-Correlation-ID`.
 
 ---
 
-# 10. Tests/authoring endpoints
+# 11. Test authoring API
 
-Base group:
+Base:
 
 ```text
 /api/v1/tests
 ```
 
-Все endpoints authenticated.
-
-## 10.1 Catalog
+## 11.1 Catalog
 
 ```http
 GET /api/v1/tests?page=1&pageSize=20&status=Published&search=text
 Authorization: tests:write
 ```
 
-Response: `PagedResult<TestCatalogItem>`.
+Author получает только owned tests; admin — global list.
 
-Catalog item:
+`TestCatalogItem`:
 
-- `id`;
-- `title`;
-- `status`;
-- `passingPercentage`;
-- `timeLimitMinutes`;
-- `questionCount`;
-- `publishedRevisionCount`;
-- `latestRevisionVersion`;
-- `latestPublishedAt`.
+- id;
+- title;
+- status;
+- passingPercentage;
+- timeLimitMinutes;
+- questionCount;
+- publishedRevisionCount;
+- latestRevisionVersion;
+- latestPublishedAt.
 
-## 10.2 Create
+## 11.2 Create
 
 ```http
 POST /api/v1/tests
@@ -222,24 +291,37 @@ Content-Type: application/json
 }
 ```
 
+Создание не требует `If-Match`, потому что resource ещё не существует. Owner = current `sub`.
+
 Response: `TestId`.
 
-## 10.3 Rename
+## 11.3 Editor
+
+```http
+GET /api/v1/tests/{testId}/editor
+Authorization: tests:write + ownership/admin scope
+```
+
+Response содержит questions/options/correctness и `ConcurrencyVersion`; response header содержит `ETag`.
+
+Editor DTO **не является student-safe**.
+
+## 11.4 Rename
 
 ```http
 PATCH /api/v1/tests/{testId}/title
-Authorization: tests:write
+If-Match: "N"
 
 {
   "title": "New title"
 }
 ```
 
-## 10.4 Settings
+## 11.5 Settings
 
 ```http
 PATCH /api/v1/tests/{testId}/settings
-Authorization: tests:write
+If-Match: "N"
 
 {
   "passingPercentage": 70,
@@ -249,11 +331,11 @@ Authorization: tests:write
 
 `timeLimitMinutes` nullable.
 
-## 10.5 Add question
+## 11.6 Add question
 
 ```http
 POST /api/v1/tests/{testId}/questions
-Authorization: tests:write
+If-Match: "N"
 
 {
   "text": "Question text",
@@ -263,132 +345,72 @@ Authorization: tests:write
 }
 ```
 
-Текущий API не регистрирует `JsonStringEnumConverter`, поэтому `QuestionType` передаётся стандартным numeric enum JSON contract:
+Current enum values:
 
 ```text
 1 = SingleChoice
 2 = MultipleChoice
 ```
 
-Response: `QuestionId`.
+JSON enum currently follows default numeric System.Text.Json serialization.
 
-## 10.6 Update question
-
-```http
-PUT /api/v1/tests/{testId}/questions/{questionId}
-Authorization: tests:write
-
-{
-  "text": "Updated",
-  "type": 1,
-  "points": 2
-}
-```
-
-## 10.7 Remove question
+## 11.7 Update/remove/reorder question
 
 ```http
+PUT    /api/v1/tests/{testId}/questions/{questionId}
 DELETE /api/v1/tests/{testId}/questions/{questionId}
-Authorization: tests:write
+PATCH  /api/v1/tests/{testId}/questions/{questionId}/order
+If-Match: "N"
 ```
 
-## 10.8 Reorder question
+## 11.8 Answer options
 
 ```http
-PATCH /api/v1/tests/{testId}/questions/{questionId}/order
-Authorization: tests:write
-
-{
-  "order": 3
-}
-```
-
-## 10.9 Add answer option
-
-```http
-POST /api/v1/tests/{testId}/questions/{questionId}/options
-Authorization: tests:write
-
-{
-  "text": "Answer",
-  "isCorrect": true,
-  "order": 0
-}
-```
-
-Response: `AnswerOptionId`.
-
-## 10.10 Update answer option
-
-```http
-PUT /api/v1/tests/{testId}/questions/{questionId}/options/{optionId}
-Authorization: tests:write
-
-{
-  "text": "Updated answer",
-  "isCorrect": false
-}
-```
-
-## 10.11 Remove option
-
-```http
+POST   /api/v1/tests/{testId}/questions/{questionId}/options
+PUT    /api/v1/tests/{testId}/questions/{questionId}/options/{optionId}
 DELETE /api/v1/tests/{testId}/questions/{questionId}/options/{optionId}
-Authorization: tests:write
+PATCH  /api/v1/tests/{testId}/questions/{questionId}/options/{optionId}/order
+If-Match: "N"
 ```
 
-## 10.12 Reorder option
-
-```http
-PATCH /api/v1/tests/{testId}/questions/{questionId}/options/{optionId}/order
-Authorization: tests:write
-
-{
-  "order": 2
-}
-```
-
-## 10.13 Publish
+## 11.9 Publish
 
 ```http
 POST /api/v1/tests/{testId}/publish
-Authorization: tests:publish
+Authorization: tests:publish + ownership/admin scope
+If-Match: "N"
+Idempotency-Key: <UUID>
 
 {
-  "idempotencyKey": "00000000-0000-0000-0000-000000000001"
+  "idempotencyKey": "00000000-0000-0000-0000-000000000000"
 }
 ```
 
+Body key может быть empty при использовании header.
+
 Response: `PublishedTestRevisionId`.
 
-## 10.14 Archive
+Idempotency replay проверяется до повторного aggregate mutation; retry уже завершённого publish возвращает сохранённый revision ID.
+
+## 11.10 Archive
 
 ```http
 POST /api/v1/tests/{testId}/archive
-Authorization: tests:write
+If-Match: "N"
 ```
 
-## 10.15 Editor view
-
-```http
-GET /api/v1/tests/{testId}/editor
-Authorization: tests:write
-```
-
-Editor view включает `IsCorrect` и поэтому не является student-safe DTO.
-
-## 10.16 Revision list
+## 11.11 Revisions
 
 ```http
 GET /api/v1/tests/{testId}/revisions
-Authorization: tests:write
+Authorization: tests:write + owner/admin scope
 ```
 
-Response metadata не раскрывает answer correctness.
+Metadata list не раскрывает correctness.
 
 ---
 
-# 11. Assignment endpoints
+# 12. Assignment API
 
 Base:
 
@@ -396,244 +418,117 @@ Base:
 /api/v1/assignments
 ```
 
-## 11.1 Admin list
+Admin only для administration endpoints.
+
+### List/detail/attempts
 
 ```http
-GET /api/v1/assignments?testId=&revisionId=&targetType=&targetId=&status=&page=1&pageSize=20
-Authorization: tests:assign
-```
-
-Response содержит assignment metadata и aggregate attempt statistics.
-
-## 11.2 Admin detail
-
-```http
+GET /api/v1/assignments?testId=&revisionId=&targetType=&targetId=&status=&page=&pageSize=
 GET /api/v1/assignments/{assignmentId}
-Authorization: tests:assign
+GET /api/v1/assignments/{assignmentId}/attempts?status=&outcome=&page=&pageSize=
 ```
 
-## 11.3 Assignment attempts
-
-```http
-GET /api/v1/assignments/{assignmentId}/attempts?status=&outcome=&page=1&pageSize=20
-Authorization: tests:assign
-```
-
-## 11.4 Single assign
+### Single assign
 
 ```http
 POST /api/v1/assignments
-Authorization: tests:assign
+Idempotency-Key: <UUID>
 
 {
   "revisionId": "...",
   "userId": "student-sub",
   "groupId": null,
   "availableFrom": "2026-08-12T15:00:00Z",
-  "availableUntil": "2026-08-13T15:00:00Z",
+  "availableUntil": null,
   "attemptLimit": 2,
-  "idempotencyKey": "..."
+  "idempotencyKey": "00000000-0000-0000-0000-000000000000"
 }
 ```
 
-Ровно одно из `userId/groupId` должно быть задано.
+Ровно один target: user или group.
 
-## 11.5 Bulk assign
+### Bulk assign
 
 ```http
 POST /api/v1/assignments/bulk
-Authorization: tests:assign
-
-{
-  "revisionId": "...",
-  "targets": [
-    { "userId": "student-1", "groupId": null },
-    { "userId": null, "groupId": "students" }
-  ],
-  "availableFrom": "...",
-  "availableUntil": null,
-  "attemptLimit": 1,
-  "idempotencyKey": "..."
-}
+Idempotency-Key: <UUID>
 ```
 
 Constraints:
 
 - 1..500 targets;
-- каждый target — ровно user или group;
-- duplicate target внутри batch запрещён.
+- каждый target = user xor group;
+- duplicate target запрещён;
+- весь batch валидируется до записи;
+- fingerprint canonicalizes target set независимо от порядка входного массива.
 
-Response: `BulkAssignTestsResult { createdCount, assignmentIds[] }`.
-
-## 11.6 Change window
+### Lifecycle
 
 ```http
 PATCH /api/v1/assignments/{assignmentId}/window
-Authorization: tests:assign
-
-{
-  "availableFrom": "...",
-  "availableUntil": "..."
-}
-```
-
-## 11.7 Change attempt limit
-
-```http
 PATCH /api/v1/assignments/{assignmentId}/attempt-limit
-Authorization: tests:assign
-
-{
-  "attemptLimit": 3
-}
+POST  /api/v1/assignments/{assignmentId}/cancel
 ```
 
-Nullable means unlimited.
-
-## 11.8 Cancel
-
-```http
-POST /api/v1/assignments/{assignmentId}/cancel
-Authorization: tests:assign
-
-{
-  "reason": "Cancelled by administrator"
-}
-```
-
-## 11.9 Start attempt
+### Start attempt
 
 ```http
 POST /api/v1/assignments/{assignmentId}/attempts
-Authorization: any authenticated user + application target validation
-
-{
-  "idempotencyKey": "..."
-}
+Authorization: authenticated + target/availability validation
+Idempotency-Key: <UUID>
 ```
 
-Response: `TestAttemptId`.
-
-Handler дополнительно проверяет target membership, availability, revision и attempt limit.
+Start имеет дополнительную DB uniqueness/attempt-limit concurrency protection.
 
 ---
 
-# 12. Current-user read endpoints
-
-## 12.1 My assignments
+# 13. Current-user API
 
 ```http
-GET /api/v1/me/assignments?page=1&pageSize=20&status=Active
-Authorization: authenticated
+GET /api/v1/me/assignments?page=&pageSize=&status=
+GET /api/v1/me/attempts?page=&pageSize=&status=
 ```
 
-Visibility = direct user target или current actor group membership.
-
-## 12.2 My attempts
-
-```http
-GET /api/v1/me/attempts?page=1&pageSize=20&status=InProgress
-Authorization: authenticated
-```
+Assignment visibility = direct user target или current token group membership.
 
 ---
 
-# 13. Attempt endpoints
-
-Base:
-
-```text
-/api/v1/attempts
-```
-
-## 13.1 Answer question
+# 14. Attempt API
 
 ```http
-PUT /api/v1/attempts/{attemptId}/answers/{questionId}
-Authorization: authenticated + ownership
-
-{
-  "optionIds": ["guid"]
-}
-```
-
-Application/revision validation:
-
-- attempt ownership;
-- attempt `InProgress`;
-- deadline;
-- question membership;
-- selection count for SingleChoice;
-- option membership.
-
-## 13.2 Clear answer
-
-```http
+PUT    /api/v1/attempts/{attemptId}/answers/{questionId}
 DELETE /api/v1/attempts/{attemptId}/answers/{questionId}
-Authorization: authenticated + ownership
+POST   /api/v1/attempts/{attemptId}/submit
+GET    /api/v1/attempts/{attemptId}
+GET    /api/v1/attempts/{attemptId}/result
 ```
 
-## 13.3 Submit
+Submit использует `Idempotency-Key`.
 
-```http
-POST /api/v1/attempts/{attemptId}/submit
-Authorization: authenticated + ownership
+Student attempt/read DTOs не содержат `IsCorrect`.
 
-{
-  "idempotencyKey": "..."
-}
-```
+Если deadline истёк, answer/submit фиксируют TimedOut либо background worker завершает attempt отдельно.
 
-Если deadline истёк к моменту submit, attempt завершается как `TimedOut`, а score всё равно вычисляется по сохранённым responses.
-
-Response: `AttemptScore`.
-
-## 13.4 Manual timeout
+Admin manual timeout:
 
 ```http
 POST /api/v1/attempts/{attemptId}/timeout
 Authorization: tests:assign
 ```
 
-Admin-only manual completion.
-
-## 13.5 Attempt detail
-
-```http
-GET /api/v1/attempts/{attemptId}
-Authorization: authenticated + ownership in read query
-```
-
-Student-safe: содержит selected IDs, но не correct flags.
-
-## 13.6 Own result
-
-```http
-GET /api/v1/attempts/{attemptId}/result
-Authorization: authenticated + ownership in read query
-```
-
-Не содержит correct-answer breakdown.
-
 ---
 
-# 14. Reviewer results
-
-## 14.1 Result list
+# 15. Reviewer API
 
 ```http
-GET /api/v1/results?testId=&revisionId=&outcome=&page=1&pageSize=20
-Authorization: results:review
-```
-
-## 14.2 Detailed result
-
-```http
+GET /api/v1/results?testId=&revisionId=&outcome=&page=&pageSize=
 GET /api/v1/results/{attemptId}
 Authorization: results:review
 ```
 
-Reviewer detail включает:
+`test-author` scope ограничен owned tests. `test-admin` global.
+
+Detailed reviewer DTO включает:
 
 - question text/type/order/points;
 - selected options;
@@ -641,67 +536,54 @@ Reviewer detail включает:
 - earned points;
 - final score/outcome.
 
-### Security note
-
-Этот DTO нельзя переиспользовать в student endpoint.
+Этот DTO нельзя переиспользовать в student API.
 
 ---
 
-# 15. Operational endpoints
-
-## 15.1 Outbox status
+# 16. Operational API
 
 ```http
 GET /api/v1/operations/outbox?deadLetterLimit=20
+GET /api/v1/operations/audit?actorId=&statusCode=&from=&to=&page=&pageSize=
 Authorization: operations:read
 ```
 
-Возвращает pending/retry/dead-letter operational information без выдачи event payload.
+Operational rate-limit policy применяется отдельно от general API.
 
-## 15.2 Audit trail
-
-```http
-GET /api/v1/operations/audit?actorId=&statusCode=&from=&to=&page=1&pageSize=20
-Authorization: operations:read
-```
-
-Audit entry:
-
-- ID;
-- occurredAt;
-- actorId;
-- method;
-- route;
-- statusCode;
-- correlationId;
-- traceId;
-- durationMs.
+Outbox endpoint не раскрывает event payload.
 
 ---
 
-# 16. Health endpoints
+# 17. Health
 
 ```http
 GET /health/live
 GET /health/ready
 ```
 
-`live` не зависит от external services.
-
-`ready` проверяет MariaDB; при включённом RabbitMQ delivery дополнительно проверяет broker connection/channel/exchange access.
+- live — process liveness;
+- ready — MariaDB; RabbitMQ также проверяется при enabled delivery.
 
 ---
 
-# 17. Что API пока не гарантирует
+# 18. Edge/runtime security contract
 
-- ownership isolation между разными authors;
-- tenant isolation;
-- standard `Idempotency-Key` header;
-- ETag/If-Match optimistic HTTP contract;
-- configurable per-endpoint rate limits;
-- formal deprecation headers для legacy `/api/*`;
-- stable integration event HTTP/webhook API;
-- media upload endpoints;
-- public frontend-oriented BFF.
+- forwarded headers учитываются только от configured trusted proxies/networks;
+- CORS выключен по умолчанию; при включении только explicit origins;
+- wildcard origin запрещён;
+- Production HTTPS redirect/HSTS decision explicit;
+- baseline security headers configuration-driven;
+- Kestrel server banner выключен.
 
-Эти пункты находятся в `ROADMAP.md`/`FEATURE_PLAN.md`.
+---
+
+# 19. Следующие изменения API
+
+Phase C3/C4/C5:
+
+- normalization malformed UUID/enum/body/required/max-length errors;
+- stable validation codes;
+- richer OpenAPI descriptions/examples/ProblemDetails/header schemas;
+- formal API v1 deprecation/version lifecycle;
+- последующее удаление legacy body `idempotencyKey` только через объявленное compatibility window;
+- последующее retirement legacy `/api/*` rewrite только через объявленную deprecation policy.
