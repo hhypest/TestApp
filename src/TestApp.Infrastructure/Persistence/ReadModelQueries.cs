@@ -26,6 +26,7 @@ public sealed class ReadModelQueries(AppDbContext db) : IReadModelQueries
             test.Id,
             test.Title,
             test.Status,
+            test.ConcurrencyVersion,
             test.Settings.PassingPercentage,
             test.Settings.TimeLimitMinutes,
             test.Questions.OrderBy(q => q.Order).Select(q => new QuestionEditorView(
