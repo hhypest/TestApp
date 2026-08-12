@@ -70,6 +70,18 @@ var connectionString = builder.Configuration.GetConnectionString("Database")
 builder.Services.AddInfrastructure(o =>
     o.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
+if (builder.Configuration.GetValue<bool>("RabbitMq:Enabled"))
+{
+    builder.Services.AddRabbitMqOutboxDelivery(options =>
+    {
+        options.Enabled = true;
+        options.ConnectionString = builder.Configuration["RabbitMq:ConnectionString"] ?? string.Empty;
+        options.Exchange = builder.Configuration["RabbitMq:Exchange"] ?? "testapp.events";
+        options.RoutingKeyPrefix = builder.Configuration["RabbitMq:RoutingKeyPrefix"] ?? "testapp";
+        options.ClientProvidedName = builder.Configuration["RabbitMq:ClientProvidedName"] ?? "TestApp.Outbox";
+    });
+}
+
 builder.Services.AddScoped<CreateTestCommandHandler>();
 builder.Services.AddScoped<RenameTestCommandHandler>();
 builder.Services.AddScoped<ChangeTestSettingsCommandHandler>();
