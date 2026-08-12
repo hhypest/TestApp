@@ -71,7 +71,7 @@ jobs:
       - name: Seed backup restore probe
         run: |
           docker run --rm --network host \
-            -e MARIADB_PWD=root \
+            -e MYSQL_PWD=root \
             mariadb:12.3 \
             mariadb \
               --host=127.0.0.1 \
