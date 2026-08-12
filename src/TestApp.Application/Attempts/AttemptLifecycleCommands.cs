@@ -11,10 +11,16 @@ public sealed record AnswerQuestionCommand(TestAttemptId AttemptId, QuestionId Q
     : ICommand<Result<TestAttemptId, Error>>;
 public sealed record ClearAnswerCommand(TestAttemptId AttemptId, QuestionId QuestionId)
     : ICommand<Result<TestAttemptId, Error>>;
-public sealed record SubmitAttemptCommand(TestAttemptId AttemptId)
+public sealed record SubmitAttemptCommand(TestAttemptId AttemptId, Guid IdempotencyKey)
     : ICommand<Result<AttemptScore, Error>>;
 public sealed record TimeoutAttemptCommand(TestAttemptId AttemptId)
     : ICommand<Result<AttemptScore, Error>>;
+
+internal readonly record struct CachedAttemptScore(decimal Earned, decimal Maximum)
+{
+    public AttemptScore ToDomain() => new(Earned, Maximum);
+    public static CachedAttemptScore FromDomain(AttemptScore score) => new(score.Earned, score.Maximum);
+}
 
 public sealed class AnswerQuestionCommandHandler(
     ITestAttemptRepository attempts,
@@ -87,11 +93,20 @@ public sealed class SubmitAttemptCommandHandler(
     IPublishedTestRevisionRepository revisions,
     ICurrentActor actor,
     IClock clock,
+    IIdempotencyStore idempotency,
     IUnitOfWork unitOfWork)
     : ICommandHandler<SubmitAttemptCommand, Result<AttemptScore, Error>>
 {
     public async Task<Result<AttemptScore, Error>> Handle(SubmitAttemptCommand command, CancellationToken ct)
     {
+        if (command.IdempotencyKey == Guid.Empty)
+            return Error.Validation("idempotency.key", "Idempotency key is required.");
+
+        var operation = $"attempt.submit:{command.AttemptId.Value}";
+        var cached = await idempotency.GetResultAsync<CachedAttemptScore>(operation, actor.UserId, command.IdempotencyKey, ct);
+        if (cached is { } cachedScore)
+            return cachedScore.ToDomain();
+
         var attempt = await attempts.GetAsync(command.AttemptId, ct);
         if (attempt is null) return Error.NotFound("attempt.not_found", "Attempt was not found.");
         if (attempt.UserId != actor.UserId) return Error.Forbidden("attempt.forbidden", "Attempt belongs to another user.");
@@ -104,6 +119,8 @@ public sealed class SubmitAttemptCommandHandler(
             : attempt.Submit(now, score, revision.IsPassed(score));
         var error = result.Match<Error?>(_ => null, e => e.ToApplicationError());
         if (error is not null) return error;
+
+        await idempotency.AddResultAsync(operation, actor.UserId, command.IdempotencyKey, CachedAttemptScore.FromDomain(score), now, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return score;
     }
