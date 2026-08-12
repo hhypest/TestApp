@@ -25,6 +25,32 @@ public sealed class PersistenceBehaviorTests
     }
 
     [Fact]
+    public async Task Assignment_can_be_persisted_on_MariaDB()
+    {
+        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var db = database.CreateContext();
+        await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
+
+        var now = DateTimeOffset.UtcNow;
+        var assignment = TestAssignment.Create(
+            TestAssignmentId.New(),
+            PublishedTestRevisionId.New(),
+            new AssignmentTarget.User(ExternalUserId.FromSubject("student-1")),
+            ExternalUserId.FromSubject("admin-1"),
+            now,
+            now.AddMinutes(-1),
+            now.AddHours(1),
+            1);
+
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var persisted = await db.Assignments.AsNoTracking().SingleAsync(x => x.Id == assignment.Id, TestContext.Current.CancellationToken);
+        Assert.Equal(AssignmentTargetType.User, persisted.TargetType);
+        Assert.Equal("student-1", persisted.TargetId);
+    }
+
+    [Fact]
     public async Task Concurrent_aggregate_update_is_rejected()
     {
         await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
