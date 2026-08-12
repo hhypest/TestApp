@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
+using TrustedIpNetwork = System.Net.IPNetwork;
 
 namespace TestApp.Api;
 
@@ -35,7 +36,7 @@ public sealed record ReverseProxyRuntimeOptions(
     bool Enabled,
     int ForwardLimit,
     IReadOnlyList<IPAddress> KnownProxies,
-    IReadOnlyList<IPNetwork> KnownNetworks);
+    IReadOnlyList<TrustedIpNetwork> KnownNetworks);
 
 public static class RuntimeConfiguration
 {
@@ -224,11 +225,11 @@ public static class RuntimeConfiguration
         return address;
     }
 
-    private static IPNetwork ParseNetwork(string value)
+    private static TrustedIpNetwork ParseNetwork(string value)
     {
         try
         {
-            return IPNetwork.Parse(value);
+            return TrustedIpNetwork.Parse(value);
         }
         catch (FormatException ex)
         {
