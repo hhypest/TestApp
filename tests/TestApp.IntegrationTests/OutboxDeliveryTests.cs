@@ -42,7 +42,7 @@ public sealed class OutboxDeliveryTests
     }
 
     [Fact]
-    public async Task Failed_delivery_is_dead_lettered_after_configured_attempt_limit()
+    public async Task Failed_delivery_is_dead_lettered_and_visible_to_operations_monitor()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await MariaDbTestDatabase.CreateAsync(ct);
@@ -74,6 +74,14 @@ public sealed class OutboxDeliveryTests
         Assert.NotNull(message.DeadLetteredAt);
         Assert.Null(message.NextAttemptAt);
         Assert.Contains("transport unavailable", message.Error, StringComparison.OrdinalIgnoreCase);
+
+        var status = await new OutboxMonitor(verification).GetStatusAsync(ct: ct);
+        Assert.Equal(0, status.PendingCount);
+        Assert.Equal(0, status.RetryScheduledCount);
+        Assert.Equal(1, status.DeadLetterCount);
+        var deadLetter = Assert.Single(status.RecentDeadLetters);
+        Assert.Equal(integrationEvent.EventId, deadLetter.EventId);
+        Assert.Equal(1, deadLetter.AttemptCount);
     }
 
     private static ServiceProvider BuildServices(string connectionString, IOutboxPublisher publisher)
