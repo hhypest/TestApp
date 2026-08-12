@@ -25,6 +25,26 @@ public sealed class PersistenceBehaviorTests
     }
 
     [Fact]
+    public async Task Test_owner_round_trips_through_MariaDB()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        var owner = ExternalUserId.FromSubject("author-owner");
+        var test = Test.Create("Owned test", owner);
+
+        await using (var write = database.CreateContext())
+        {
+            await write.Database.MigrateAsync(ct);
+            write.Tests.Add(test);
+            await write.SaveChangesAsync(ct);
+        }
+
+        await using var read = database.CreateContext();
+        var persisted = await read.Tests.AsNoTracking().SingleAsync(x => x.Id == test.Id, ct);
+        Assert.Equal(owner, persisted.OwnerId);
+    }
+
+    [Fact]
     public async Task Assignment_can_be_persisted_on_MariaDB()
     {
         await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
@@ -53,28 +73,29 @@ public sealed class PersistenceBehaviorTests
     [Fact]
     public async Task Concurrent_aggregate_update_is_rejected()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
         await using (var setup = database.CreateContext())
         {
-            await setup.Database.MigrateAsync(TestContext.Current.CancellationToken);
-            setup.Tests.Add(Test.Create("Original"));
-            await setup.SaveChangesAsync(TestContext.Current.CancellationToken);
+            await setup.Database.MigrateAsync(ct);
+            setup.Tests.Add(Test.Create("Original", ExternalUserId.FromSubject("author-1")));
+            await setup.SaveChangesAsync(ct);
         }
 
         TestId id;
         await using (var lookup = database.CreateContext())
-            id = await lookup.Tests.Select(x => x.Id).SingleAsync(TestContext.Current.CancellationToken);
+            id = await lookup.Tests.Select(x => x.Id).SingleAsync(ct);
 
         await using var first = database.CreateContext();
         await using var second = database.CreateContext();
-        var firstCopy = await first.Tests.SingleAsync(x => x.Id == id, TestContext.Current.CancellationToken);
-        var secondCopy = await second.Tests.SingleAsync(x => x.Id == id, TestContext.Current.CancellationToken);
+        var firstCopy = await first.Tests.SingleAsync(x => x.Id == id, ct);
+        var secondCopy = await second.Tests.SingleAsync(x => x.Id == id, ct);
 
         firstCopy.Rename("First");
         secondCopy.Rename("Second");
-        await first.SaveChangesAsync(TestContext.Current.CancellationToken);
+        await first.SaveChangesAsync(ct);
 
-        await Assert.ThrowsAsync<ConcurrencyConflictException>(() => second.SaveChangesAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() => second.SaveChangesAsync(ct));
     }
 
     [Fact]
