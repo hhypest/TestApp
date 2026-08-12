@@ -67,6 +67,8 @@ public static class DependencyInjection
 
         services.AddSingleton<RabbitMqOutboxPublisher>();
         services.AddSingleton<IOutboxPublisher>(sp => sp.GetRequiredService<RabbitMqOutboxPublisher>());
+        services.AddHealthChecks()
+            .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: ["ready"]);
         services.AddHostedService<OutboxProcessor>();
         return services;
     }
