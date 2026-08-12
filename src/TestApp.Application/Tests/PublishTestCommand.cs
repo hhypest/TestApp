@@ -28,6 +28,12 @@ public sealed class PublishTestCommandHandler(
         if (cached is { } cachedRevisionId)
             return cachedRevisionId;
 
+        await using var lease = await idempotency.AcquireAsync(Operation, actor.UserId, command.RequestId, ct);
+
+        cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(Operation, actor.UserId, command.RequestId, ct);
+        if (cached is { } leasedCachedRevisionId)
+            return leasedCachedRevisionId;
+
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null)
             return Error.NotFound("test.not_found", "Test was not found.");
