@@ -34,6 +34,7 @@ var transportSecurityOptions = migrateOnly
     ? null
     : RuntimeConfiguration.LoadTransportSecurity(builder.Configuration, builder.Environment);
 var reverseProxyOptions = RuntimeConfiguration.LoadReverseProxy(builder.Configuration);
+var apiLifecycleOptions = ApiLifecycleConfiguration.Load(builder.Configuration);
 
 RuntimeConfiguration.RegisterTypedOptions(
     builder.Services,
@@ -205,16 +206,7 @@ if (transportSecurityOptions.HttpsRedirectionEnabled)
 if (transportSecurityOptions.SecurityHeadersEnabled)
     app.UseMiddleware<SecurityHeadersMiddleware>();
 
-app.Use(async (context, next) =>
-{
-    if (context.Request.Path.StartsWithSegments("/api", out var remaining) &&
-        !context.Request.Path.StartsWithSegments("/api/v1"))
-    {
-        context.Request.Path = "/api/v1" + remaining;
-    }
-
-    await next();
-});
+app.UseMiddleware<LegacyApiCompatibilityMiddleware>(apiLifecycleOptions);
 
 app.UseRouting();
 if (corsOptions.Enabled)
