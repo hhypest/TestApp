@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -67,7 +68,7 @@ public sealed class EdgeSecurityTests
 
     private static WebApplicationFactory<Program> CreateFactory(
         string connectionString,
-        Action<Microsoft.AspNetCore.Hosting.IWebHostBuilder>? configure = null) =>
+        Action<IWebHostBuilder>? configure = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:Database", connectionString);
