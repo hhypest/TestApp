@@ -13,6 +13,7 @@ using TestApp.Domain.Assignments;
 using TestApp.Domain.Attempts;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
+using TestApp.Infrastructure.Outbox;
 using Xunit;
 
 namespace TestApp.IntegrationTests;
@@ -56,6 +57,10 @@ public sealed class ApiHostTests
             1,
             Guid.NewGuid()), ct);
 
+        var outboxStatus = await client.GetFromJsonAsync<OutboxOperationalStatus>("/api/operations/outbox", ct);
+        Assert.NotNull(outboxStatus);
+        Assert.True(outboxStatus.PendingCount >= 0);
+
         Authenticate(client, "student-1");
         var attemptId = await PostValue<TestAttemptId>(client, $"/api/assignments/{assignmentId.Value}/attempts", new StartAttemptRequest(Guid.NewGuid()), ct);
 
@@ -88,6 +93,8 @@ public sealed class ApiHostTests
 
         using (var forbiddenReviewerDetail = await client.GetAsync($"/api/results/{attemptId.Value}", ct))
             Assert.Equal(HttpStatusCode.Forbidden, forbiddenReviewerDetail.StatusCode);
+        using (var forbiddenOperations = await client.GetAsync("/api/operations/outbox", ct))
+            Assert.Equal(HttpStatusCode.Forbidden, forbiddenOperations.StatusCode);
 
         Authenticate(client, "author-1", "test-author");
         var reviewed = await client.GetFromJsonAsync<PagedResult<ReviewerResultSummary>>(
@@ -109,6 +116,9 @@ public sealed class ApiHostTests
         Assert.Equal(1m, reviewedQuestion.EarnedPoints);
         Assert.Contains(reviewedQuestion.Options, x => x.Id == correctOptionId && x.IsCorrect && x.IsSelected);
         Assert.Contains(reviewedQuestion.Options, x => x.Id == wrongOptionId && !x.IsCorrect && !x.IsSelected);
+
+        using var authorOperations = await client.GetAsync("/api/operations/outbox", ct);
+        Assert.Equal(HttpStatusCode.Forbidden, authorOperations.StatusCode);
     }
 
     [Fact]
