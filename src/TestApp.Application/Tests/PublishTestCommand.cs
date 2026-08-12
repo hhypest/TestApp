@@ -17,26 +17,27 @@ public sealed class PublishTestCommandHandler(
     IClock clock,
     IUnitOfWork unitOfWork) : ICommandHandler<PublishTestCommand, Result<PublishedTestRevisionId, Error>>
 {
-    private const string Operation = "tests.publish";
-
     public async Task<Result<PublishedTestRevisionId, Error>> Handle(PublishTestCommand command, CancellationToken ct)
     {
         if (command.RequestId == Guid.Empty)
             return Error.Validation("idempotency.request_id", "A non-empty idempotency key is required.");
 
-        var cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(Operation, actor.UserId, command.RequestId, ct);
+        var operation = $"tests.publish:{command.TestId.Value:N}";
+        var cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(operation, actor.UserId, command.RequestId, ct);
         if (cached is { } cachedRevisionId)
             return cachedRevisionId;
 
-        await using var lease = await idempotency.AcquireAsync(Operation, actor.UserId, command.RequestId, ct);
+        await using var lease = await idempotency.AcquireAsync(operation, actor.UserId, command.RequestId, ct);
 
-        cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(Operation, actor.UserId, command.RequestId, ct);
+        cached = await idempotency.GetResultAsync<PublishedTestRevisionId>(operation, actor.UserId, command.RequestId, ct);
         if (cached is { } leasedCachedRevisionId)
             return leasedCachedRevisionId;
 
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null)
             return Error.NotFound("test.not_found", "Test was not found.");
+        if (TestAccess.EnsureCanManage(test, actor) is { } accessError)
+            return accessError;
         if (test.Status == TestStatus.Archived)
             return Error.Conflict("test.archived", "Archived tests cannot be published.");
         if (test.Status == TestStatus.Published)
@@ -52,7 +53,7 @@ public sealed class PublishTestCommandHandler(
         var revisionId = PublishedTestRevisionId.New();
         var revision = PublishedTestRevision.From(test, revisionId, version, now);
         await revisions.AddAsync(revision, ct);
-        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, revisionId, now, ct);
+        await idempotency.AddResultAsync(operation, actor.UserId, command.RequestId, revisionId, now, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return revisionId;
     }
