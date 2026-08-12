@@ -21,10 +21,7 @@ public sealed class EdgeSecurityTests
     {
         var options = ForwardedOptions(IPAddress.Parse("10.0.0.10"));
         using var loggerFactory = LoggerFactory.Create(_ => { });
-        var middleware = new ForwardedHeadersMiddleware(
-            _ => Task.CompletedTask,
-            loggerFactory,
-            Options.Create(options));
+        var middleware = new ForwardedHeadersMiddleware(_ => Task.CompletedTask, loggerFactory, Options.Create(options));
 
         var context = new DefaultHttpContext();
         context.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.25");
@@ -41,10 +38,7 @@ public sealed class EdgeSecurityTests
         var trustedProxy = IPAddress.Parse("10.0.0.10");
         var options = ForwardedOptions(trustedProxy);
         using var loggerFactory = LoggerFactory.Create(_ => { });
-        var middleware = new ForwardedHeadersMiddleware(
-            _ => Task.CompletedTask,
-            loggerFactory,
-            Options.Create(options));
+        var middleware = new ForwardedHeadersMiddleware(_ => Task.CompletedTask, loggerFactory, Options.Create(options));
 
         var context = new DefaultHttpContext();
         context.Connection.RemoteIpAddress = trustedProxy;
@@ -67,6 +61,8 @@ public sealed class EdgeSecurityTests
         {
             builder.UseEnvironment("Production");
             builder.UseSetting("Keycloak:RequireHttpsMetadata", "true");
+            builder.UseSetting("TransportSecurity:HttpsRedirectionEnabled", "false");
+            builder.UseSetting("TransportSecurity:HstsEnabled", "false");
             builder.UseSetting("OpenApi:Enabled", "true");
             builder.UseSetting("OpenApi:AllowAnonymous", "false");
         });
@@ -79,6 +75,86 @@ public sealed class EdgeSecurityTests
         client.DefaultRequestHeaders.Add("X-Test-Roles", "test-admin");
         using var admin = await client.GetAsync("/openapi/v1.json", ct);
         Assert.Equal(HttpStatusCode.OK, admin.StatusCode);
+    }
+
+    [Fact]
+    public async Task Operations_rate_limit_is_independent_and_returns_correlation_on_429()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using (var db = database.CreateContext())
+            await db.Database.MigrateAsync(ct);
+
+        await using var factory = CreateFactory(database.ConnectionString, builder =>
+        {
+            builder.UseSetting("RateLimiting:General:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:Operations:PermitLimit", "1");
+            builder.UseSetting("RateLimiting:Operations:WindowSeconds", "60");
+        });
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-User", "admin-rate-limit");
+        client.DefaultRequestHeaders.Add("X-Test-Roles", "test-admin");
+
+        using var first = await client.GetAsync("/api/v1/operations/outbox", ct);
+        using var second = await client.GetAsync("/api/v1/operations/outbox", ct);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.True(second.Headers.Contains("X-Correlation-ID"));
+    }
+
+    [Fact]
+    public async Task Cors_preflight_allows_only_configured_origin()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using (var db = database.CreateContext())
+            await db.Database.MigrateAsync(ct);
+
+        await using var factory = CreateFactory(database.ConnectionString, builder =>
+        {
+            builder.UseSetting("Cors:Enabled", "true");
+            builder.UseSetting("Cors:AllowedOrigins:0", "https://frontend.example");
+        });
+        using var client = factory.CreateClient();
+
+        using var allowedRequest = Preflight("https://frontend.example");
+        using var allowed = await client.SendAsync(allowedRequest, ct);
+        Assert.Equal(HttpStatusCode.NoContent, allowed.StatusCode);
+        Assert.Equal("https://frontend.example", allowed.Headers.GetValues("Access-Control-Allow-Origin").Single());
+
+        using var deniedRequest = Preflight("https://evil.example");
+        using var denied = await client.SendAsync(deniedRequest, ct);
+        Assert.False(denied.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
+    [Fact]
+    public async Task Security_headers_are_emitted_when_enabled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using (var db = database.CreateContext())
+            await db.Database.MigrateAsync(ct);
+
+        await using var factory = CreateFactory(database.ConnectionString, builder =>
+            builder.UseSetting("TransportSecurity:SecurityHeadersEnabled", "true"));
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/openapi/v1.json", ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
+        Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single());
+        Assert.Equal("no-referrer", response.Headers.GetValues("Referrer-Policy").Single());
+        Assert.Contains("default-src 'none'", response.Headers.GetValues("Content-Security-Policy").Single(), StringComparison.Ordinal);
+    }
+
+    private static HttpRequestMessage Preflight(string origin)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Options, "/api/v1/me/attempts");
+        request.Headers.Add("Origin", origin);
+        request.Headers.Add("Access-Control-Request-Method", "GET");
+        return request;
     }
 
     private static ForwardedHeadersOptions ForwardedOptions(IPAddress trustedProxy)
