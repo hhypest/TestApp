@@ -47,7 +47,7 @@ public sealed class StartAttemptTests
         var now = DateTimeOffset.Parse("2026-08-10T12:00:00Z");
         var group = ExternalGroupId.FromExternalId("students");
         var userId = ExternalUserId.FromSubject("user-1");
-        var test = Test.Create("DDD");
+        var test = Test.Create("DDD", ExternalUserId.FromSubject("author-1"));
         var question = test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
         test.AddAnswerOption(question, "Consistency boundary", true, 1);
