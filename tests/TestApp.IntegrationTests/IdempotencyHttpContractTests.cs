@@ -25,11 +25,11 @@ public sealed class IdempotencyHttpContractTests
         Authenticate(client, "author-header", "test-author");
 
         var testId = await PostValue<TestId>(client, "/api/v1/tests", new CreateTestRequest("Header publish"), ct);
-        var questionId = await PostValue<QuestionId>(client, $"/api/v1/tests/{testId.Value}/questions",
+        var questionId = await PostTestValue<QuestionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions",
             new QuestionWriteRequest("Pick one", QuestionType.SingleChoice, 1m, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
             new AnswerOptionWriteRequest("Correct", true, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
             new AnswerOptionWriteRequest("Wrong", false, 2), ct);
 
         var key = Guid.NewGuid();
@@ -49,10 +49,12 @@ public sealed class IdempotencyHttpContractTests
         Authenticate(client, "author-mismatch", "test-author");
 
         var testId = await PostValue<TestId>(client, "/api/v1/tests", new CreateTestRequest("Mismatch"), ct);
+        var etag = await GetTestEtagAsync(client, testId, ct);
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/tests/{testId.Value}/publish")
         {
             Content = JsonContent.Create(new PublishRequest(Guid.NewGuid()))
         };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
         request.Headers.Add(IdempotencyKeyResolver.HeaderName, Guid.NewGuid().ToString());
 
         using var response = await client.SendAsync(request, ct);
@@ -71,11 +73,11 @@ public sealed class IdempotencyHttpContractTests
 
         Authenticate(client, "author-fingerprint", "test-author");
         var testId = await PostValue<TestId>(client, "/api/v1/tests", new CreateTestRequest("Fingerprint assignment"), ct);
-        var questionId = await PostValue<QuestionId>(client, $"/api/v1/tests/{testId.Value}/questions",
+        var questionId = await PostTestValue<QuestionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions",
             new QuestionWriteRequest("Pick", QuestionType.SingleChoice, 1m, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
             new AnswerOptionWriteRequest("A", true, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
             new AnswerOptionWriteRequest("B", false, 2), ct);
         var revision = await PublishWithHeader(client, testId, Guid.NewGuid(), Guid.Empty, ct);
 
@@ -124,15 +126,39 @@ public sealed class IdempotencyHttpContractTests
         Guid bodyKey,
         CancellationToken ct)
     {
+        var etag = await GetTestEtagAsync(client, testId, ct);
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/tests/{testId.Value}/publish")
         {
             Content = JsonContent.Create(new PublishRequest(bodyKey))
         };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
         request.Headers.Add(IdempotencyKeyResolver.HeaderName, headerKey.ToString());
         using var response = await client.SendAsync(request, ct);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var value = await response.Content.ReadFromJsonAsync<PublishedTestRevisionId>(cancellationToken: ct);
         return Assert.IsType<PublishedTestRevisionId>(value);
+    }
+
+    private static async Task<T> PostTestValue<T>(HttpClient client, TestId testId, string uri, object body, CancellationToken ct)
+    {
+        var etag = await GetTestEtagAsync(client, testId, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, uri)
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+        using var response = await client.SendAsync(request, ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct);
+        return Assert.IsType<T>(value);
+    }
+
+    private static async Task<string> GetTestEtagAsync(HttpClient client, TestId testId, CancellationToken ct)
+    {
+        using var response = await client.GetAsync($"/api/v1/tests/{testId.Value}/editor", ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return response.Headers.ETag?.ToString()
+            ?? throw new Xunit.Sdk.XunitException("Test editor response did not contain ETag.");
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string connectionString) =>
