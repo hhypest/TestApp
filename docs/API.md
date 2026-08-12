@@ -257,13 +257,18 @@ Authorization: tests:write
 
 {
   "text": "Question text",
-  "type": "SingleChoice",
+  "type": 1,
   "points": 1,
   "order": 0
 }
 ```
 
-Enum values also follow normal ASP.NET JSON enum serialization configuration; clients should rely on generated OpenAPI/runtime serializer contract rather than assume a custom string-enum converter if one is not configured.
+Текущий API не регистрирует `JsonStringEnumConverter`, поэтому `QuestionType` передаётся стандартным numeric enum JSON contract:
+
+```text
+1 = SingleChoice
+2 = MultipleChoice
+```
 
 Response: `QuestionId`.
 
