@@ -198,6 +198,7 @@ public sealed class Test : AggregateRoot<TestId>
         }
 
         Status = TestStatus.Published;
+        Touch();
         Raise(new TestPublished(Id, occurredAt));
         return this;
     }
@@ -208,6 +209,7 @@ public sealed class Test : AggregateRoot<TestId>
             return DomainError.Conflict("test.archived", "Test is already archived.");
 
         Status = TestStatus.Archived;
+        Touch();
         return this;
     }
 
@@ -222,6 +224,7 @@ public sealed class Test : AggregateRoot<TestId>
     {
         if (Status == TestStatus.Published)
             Status = TestStatus.Draft;
+        Touch();
     }
 
     private static string Normalize(string value, string parameter)
