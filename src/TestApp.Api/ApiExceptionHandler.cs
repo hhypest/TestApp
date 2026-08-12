@@ -24,6 +24,24 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
                 Instance = httpContext.Request.Path
             };
         }
+        else if (exception is IdempotencyKeyReuseException idempotency)
+        {
+            logger.LogWarning(idempotency,
+                "Idempotency key reused with a different request for {Method} {Path} Operation={Operation} TraceId={TraceId}",
+                httpContext.Request.Method,
+                httpContext.Request.Path,
+                idempotency.Operation,
+                httpContext.TraceIdentifier);
+
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "idempotency.key_reused",
+                Detail = idempotency.Message,
+                Instance = httpContext.Request.Path
+            };
+        }
         else
         {
             logger.LogError(exception, "Unhandled exception for {Method} {Path} TraceId={TraceId}",
