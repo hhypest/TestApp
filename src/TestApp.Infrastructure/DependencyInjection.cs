@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -37,7 +38,7 @@ public static class DependencyInjection
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(TimeProvider.System);
         services.Configure<AttemptExpirationOptions>(_ => { });
-        services.Configure<OperationalRetentionOptions>(_ => { });
+        services.AddSingleton<IConfigureOptions<OperationalRetentionOptions>, OperationalRetentionOptionsSetup>();
         services.AddHostedService<OverdueAttemptProcessor>();
         services.AddHostedService<OperationalRetentionWorker>();
         services.AddHealthChecks()
