@@ -15,7 +15,7 @@ TestApp.Application -> TestApp.Messaging
 TestApp.Infrastructure -> TestApp.Application + TestApp.Domain
 ```
 
-`Domain` не зависит от ASP.NET Core, EF Core, JWT или Keycloak SDK. `Infrastructure` реализует persistence, identity adapters и Outbox. `Api` содержит HTTP contracts, authentication/authorization policies и mapping ошибок в ProblemDetails.
+`Domain` не зависит от ASP.NET Core, EF Core, JWT или Keycloak SDK. `Infrastructure` реализует persistence, identity adapters, MariaDB advisory locking, health checks и transactional Outbox. `Api` содержит HTTP contracts, authentication/authorization policies и mapping ошибок в ProblemDetails.
 
 ## Основная модель
 
@@ -24,7 +24,8 @@ TestApp.Infrastructure -> TestApp.Application + TestApp.Domain
 - Изменение опубликованного `Test` переводит definition обратно в `Draft`; ранее опубликованные revisions не меняются.
 - `TestAssignment` назначает конкретную revision пользователю или группе.
 - `TestAttempt` всегда принадлежит одному пользователю, одному assignment и одной immutable revision.
-- Варианты правильных ответов хранятся только на серверной стороне в published revision; клиентские ответы проверяются против этой revision перед сохранением.
+- Варианты правильных ответов хранятся только на серверной стороне в published revision; student API не раскрывает correctness.
+- Reviewer API строит детальный результат по immutable revision, поэтому дальнейшее редактирование draft не меняет историю уже завершённой попытки.
 
 ## Keycloak
 
@@ -41,7 +42,8 @@ HTTP-слой преобразует Keycloak roles в application permissions. 
 - `tests:write` — `test-author` или `test-admin`;
 - `tests:publish` — `test-author` или `test-admin`;
 - `tests:assign` — `test-admin`;
-- `results:review` — `test-author` или `test-admin`.
+- `results:review` — `test-author` или `test-admin`;
+- `operations:read` — `test-admin`.
 
 Бизнес-правила eligibility (назначение пользователю/группе, окно доступности, лимит попыток) проверяются отдельно от endpoint authorization.
 
@@ -51,22 +53,61 @@ Write side использует aggregates и command handlers. Read side исп
 
 - editor view теста;
 - назначения текущего пользователя;
-- состояние попытки;
-- результат попытки.
+- попытки текущего пользователя;
+- состояние и итог собственной попытки;
+- reviewer results list;
+- детальный reviewer result с question/option breakdown.
 
 Отдельная read database пока намеренно не используется.
 
 ## Persistence
 
-EF Core + SQLite используется для текущего development profile. Initial migration находится в `TestApp.Infrastructure/Persistence/Migrations` и применяется при старте API через `Database.MigrateAsync()`.
+Основная СУБД — MariaDB. Infrastructure использует EF Core 9 + Pomelo provider, приложение остаётся на `net10.0`.
+
+Connection string читается из `ConnectionStrings:Database`. Development fallback:
+
+```text
+Server=localhost;Port=3306;Database=testapp;User=testapp;Password=testapp;
+```
+
+MariaDB migrations находятся в `src/TestApp.Infrastructure/Persistence/Migrations` и применяются при старте API через `Database.MigrateAsync()`.
 
 Mutable attempt responses хранятся нормализованно (`TestAttempt -> QuestionResponse -> SelectedAnswerOption`), а immutable published revision хранит snapshot вопросов в JSON.
 
-Лимит попыток защищён от гонки через атомарный `TryAddWithinLimitAsync` в `Serializable` transaction.
+Лимит попыток защищён от гонки через `Serializable` transaction. Идемпотентные publish/assign/submit operations дополнительно сериализуются между несколькими API-инстансами через MariaDB advisory locks (`GET_LOCK`/`RELEASE_LOCK`) с повторной проверкой idempotency result после получения lease.
 
 ## Events / Outbox
 
-`IDomainEvent` — внутреннее событие домена. Только события, явно реализующие `IIntegrationEvent`, могут попадать в transactional Outbox. Обычные domain events больше не считаются автоматически внешними сообщениями.
+`IDomainEvent` — внутреннее событие домена. Только события, явно реализующие `IIntegrationEvent`, могут попадать в transactional Outbox.
+
+Outbox delivery использует at-least-once semantics. `EventId` передаётся publisher как стабильный deduplication key для downstream consumer.
+
+Важно: `AddInfrastructure()` сам по себе **не запускает доставку Outbox**. Это сделано намеренно: если реальный transport publisher не настроен, сообщения остаются durable pending rows в MariaDB и не помечаются доставленными через no-op implementation.
+
+Доставка включается явно:
+
+```csharp
+services.AddOutboxDelivery<MyOutboxPublisher>(options =>
+{
+    options.MaxAttempts = 10;
+    options.PollInterval = TimeSpan.FromSeconds(5);
+});
+```
+
+Processor использует exponential retry/backoff, dead-letter state и MariaDB advisory lock по `OutboxMessage.Id`, чтобы несколько API-инстансов не публиковали одно сообщение одновременно. После crash между внешней публикацией и записью `ProcessedAt` повторная доставка возможна — это нормальная семантика at-least-once, поэтому consumer обязан дедуплицировать события по `EventId`.
+
+Operational status доступен `test-admin`:
+
+```text
+GET /api/operations/outbox
+```
+
+Ответ содержит pending/retry/dead-letter counts, возраст старейшего pending message и последние dead letters без раскрытия payload.
+
+## Health
+
+- `GET /health/live` — процесс жив, проверка не зависит от MariaDB;
+- `GET /health/ready` — readiness с реальным подключением к MariaDB, возвращает `503`, если база недоступна.
 
 ## Проверка
 
@@ -76,6 +117,4 @@ dotnet build TestApp.slnx --no-restore --configuration Release
 dotnet test TestApp.slnx --no-build --configuration Release
 ```
 
-CI выполняет эти команды для `beta-ddd`, архитектурной ветки и stacked `beta-ddd-*` веток.
-
-Тесты включают domain/application unit tests, dependency-rule checks, Keycloak claims mapping и запуск защищённого Minimal API host.
+GitHub Actions поднимает настоящий `mariadb:11.4` service container и выполняет restore/build/test против MariaDB. Integration tests используют отдельные временные databases и проверяют migrations, optimistic concurrency, idempotency/advisory locks, persistence round-trip, Outbox delivery/dead-letter behavior и защищённый Minimal API end-to-end flow.
