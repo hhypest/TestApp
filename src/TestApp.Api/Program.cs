@@ -376,6 +376,7 @@ app.MapGet("/api/v1/operations/outbox", async (int? deadLetterLimit, OutboxMonit
     Results.Ok(await monitor.GetStatusAsync(deadLetterLimit ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead).RequireRateLimiting(RatePolicies.Operations);
 app.MapGet("/api/v1/operations/audit", async (string? actorId, int? statusCode, DateTimeOffset? from, DateTimeOffset? to, int? page, int? pageSize, AuditTrail audit, CancellationToken ct) =>
     Results.Ok(await audit.GetAsync(actorId, statusCode, from, to, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead).RequireRateLimiting(RatePolicies.Operations);
+app.MapOutboxDeadLetterEndpoints();
 
 var attempts = app.MapGroup("/api/v1/attempts")
     .RequireAuthorization()
