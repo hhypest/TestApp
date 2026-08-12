@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,12 +20,29 @@ public sealed class OperationalRetentionOptions
 
     internal void Validate()
     {
-        if (AuditRetentionDays < 1) throw new InvalidOperationException("OperationalRetention AuditRetentionDays must be greater than zero.");
-        if (IdempotencyRetentionDays < 1) throw new InvalidOperationException("OperationalRetention IdempotencyRetentionDays must be greater than zero.");
-        if (ProcessedOutboxRetentionDays < 1) throw new InvalidOperationException("OperationalRetention ProcessedOutboxRetentionDays must be greater than zero.");
-        if (BatchSize is < 1 or > 5000) throw new InvalidOperationException("OperationalRetention BatchSize must be between 1 and 5000.");
-        if (MaxBatchesPerRun is < 1 or > 1000) throw new InvalidOperationException("OperationalRetention MaxBatchesPerRun must be between 1 and 1000.");
-        if (PollInterval < TimeSpan.FromMinutes(1)) throw new InvalidOperationException("OperationalRetention PollInterval must be at least one minute.");
+        if (AuditRetentionDays < 1) throw new InvalidOperationException("OperationalRetention:AuditRetentionDays must be greater than zero.");
+        if (IdempotencyRetentionDays < 1) throw new InvalidOperationException("OperationalRetention:IdempotencyRetentionDays must be greater than zero.");
+        if (ProcessedOutboxRetentionDays < 1) throw new InvalidOperationException("OperationalRetention:ProcessedOutboxRetentionDays must be greater than zero.");
+        if (BatchSize is < 1 or > 5000) throw new InvalidOperationException("OperationalRetention:BatchSize must be between 1 and 5000.");
+        if (MaxBatchesPerRun is < 1 or > 1000) throw new InvalidOperationException("OperationalRetention:MaxBatchesPerRun must be between 1 and 1000.");
+        if (PollInterval < TimeSpan.FromMinutes(1)) throw new InvalidOperationException("OperationalRetention:PollIntervalMinutes must be at least one minute.");
+    }
+}
+
+public sealed class OperationalRetentionOptionsSetup(IConfiguration configuration)
+    : IConfigureOptions<OperationalRetentionOptions>
+{
+    public void Configure(OperationalRetentionOptions options)
+    {
+        options.Enabled = configuration.GetValue<bool?>("OperationalRetention:Enabled") ?? true;
+        options.AuditRetentionDays = configuration.GetValue<int?>("OperationalRetention:AuditRetentionDays") ?? 90;
+        options.IdempotencyRetentionDays = configuration.GetValue<int?>("OperationalRetention:IdempotencyRetentionDays") ?? 14;
+        options.ProcessedOutboxRetentionDays = configuration.GetValue<int?>("OperationalRetention:ProcessedOutboxRetentionDays") ?? 14;
+        options.BatchSize = configuration.GetValue<int?>("OperationalRetention:BatchSize") ?? 500;
+        options.MaxBatchesPerRun = configuration.GetValue<int?>("OperationalRetention:MaxBatchesPerRun") ?? 20;
+        var pollMinutes = configuration.GetValue<int?>("OperationalRetention:PollIntervalMinutes") ?? 360;
+        options.PollInterval = TimeSpan.FromMinutes(pollMinutes);
+        options.Validate();
     }
 }
 
