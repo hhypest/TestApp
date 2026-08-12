@@ -17,6 +17,7 @@ public sealed class TestConfiguration : IEntityTypeConfiguration<Test>
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasConversion(x => x.Value, x => new TestId(x));
         b.Property(x => x.Title).HasMaxLength(300).IsRequired();
+        b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
         b.OwnsMany(x => x.Questions, q =>
         {
             q.ToTable("questions");
@@ -46,6 +47,7 @@ public sealed class RevisionConfiguration : IEntityTypeConfiguration<PublishedTe
         b.Property(x => x.Id).HasConversion(x => x.Value, x => new PublishedTestRevisionId(x));
         b.Property(x => x.TestId).HasConversion(x => x.Value, x => new TestId(x));
         b.Property(x => x.Title).HasMaxLength(300).IsRequired();
+        b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
         b.Property(x => x.Questions)
             .HasConversion(
                 v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
@@ -64,6 +66,7 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<TestAssig
         b.Property(x => x.Id).HasConversion(x => x.Value, x => new TestAssignmentId(x));
         b.Property(x => x.RevisionId).HasConversion(x => x.Value, x => new PublishedTestRevisionId(x));
         b.Property(x => x.AssignedBy).HasConversion(x => x.Value, x => new ExternalUserId(x));
+        b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
         b.Property(x => x.CancelledBy)
             .HasConversion(
                 x => x.HasValue ? x.Value.Value : null,
@@ -101,6 +104,8 @@ public sealed class AttemptConfiguration : IEntityTypeConfiguration<TestAttempt>
         b.Property(x => x.AssignmentId).HasConversion(x => x.Value, x => new TestAssignmentId(x));
         b.Property(x => x.RevisionId).HasConversion(x => x.Value, x => new PublishedTestRevisionId(x));
         b.Property(x => x.UserId).HasConversion(x => x.Value, x => new ExternalUserId(x));
+        b.Property(x => x.StartRequestId).IsRequired();
+        b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
         b.OwnsOne(x => x.Score, score =>
         {
             score.Property(x => x.Earned).HasColumnName("score_earned");
@@ -128,5 +133,6 @@ public sealed class AttemptConfiguration : IEntityTypeConfiguration<TestAttempt>
 
         b.Ignore(x => x.DomainEvents);
         b.HasIndex(x => new { x.AssignmentId, x.UserId });
+        b.HasIndex(x => new { x.AssignmentId, x.UserId, x.StartRequestId }).IsUnique();
     }
 }
