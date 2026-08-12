@@ -14,6 +14,13 @@ internal static class TestAccess
             ? null
             : Error.Forbidden("test.forbidden", "The current user is not allowed to manage this test.");
 
+    public static Error? EnsureExpectedVersion(Test test, long? expectedVersion) =>
+        expectedVersion is null || test.ConcurrencyVersion == expectedVersion.Value
+            ? null
+            : Error.PreconditionFailed(
+                "concurrency.precondition_failed",
+                $"The test has changed. Expected version {expectedVersion.Value}, current version {test.ConcurrencyVersion}.");
+
     public static ExternalUserId? OwnerFilter(ICurrentActor actor) =>
         IsAdmin(actor) ? null : actor.UserId;
 
