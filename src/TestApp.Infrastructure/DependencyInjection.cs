@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ICurrentActor, HttpCurrentActor>();
         services.AddScoped<OutboxMonitor>();
+        services.AddScoped<AuditTrail>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(TimeProvider.System);
         services.AddHealthChecks()
