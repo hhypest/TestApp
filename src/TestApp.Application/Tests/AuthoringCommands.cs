@@ -7,17 +7,17 @@ using TestApp.Messaging.Abstractions;
 namespace TestApp.Application.Tests;
 
 public sealed record CreateTestCommand(string Title) : ICommand<Result<TestId, Error>>;
-public sealed record RenameTestCommand(TestId TestId, string Title) : ICommand<Result<TestId, Error>>;
-public sealed record ChangeTestSettingsCommand(TestId TestId, decimal PassingPercentage, int? TimeLimitMinutes) : ICommand<Result<TestId, Error>>;
-public sealed record AddQuestionCommand(TestId TestId, string Text, QuestionType Type, decimal Points, int Order) : ICommand<Result<QuestionId, Error>>;
-public sealed record UpdateQuestionCommand(TestId TestId, QuestionId QuestionId, string Text, QuestionType Type, decimal Points) : ICommand<Result<TestId, Error>>;
-public sealed record RemoveQuestionCommand(TestId TestId, QuestionId QuestionId) : ICommand<Result<TestId, Error>>;
-public sealed record ReorderQuestionCommand(TestId TestId, QuestionId QuestionId, int Order) : ICommand<Result<TestId, Error>>;
-public sealed record AddAnswerOptionCommand(TestId TestId, QuestionId QuestionId, string Text, bool IsCorrect, int Order) : ICommand<Result<AnswerOptionId, Error>>;
-public sealed record UpdateAnswerOptionCommand(TestId TestId, QuestionId QuestionId, AnswerOptionId OptionId, string Text, bool IsCorrect) : ICommand<Result<TestId, Error>>;
-public sealed record RemoveAnswerOptionCommand(TestId TestId, QuestionId QuestionId, AnswerOptionId OptionId) : ICommand<Result<TestId, Error>>;
-public sealed record ReorderAnswerOptionCommand(TestId TestId, QuestionId QuestionId, AnswerOptionId OptionId, int Order) : ICommand<Result<TestId, Error>>;
-public sealed record ArchiveTestCommand(TestId TestId) : ICommand<Result<TestId, Error>>;
+public sealed record RenameTestCommand(TestId TestId, string Title, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record ChangeTestSettingsCommand(TestId TestId, decimal PassingPercentage, int? TimeLimitMinutes, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record AddQuestionCommand(TestId TestId, string Text, QuestionType Type, decimal Points, int Order, long? ExpectedVersion = null) : ICommand<Result<QuestionId, Error>>;
+public sealed record UpdateQuestionCommand(TestId TestId, QuestionId QuestionId, string Text, QuestionType Type, decimal Points, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record RemoveQuestionCommand(TestId TestId, QuestionId QuestionId, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record ReorderQuestionCommand(TestId TestId, QuestionId QuestionId, int Order, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record AddAnswerOptionCommand(TestId TestId, QuestionId QuestionId, string Text, bool IsCorrect, int Order, long? ExpectedVersion = null) : ICommand<Result<AnswerOptionId, Error>>;
+public sealed record UpdateAnswerOptionCommand(TestId TestId, QuestionId QuestionId, AnswerOptionId OptionId, string Text, bool IsCorrect, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record RemoveAnswerOptionCommand(TestId TestId, QuestionId QuestionId, AnswerOptionId OptionId, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record ReorderAnswerOptionCommand(TestId TestId, QuestionId QuestionId, AnswerOptionId OptionId, int Order, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
+public sealed record ArchiveTestCommand(TestId TestId, long? ExpectedVersion = null) : ICommand<Result<TestId, Error>>;
 
 public sealed class CreateTestCommandHandler(ITestRepository tests, ICurrentActor actor, IUnitOfWork unitOfWork)
     : ICommandHandler<CreateTestCommand, Result<TestId, Error>>
@@ -46,6 +46,7 @@ public sealed class RenameTestCommandHandler(ITestRepository tests, ICurrentActo
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         try { return await TestCommandResult.Save(test.Rename(command.Title), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.title", ex.Message); }
     }
@@ -59,6 +60,7 @@ public sealed class ChangeTestSettingsCommandHandler(ITestRepository tests, ICur
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         return await TestCommandResult.Save(test.ChangeSettings(command.PassingPercentage, command.TimeLimitMinutes), test.Id, unitOfWork, ct);
     }
 }
@@ -71,6 +73,7 @@ public sealed class AddQuestionCommandHandler(ITestRepository tests, ICurrentAct
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         try
         {
             var result = test.AddQuestion(command.Text, command.Type, command.Points, command.Order);
@@ -93,6 +96,7 @@ public sealed class UpdateQuestionCommandHandler(ITestRepository tests, ICurrent
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         try { return await TestCommandResult.Save(test.UpdateQuestion(command.QuestionId, command.Text, command.Type, command.Points), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.question.text", ex.Message); }
     }
@@ -106,6 +110,7 @@ public sealed class RemoveQuestionCommandHandler(ITestRepository tests, ICurrent
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         return await TestCommandResult.Save(test.RemoveQuestion(command.QuestionId), test.Id, unitOfWork, ct);
     }
 }
@@ -118,6 +123,7 @@ public sealed class ReorderQuestionCommandHandler(ITestRepository tests, ICurren
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         return await TestCommandResult.Save(test.ReorderQuestion(command.QuestionId, command.Order), test.Id, unitOfWork, ct);
     }
 }
@@ -130,6 +136,7 @@ public sealed class AddAnswerOptionCommandHandler(ITestRepository tests, ICurren
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         try
         {
             var result = test.AddAnswerOption(command.QuestionId, command.Text, command.IsCorrect, command.Order);
@@ -152,6 +159,7 @@ public sealed class UpdateAnswerOptionCommandHandler(ITestRepository tests, ICur
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         try { return await TestCommandResult.Save(test.UpdateAnswerOption(command.QuestionId, command.OptionId, command.Text, command.IsCorrect), test.Id, unitOfWork, ct); }
         catch (ArgumentException ex) { return Error.Validation("test.answer_option.text", ex.Message); }
     }
@@ -165,6 +173,7 @@ public sealed class RemoveAnswerOptionCommandHandler(ITestRepository tests, ICur
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         return await TestCommandResult.Save(test.RemoveAnswerOption(command.QuestionId, command.OptionId), test.Id, unitOfWork, ct);
     }
 }
@@ -177,6 +186,7 @@ public sealed class ReorderAnswerOptionCommandHandler(ITestRepository tests, ICu
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         return await TestCommandResult.Save(test.ReorderAnswerOption(command.QuestionId, command.OptionId, command.Order), test.Id, unitOfWork, ct);
     }
 }
@@ -189,6 +199,7 @@ public sealed class ArchiveTestCommandHandler(ITestRepository tests, ICurrentAct
         var test = await tests.GetAsync(command.TestId, ct);
         if (test is null) return Error.NotFound("test.not_found", "Test was not found.");
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
+        if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
         return await TestCommandResult.Save(test.Archive(), test.Id, unitOfWork, ct);
     }
 }
