@@ -119,7 +119,7 @@ app.MapGet("/api/results", async (Guid? testId, Guid? revisionId, AttemptOutcome
 var attempts = app.MapGroup("/api/attempts").RequireAuthorization();
 attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct)));
 attempts.MapDelete("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, ClearAnswerCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ClearAnswerCommand(new TestAttemptId(id), new QuestionId(questionId)), ct)));
-attempts.MapPost("/{id:guid}/submit", async (Guid id, SubmitAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new SubmitAttemptCommand(new TestAttemptId(id)), ct)));
+attempts.MapPost("/{id:guid}/submit", async (Guid id, SubmitAttemptRequest r, SubmitAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new SubmitAttemptCommand(new TestAttemptId(id), r.IdempotencyKey), ct)));
 attempts.MapPost("/{id:guid}/timeout", async (Guid id, TimeoutAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new TimeoutAttemptCommand(new TestAttemptId(id)), ct))).RequireAuthorization(Permissions.TestsAssign);
 attempts.MapGet("/{id:guid}", async (Guid id, GetAttemptQueryHandler h, CancellationToken ct) => await h.Handle(new GetAttemptQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
 attempts.MapGet("/{id:guid}/result", async (Guid id, GetAttemptResultQueryHandler h, CancellationToken ct) => await h.Handle(new GetAttemptResultQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
@@ -152,6 +152,7 @@ public sealed record AssignmentWindowRequest(DateTimeOffset AvailableFrom, DateT
 public sealed record AttemptLimitRequest(int? AttemptLimit);
 public sealed record CancelAssignmentRequest(string? Reason);
 public sealed record StartAttemptRequest(Guid IdempotencyKey);
+public sealed record SubmitAttemptRequest(Guid IdempotencyKey);
 public sealed record AnswerQuestionRequest(IReadOnlyCollection<Guid> OptionIds);
 
 public partial class Program;
