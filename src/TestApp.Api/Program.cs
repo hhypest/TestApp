@@ -14,17 +14,24 @@ using TestApp.Domain.Identity;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
 using TestApp.Infrastructure;
+using TestApp.Infrastructure.Attempts;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
 
 var migrateOnly = args.Any(x => string.Equals(x, "--migrate", StringComparison.OrdinalIgnoreCase));
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 var databaseOptions = RuntimeConfiguration.LoadDatabase(builder.Configuration, builder.Environment);
 var keycloakOptions = migrateOnly ? null : RuntimeConfiguration.LoadKeycloak(builder.Configuration, builder.Environment);
 var rabbitMqOptions = RuntimeConfiguration.LoadRabbitMq(builder.Configuration);
+var expirationOptions = RuntimeConfiguration.LoadAttemptExpiration(builder.Configuration);
 var rateLimitingOptions = RuntimeConfiguration.LoadRateLimiting(builder.Configuration);
 var openApiOptions = RuntimeConfiguration.LoadOpenApi(builder.Configuration, builder.Environment);
+var corsOptions = RuntimeConfiguration.LoadCors(builder.Configuration);
+var transportSecurityOptions = migrateOnly
+    ? null
+    : RuntimeConfiguration.LoadTransportSecurity(builder.Configuration, builder.Environment);
 var reverseProxyOptions = RuntimeConfiguration.LoadReverseProxy(builder.Configuration);
 
 RuntimeConfiguration.RegisterTypedOptions(
@@ -32,8 +39,11 @@ RuntimeConfiguration.RegisterTypedOptions(
     databaseOptions,
     keycloakOptions,
     rabbitMqOptions,
+    expirationOptions,
     rateLimitingOptions,
     openApiOptions,
+    corsOptions,
+    transportSecurityOptions,
     reverseProxyOptions);
 RuntimeConfiguration.ConfigureForwardedHeaders(builder.Services, reverseProxyOptions);
 
@@ -69,24 +79,45 @@ if (!migrateOnly)
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-        {
-            var partitionKey = context.User.FindFirst("sub")?.Value
-                ?? context.Connection.RemoteIpAddress?.ToString()
-                ?? "anonymous";
-
-            return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = rateLimitingOptions.PermitLimit,
-                Window = TimeSpan.FromSeconds(rateLimitingOptions.WindowSeconds),
-                QueueLimit = rateLimitingOptions.QueueLimit,
-                AutoReplenishment = true
-            });
-        });
+            FixedWindowPartition(context, rateLimitingOptions.General));
+        options.AddPolicy(RatePolicies.StudentWrite, context =>
+            FixedWindowPartition(context, rateLimitingOptions.StudentWrite));
+        options.AddPolicy(RatePolicies.PrivilegedRead, context =>
+            FixedWindowPartition(context, rateLimitingOptions.PrivilegedRead));
+        options.AddPolicy(RatePolicies.Operations, context =>
+            FixedWindowPartition(context, rateLimitingOptions.Operations));
     });
+
+    if (corsOptions.Enabled)
+    {
+        builder.Services.AddCors(options => options.AddPolicy(CorsPolicies.Api, policy =>
+        {
+            policy.WithOrigins(corsOptions.AllowedOrigins.ToArray())
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+            if (corsOptions.AllowCredentials)
+                policy.AllowCredentials();
+        }));
+    }
+
+    if (transportSecurityOptions!.HstsEnabled)
+    {
+        builder.Services.AddHsts(options =>
+        {
+            options.MaxAge = TimeSpan.FromDays(transportSecurityOptions.HstsMaxAgeDays);
+            options.IncludeSubDomains = transportSecurityOptions.HstsIncludeSubDomains;
+            options.Preload = transportSecurityOptions.HstsPreload;
+        });
+    }
 }
 
 builder.Services.AddInfrastructure(o =>
     o.UseMySql(databaseOptions.ConnectionString, ServerVersion.AutoDetect(databaseOptions.ConnectionString)));
+builder.Services.Configure<AttemptExpirationOptions>(options =>
+{
+    options.BatchSize = expirationOptions.BatchSize;
+    options.PollInterval = TimeSpan.FromSeconds(expirationOptions.PollIntervalSeconds);
+});
 
 if (!migrateOnly && rabbitMqOptions.Enabled)
 {
@@ -160,6 +191,12 @@ if (migrateOnly)
 
 if (reverseProxyOptions.Enabled)
     app.UseForwardedHeaders();
+if (transportSecurityOptions!.HstsEnabled)
+    app.UseHsts();
+if (transportSecurityOptions.HttpsRedirectionEnabled)
+    app.UseHttpsRedirection();
+if (transportSecurityOptions.SecurityHeadersEnabled)
+    app.UseMiddleware<SecurityHeadersMiddleware>();
 
 app.Use(async (context, next) =>
 {
@@ -173,6 +210,8 @@ app.Use(async (context, next) =>
 });
 
 app.UseRouting();
+if (corsOptions.Enabled)
+    app.UseCors(CorsPolicies.Api);
 app.UseMiddleware<RequestTelemetryMiddleware>();
 app.UseExceptionHandler();
 app.UseAuthentication();
@@ -186,12 +225,12 @@ if (openApiOptions.Enabled)
     if (openApiOptions.AllowAnonymous)
         openApiEndpoint.AllowAnonymous();
     else
-        openApiEndpoint.RequireAuthorization(Permissions.OperationsRead);
+        openApiEndpoint.RequireAuthorization(Permissions.OperationsRead).RequireRateLimiting(RatePolicies.Operations);
 }
 
 var tests = app.MapGroup("/api/v1/tests").RequireAuthorization();
 tests.MapGet("/", async (int? page, int? pageSize, TestStatus? status, string? search, GetTestsQueryHandler h, CancellationToken ct) =>
-    Results.Ok(await h.Handle(new GetTestsQuery(page ?? 1, pageSize ?? 20, status, search), ct))).RequireAuthorization(Permissions.TestsWrite);
+    Results.Ok(await h.Handle(new GetTestsQuery(page ?? 1, pageSize ?? 20, status, search), ct))).RequireAuthorization(Permissions.TestsWrite).RequireRateLimiting(RatePolicies.PrivilegedRead);
 tests.MapPost("/", async (CreateTestRequest r, CreateTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CreateTestCommand(r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPatch("/{id:guid}/title", async (Guid id, RenameTestRequest r, RenameTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RenameTestCommand(new TestId(id), r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPatch("/{id:guid}/settings", async (Guid id, TestSettingsRequest r, ChangeTestSettingsCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeTestSettingsCommand(new TestId(id), r.PassingPercentage, r.TimeLimitMinutes), ct))).RequireAuthorization(Permissions.TestsWrite);
@@ -205,9 +244,9 @@ tests.MapDelete("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}"
 tests.MapPatch("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}/order", async (Guid id, Guid questionId, Guid optionId, OrderRequest r, ReorderAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ReorderAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId), r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
 tests.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest r, PublishTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new PublishTestCommand(new TestId(id), r.IdempotencyKey), ct))).RequireAuthorization(Permissions.TestsPublish);
 tests.MapPost("/{id:guid}/archive", async (Guid id, ArchiveTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ArchiveTestCommand(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
-tests.MapGet("/{id:guid}/editor", async (Guid id, GetTestEditorViewQueryHandler h, CancellationToken ct) => await h.Handle(new GetTestEditorViewQuery(new TestId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsWrite);
+tests.MapGet("/{id:guid}/editor", async (Guid id, GetTestEditorViewQueryHandler h, CancellationToken ct) => await h.Handle(new GetTestEditorViewQuery(new TestId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsWrite).RequireRateLimiting(RatePolicies.PrivilegedRead);
 tests.MapGet("/{id:guid}/revisions", async (Guid id, GetTestRevisionsQueryHandler h, CancellationToken ct) =>
-    Results.Ok(await h.Handle(new GetTestRevisionsQuery(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
+    Results.Ok(await h.Handle(new GetTestRevisionsQuery(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite).RequireRateLimiting(RatePolicies.PrivilegedRead);
 
 var assignments = app.MapGroup("/api/v1/assignments").RequireAuthorization();
 assignments.MapGet("/", async (Guid? testId, Guid? revisionId, AssignmentTargetType? targetType, string? targetId, AssignmentStatus? status, int? page, int? pageSize, GetAdminAssignmentsQueryHandler h, CancellationToken ct) =>
@@ -218,11 +257,11 @@ assignments.MapGet("/", async (Guid? testId, Guid? revisionId, AssignmentTargetT
         targetId,
         status,
         page ?? 1,
-        pageSize ?? 20), ct))).RequireAuthorization(Permissions.TestsAssign);
+        pageSize ?? 20), ct))).RequireAuthorization(Permissions.TestsAssign).RequireRateLimiting(RatePolicies.PrivilegedRead);
 assignments.MapGet("/{id:guid}", async (Guid id, GetAdminAssignmentQueryHandler h, CancellationToken ct) =>
-    await h.Handle(new GetAdminAssignmentQuery(new TestAssignmentId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsAssign);
+    await h.Handle(new GetAdminAssignmentQuery(new TestAssignmentId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsAssign).RequireRateLimiting(RatePolicies.PrivilegedRead);
 assignments.MapGet("/{id:guid}/attempts", async (Guid id, AttemptStatus? status, AttemptOutcome? outcome, int? page, int? pageSize, GetAdminAssignmentAttemptsQueryHandler h, CancellationToken ct) =>
-    await h.Handle(new GetAdminAssignmentAttemptsQuery(new TestAssignmentId(id), status, outcome, page ?? 1, pageSize ?? 20), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsAssign);
+    await h.Handle(new GetAdminAssignmentAttemptsQuery(new TestAssignmentId(id), status, outcome, page ?? 1, pageSize ?? 20), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsAssign).RequireRateLimiting(RatePolicies.PrivilegedRead);
 assignments.MapPost("/", async (AssignRequest r, AssignTestCommandHandler h, CancellationToken ct) =>
 {
     ExternalUserId? user = string.IsNullOrWhiteSpace(r.UserId) ? null : ExternalUserId.FromSubject(r.UserId);
@@ -245,30 +284,44 @@ assignments.MapPost("/bulk", async (BulkAssignRequest r, BulkAssignTestsCommandH
 assignments.MapPatch("/{id:guid}/window", async (Guid id, AssignmentWindowRequest r, ChangeAssignmentWindowCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeAssignmentWindowCommand(new TestAssignmentId(id), r.AvailableFrom, r.AvailableUntil), ct))).RequireAuthorization(Permissions.TestsAssign);
 assignments.MapPatch("/{id:guid}/attempt-limit", async (Guid id, AttemptLimitRequest r, ChangeAssignmentAttemptLimitCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeAssignmentAttemptLimitCommand(new TestAssignmentId(id), r.AttemptLimit), ct))).RequireAuthorization(Permissions.TestsAssign);
 assignments.MapPost("/{id:guid}/cancel", async (Guid id, CancelAssignmentRequest r, CancelAssignmentCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CancelAssignmentCommand(new TestAssignmentId(id), r.Reason), ct))).RequireAuthorization(Permissions.TestsAssign);
-assignments.MapPost("/{id:guid}/attempts", async (Guid id, StartAttemptRequest r, StartAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new StartAttemptCommand(new TestAssignmentId(id), r.IdempotencyKey), ct)));
+assignments.MapPost("/{id:guid}/attempts", async (Guid id, StartAttemptRequest r, StartAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new StartAttemptCommand(new TestAssignmentId(id), r.IdempotencyKey), ct))).RequireRateLimiting(RatePolicies.StudentWrite);
 
 app.MapGet("/api/v1/me/assignments", async (int? page, int? pageSize, AssignmentStatus? status, GetMyAssignmentsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetMyAssignmentsQuery(page ?? 1, pageSize ?? 20, status), ct))).RequireAuthorization();
 app.MapGet("/api/v1/me/attempts", async (int? page, int? pageSize, AttemptStatus? status, GetMyAttemptsQueryHandler h, CancellationToken ct) =>
     Results.Ok(await h.Handle(new GetMyAttemptsQuery(page ?? 1, pageSize ?? 20, status), ct))).RequireAuthorization();
 app.MapGet("/api/v1/results", async (Guid? testId, Guid? revisionId, AttemptOutcome? outcome, int? page, int? pageSize, GetReviewerResultsQueryHandler h, CancellationToken ct) =>
-    Results.Ok(await h.Handle(new GetReviewerResultsQuery(testId is null ? null : new TestId(testId.Value), revisionId is null ? null : new PublishedTestRevisionId(revisionId.Value), outcome, page ?? 1, pageSize ?? 20), ct))).RequireAuthorization(Permissions.ResultsReview);
+    Results.Ok(await h.Handle(new GetReviewerResultsQuery(testId is null ? null : new TestId(testId.Value), revisionId is null ? null : new PublishedTestRevisionId(revisionId.Value), outcome, page ?? 1, pageSize ?? 20), ct))).RequireAuthorization(Permissions.ResultsReview).RequireRateLimiting(RatePolicies.PrivilegedRead);
 app.MapGet("/api/v1/results/{attemptId:guid}", async (Guid attemptId, GetReviewerAttemptResultQueryHandler h, CancellationToken ct) =>
-    await h.Handle(new GetReviewerAttemptResultQuery(new TestAttemptId(attemptId)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.ResultsReview);
+    await h.Handle(new GetReviewerAttemptResultQuery(new TestAttemptId(attemptId)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.ResultsReview).RequireRateLimiting(RatePolicies.PrivilegedRead);
 app.MapGet("/api/v1/operations/outbox", async (int? deadLetterLimit, OutboxMonitor monitor, CancellationToken ct) =>
-    Results.Ok(await monitor.GetStatusAsync(deadLetterLimit ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead);
+    Results.Ok(await monitor.GetStatusAsync(deadLetterLimit ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead).RequireRateLimiting(RatePolicies.Operations);
 app.MapGet("/api/v1/operations/audit", async (string? actorId, int? statusCode, DateTimeOffset? from, DateTimeOffset? to, int? page, int? pageSize, AuditTrail audit, CancellationToken ct) =>
-    Results.Ok(await audit.GetAsync(actorId, statusCode, from, to, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead);
+    Results.Ok(await audit.GetAsync(actorId, statusCode, from, to, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization(Permissions.OperationsRead).RequireRateLimiting(RatePolicies.Operations);
 
 var attempts = app.MapGroup("/api/v1/attempts").RequireAuthorization();
-attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct)));
-attempts.MapDelete("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, ClearAnswerCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ClearAnswerCommand(new TestAttemptId(id), new QuestionId(questionId)), ct)));
-attempts.MapPost("/{id:guid}/submit", async (Guid id, SubmitAttemptRequest r, SubmitAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new SubmitAttemptCommand(new TestAttemptId(id), r.IdempotencyKey), ct)));
+attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct))).RequireRateLimiting(RatePolicies.StudentWrite);
+attempts.MapDelete("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, ClearAnswerCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ClearAnswerCommand(new TestAttemptId(id), new QuestionId(questionId)), ct))).RequireRateLimiting(RatePolicies.StudentWrite);
+attempts.MapPost("/{id:guid}/submit", async (Guid id, SubmitAttemptRequest r, SubmitAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new SubmitAttemptCommand(new TestAttemptId(id), r.IdempotencyKey), ct))).RequireRateLimiting(RatePolicies.StudentWrite);
 attempts.MapPost("/{id:guid}/timeout", async (Guid id, TimeoutAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new TimeoutAttemptCommand(new TestAttemptId(id)), ct))).RequireAuthorization(Permissions.TestsAssign);
 attempts.MapGet("/{id:guid}", async (Guid id, GetAttemptQueryHandler h, CancellationToken ct) => await h.Handle(new GetAttemptQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
 attempts.MapGet("/{id:guid}/result", async (Guid id, GetAttemptResultQueryHandler h, CancellationToken ct) => await h.Handle(new GetAttemptResultQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
 
 app.Run();
+
+static RateLimitPartition<string> FixedWindowPartition(HttpContext context, RateLimitRule rule)
+{
+    var partitionKey = context.User.FindFirst("sub")?.Value
+        ?? context.Connection.RemoteIpAddress?.ToString()
+        ?? "anonymous";
+    return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+    {
+        PermitLimit = rule.PermitLimit,
+        Window = TimeSpan.FromSeconds(rule.WindowSeconds),
+        QueueLimit = rule.QueueLimit,
+        AutoReplenishment = true
+    });
+}
 
 static IResult ToHttp<T>(TestApp.Core.Monads.Result<T, Error> result) where T : notnull => result.Match<IResult>(
     value => Results.Ok(value),
@@ -281,6 +334,18 @@ public static class Permissions
     public const string TestsAssign = "tests:assign";
     public const string ResultsReview = "results:review";
     public const string OperationsRead = "operations:read";
+}
+
+public static class RatePolicies
+{
+    public const string StudentWrite = "student-write";
+    public const string PrivilegedRead = "privileged-read";
+    public const string Operations = "operations";
+}
+
+public static class CorsPolicies
+{
+    public const string Api = "api-cors";
 }
 
 public sealed record CreateTestRequest(string Title);
