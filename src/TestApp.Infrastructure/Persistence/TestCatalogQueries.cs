@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TestApp.Application.Queries;
+using TestApp.Domain.Identity;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
 
@@ -8,6 +9,7 @@ namespace TestApp.Infrastructure.Persistence;
 public sealed class TestCatalogQueries(AppDbContext db) : ITestCatalogQueries
 {
     public async Task<PagedResult<TestCatalogItem>> GetTestsAsync(
+        ExternalUserId? ownerId,
         int page,
         int pageSize,
         TestStatus? status,
@@ -15,6 +17,8 @@ public sealed class TestCatalogQueries(AppDbContext db) : ITestCatalogQueries
         CancellationToken ct)
     {
         var query = db.Tests.AsNoTracking().AsQueryable();
+        if (ownerId is { } owner)
+            query = query.Where(x => x.OwnerId == owner);
         if (status is { } statusValue)
             query = query.Where(x => x.Status == statusValue);
         if (!string.IsNullOrWhiteSpace(search))
@@ -66,8 +70,15 @@ public sealed class TestCatalogQueries(AppDbContext db) : ITestCatalogQueries
         return new PagedResult<TestCatalogItem>(items, page, pageSize, totalCount);
     }
 
-    public async Task<IReadOnlyList<PublishedRevisionSummary>> GetRevisionsAsync(TestId testId, CancellationToken ct) =>
-        await db.Revisions.AsNoTracking()
+    public async Task<IReadOnlyList<PublishedRevisionSummary>> GetRevisionsAsync(
+        TestId testId,
+        ExternalUserId? ownerId,
+        CancellationToken ct)
+    {
+        if (ownerId is { } owner && !await db.Tests.AsNoTracking().AnyAsync(x => x.Id == testId && x.OwnerId == owner, ct))
+            return [];
+
+        return await db.Revisions.AsNoTracking()
             .Where(x => x.TestId == testId)
             .OrderByDescending(x => x.Version)
             .Select(x => new PublishedRevisionSummary(
@@ -79,4 +90,5 @@ public sealed class TestCatalogQueries(AppDbContext db) : ITestCatalogQueries
                 x.TimeLimitMinutes,
                 x.PublishedAt))
             .ToArrayAsync(ct);
+    }
 }
