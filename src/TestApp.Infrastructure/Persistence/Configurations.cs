@@ -55,10 +55,11 @@ public sealed class RevisionConfiguration : IEntityTypeConfiguration<PublishedTe
         b.Property(x => x.Title).HasMaxLength(300).IsRequired();
         b.Property(x => x.PassingPercentage).HasPrecision(5, 2);
         b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
-        b.Property(x => x.Questions)
+        b.Ignore(x => x.Questions);
+        b.Property<List<PublishedQuestion>>("_questions")
             .HasConversion(
                 v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
-                v => JsonSerializer.Deserialize<PublishedQuestion[]>(v, JsonSerializerOptions.Default) ?? Array.Empty<PublishedQuestion>())
+                v => JsonSerializer.Deserialize<List<PublishedQuestion>>(v, JsonSerializerOptions.Default) ?? new List<PublishedQuestion>())
             .HasColumnName("questions_json")
             .HasColumnType("longtext");
         b.Ignore(x => x.DomainEvents);
