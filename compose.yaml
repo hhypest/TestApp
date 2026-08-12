@@ -1,0 +1,79 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: testapp
+      MARIADB_USER: testapp
+      MARIADB_PASSWORD: testapp
+    ports:
+      - "3306:3306"
+    volumes:
+      - testapp-mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: bootstrap-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: bootstrap-admin
+      KC_HOSTNAME: http://localhost:8081
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./deploy/keycloak:/opt/keycloak/data/import:ro
+
+  migrate:
+    image: testapp-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Database: Server=mariadb;Port=3306;Database=testapp;User=testapp;Password=testapp;
+      Database__ApplyMigrationsOnStartup: "false"
+      Keycloak__Authority: http://localhost:8081/realms/testapp
+      Keycloak__MetadataAddress: http://keycloak:8080/realms/testapp/.well-known/openid-configuration
+      Keycloak__Issuer: http://localhost:8081/realms/testapp
+      Keycloak__Audience: testapp-api
+      Keycloak__RequireHttpsMetadata: "false"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: testapp-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__Database: Server=mariadb;Port=3306;Database=testapp;User=testapp;Password=testapp;
+      Database__ApplyMigrationsOnStartup: "false"
+      Keycloak__Authority: http://localhost:8081/realms/testapp
+      Keycloak__MetadataAddress: http://keycloak:8080/realms/testapp/.well-known/openid-configuration
+      Keycloak__Issuer: http://localhost:8081/realms/testapp
+      Keycloak__Audience: testapp-api
+      Keycloak__RequireHttpsMetadata: "false"
+    ports:
+      - "8080:8080"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_started
+
+volumes:
+  testapp-mariadb:
