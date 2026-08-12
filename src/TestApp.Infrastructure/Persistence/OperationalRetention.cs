@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,7 +63,6 @@ public sealed class OperationalRetentionCleaner(
     IOptions<OperationalRetentionOptions> options,
     ILogger<OperationalRetentionCleaner> logger)
 {
-    private const string LockName = "testapp:retention";
     private readonly OperationalRetentionOptions _options = options.Value;
 
     public async Task<OperationalRetentionResult> RunOnceAsync(CancellationToken ct = default)
@@ -74,8 +75,9 @@ public sealed class OperationalRetentionCleaner(
             ?? throw new InvalidOperationException("Database connection string is not configured.");
         await using var lockConnection = new MySqlConnection(connectionString);
         await lockConnection.OpenAsync(ct);
+        var lockName = CreateLockName(lockConnection.Database);
 
-        if (!await TryAcquireLockAsync(lockConnection, ct))
+        if (!await TryAcquireLockAsync(lockConnection, lockName, ct))
             return new OperationalRetentionResult(false, 0, 0, 0);
 
         try
@@ -100,7 +102,7 @@ public sealed class OperationalRetentionCleaner(
         }
         finally
         {
-            await ReleaseLockAsync(lockConnection);
+            await ReleaseLockAsync(lockConnection, lockName);
         }
     }
 
@@ -161,23 +163,29 @@ public sealed class OperationalRetentionCleaner(
         return deleted;
     }
 
-    private static async Task<bool> TryAcquireLockAsync(MySqlConnection connection, CancellationToken ct)
+    private static string CreateLockName(string database)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(database))).ToLowerInvariant();
+        return $"testapp:retention:{hash[..40]}";
+    }
+
+    private static async Task<bool> TryAcquireLockAsync(MySqlConnection connection, string lockName, CancellationToken ct)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT GET_LOCK(@name, 0);";
-        command.Parameters.AddWithValue("@name", LockName);
+        command.Parameters.AddWithValue("@name", lockName);
         var value = await command.ExecuteScalarAsync(ct);
         return value is not null && value is not DBNull && Convert.ToInt32(value) == 1;
     }
 
-    private static async Task ReleaseLockAsync(MySqlConnection connection)
+    private static async Task ReleaseLockAsync(MySqlConnection connection, string lockName)
     {
         if (connection.State != System.Data.ConnectionState.Open)
             return;
 
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT RELEASE_LOCK(@name);";
-        command.Parameters.AddWithValue("@name", LockName);
+        command.Parameters.AddWithValue("@name", lockName);
         await command.ExecuteScalarAsync();
     }
 }
