@@ -33,10 +33,13 @@ public static class DependencyInjection
         services.AddScoped<ExpireAttemptCommandHandler>();
         services.AddScoped<OutboxMonitor>();
         services.AddScoped<AuditTrail>();
+        services.AddScoped<OperationalRetentionCleaner>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(TimeProvider.System);
         services.Configure<AttemptExpirationOptions>(_ => { });
+        services.Configure<OperationalRetentionOptions>(_ => { });
         services.AddHostedService<OverdueAttemptProcessor>();
+        services.AddHostedService<OperationalRetentionWorker>();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
         services.AddSingleton<IStartupFilter, HealthEndpointStartupFilter>();
