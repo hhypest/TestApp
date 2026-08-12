@@ -43,10 +43,10 @@ public sealed class ApiHostTests
 
         Authenticate(client, "author-1", "test-author");
         var testId = await PostValue<TestId>(client, "/api/tests", new CreateTestRequest("DDD fundamentals"), ct);
-        var questionId = await PostValue<QuestionId>(client, $"/api/tests/{testId.Value}/questions", new QuestionWriteRequest("What is an aggregate?", QuestionType.SingleChoice, 1m, 1), ct);
-        var correctOptionId = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Consistency boundary", true, 1), ct);
-        var wrongOptionId = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("A database table", false, 2), ct);
-        var revisionId = await PostValue<PublishedTestRevisionId>(client, $"/api/tests/{testId.Value}/publish", new PublishRequest(Guid.NewGuid()), ct);
+        var questionId = await PostTestValue<QuestionId>(client, testId, $"/api/tests/{testId.Value}/questions", new QuestionWriteRequest("What is an aggregate?", QuestionType.SingleChoice, 1m, 1), ct);
+        var correctOptionId = await PostTestValue<AnswerOptionId>(client, testId, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Consistency boundary", true, 1), ct);
+        var wrongOptionId = await PostTestValue<AnswerOptionId>(client, testId, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("A database table", false, 2), ct);
+        var revisionId = await PostTestValue<PublishedTestRevisionId>(client, testId, $"/api/tests/{testId.Value}/publish", new PublishRequest(Guid.NewGuid()), ct);
 
         var catalog = await client.GetFromJsonAsync<PagedResult<TestCatalogItem>>("/api/tests?status=Published&search=fundamentals&page=1&pageSize=20", ct);
         Assert.NotNull(catalog);
@@ -145,10 +145,10 @@ public sealed class ApiHostTests
 
         Authenticate(client, "author-1", "test-author");
         var testId = await PostValue<TestId>(client, "/api/tests", new CreateTestRequest("Bulk assignment test"), ct);
-        var questionId = await PostValue<QuestionId>(client, $"/api/tests/{testId.Value}/questions", new QuestionWriteRequest("Pick one", QuestionType.SingleChoice, 1m, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Correct", true, 1), ct);
-        _ = await PostValue<AnswerOptionId>(client, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Wrong", false, 2), ct);
-        var revisionId = await PostValue<PublishedTestRevisionId>(client, $"/api/tests/{testId.Value}/publish", new PublishRequest(Guid.NewGuid()), ct);
+        var questionId = await PostTestValue<QuestionId>(client, testId, $"/api/tests/{testId.Value}/questions", new QuestionWriteRequest("Pick one", QuestionType.SingleChoice, 1m, 1), ct);
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Correct", true, 1), ct);
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/tests/{testId.Value}/questions/{questionId.Value}/options", new AnswerOptionWriteRequest("Wrong", false, 2), ct);
+        var revisionId = await PostTestValue<PublishedTestRevisionId>(client, testId, $"/api/tests/{testId.Value}/publish", new PublishRequest(Guid.NewGuid()), ct);
 
         Authenticate(client, "admin-1", "test-admin");
         var idempotencyKey = Guid.NewGuid();
@@ -242,6 +242,28 @@ public sealed class ApiHostTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct);
         return Assert.IsType<T>(value);
+    }
+
+    private static async Task<T> PostTestValue<T>(HttpClient client, TestId testId, string uri, object body, CancellationToken ct)
+    {
+        var etag = await GetTestEtagAsync(client, testId, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, uri)
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+        using var response = await client.SendAsync(request, ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct);
+        return Assert.IsType<T>(value);
+    }
+
+    private static async Task<string> GetTestEtagAsync(HttpClient client, TestId testId, CancellationToken ct)
+    {
+        using var response = await client.GetAsync($"/api/tests/{testId.Value}/editor", ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return response.Headers.ETag?.ToString()
+            ?? throw new Xunit.Sdk.XunitException("Test editor response did not contain ETag.");
     }
 }
 
