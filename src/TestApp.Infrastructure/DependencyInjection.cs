@@ -5,7 +5,9 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using TestApp.Application.Abstractions;
+using TestApp.Application.Attempts;
 using TestApp.Application.Queries;
+using TestApp.Infrastructure.Attempts;
 using TestApp.Infrastructure.Identity;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
@@ -28,10 +30,13 @@ public static class DependencyInjection
         services.AddScoped<IAssignmentAdminQueries, AssignmentAdminQueries>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ICurrentActor, HttpCurrentActor>();
+        services.AddScoped<ExpireAttemptCommandHandler>();
         services.AddScoped<OutboxMonitor>();
         services.AddScoped<AuditTrail>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(TimeProvider.System);
+        services.Configure<AttemptExpirationOptions>(_ => { });
+        services.AddHostedService<OverdueAttemptProcessor>();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
         services.AddSingleton<IStartupFilter, HealthEndpointStartupFilter>();
