@@ -1,0 +1,65 @@
+name: security
+
+on:
+  push:
+    branches:
+      - beta-ddd
+  pull_request:
+    branches:
+      - beta-ddd
+
+permissions:
+  contents: read
+
+jobs:
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan repository for secrets
+        run: >-
+          docker run --rm
+          -v "$PWD:/work"
+          aquasec/trivy:0.66.0
+          fs
+          --scanners secret
+          --exit-code 1
+          --skip-files .github/workflows/dotnet.yml
+          --skip-files compose.yaml
+          /work
+
+      - name: Build production API image
+        run: docker build --tag testapp-api:security .
+
+      - name: Scan production image for high and critical vulnerabilities
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.66.0
+          image
+          --severity HIGH,CRITICAL
+          --ignore-unfixed
+          --exit-code 1
+          testapp-api:security
+
+      - name: Generate CycloneDX image SBOM
+        run: |
+          mkdir -p artifacts
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/artifacts:/out" \
+            aquasec/trivy:0.66.0 \
+            image \
+            --format cyclonedx \
+            --output /out/testapp-api.cdx.json \
+            testapp-api:security
+          test -s artifacts/testapp-api.cdx.json
+
+      - name: Upload image SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: testapp-api-cyclonedx-sbom
+          path: artifacts/testapp-api.cdx.json
+          if-no-files-found: error
+          retention-days: 30
