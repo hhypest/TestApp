@@ -46,6 +46,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet restore TestApp.slnx
+      - name: Audit high and critical NuGet vulnerabilities
+        run: >-
+          dotnet restore TestApp.slnx
+          -p:NuGetAudit=true
+          -p:NuGetAuditMode=all
+          -p:NuGetAuditLevel=high
+          -warnaserror:NU1903,NU1904
       - run: dotnet build TestApp.slnx --no-restore --configuration Release
       - run: dotnet test TestApp.slnx --no-build --configuration Release
       - name: Validate compose configuration
