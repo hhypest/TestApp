@@ -74,105 +74,47 @@ app.UseAuthorization();
 
 var tests = app.MapGroup("/api/tests").RequireAuthorization();
 
-tests.MapPost("/", async (CreateTestRequest r, CreateTestCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new CreateTestCommand(r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPatch("/{id:guid}/title", async (Guid id, RenameTestRequest r, RenameTestCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new RenameTestCommand(new TestId(id), r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPost("/{id:guid}/questions", async (Guid id, QuestionWriteRequest r, AddQuestionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new AddQuestionCommand(new TestId(id), r.Text, r.Type, r.Points, r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPut("/{id:guid}/questions/{questionId:guid}", async (Guid id, Guid questionId, QuestionUpdateRequest r, UpdateQuestionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new UpdateQuestionCommand(new TestId(id), new QuestionId(questionId), r.Text, r.Type, r.Points), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapDelete("/{id:guid}/questions/{questionId:guid}", async (Guid id, Guid questionId, RemoveQuestionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new RemoveQuestionCommand(new TestId(id), new QuestionId(questionId)), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPatch("/{id:guid}/questions/{questionId:guid}/order", async (Guid id, Guid questionId, OrderRequest r, ReorderQuestionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new ReorderQuestionCommand(new TestId(id), new QuestionId(questionId), r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPost("/{id:guid}/questions/{questionId:guid}/options", async (Guid id, Guid questionId, AnswerOptionWriteRequest r, AddAnswerOptionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new AddAnswerOptionCommand(new TestId(id), new QuestionId(questionId), r.Text, r.IsCorrect, r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPut("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}", async (Guid id, Guid questionId, Guid optionId, AnswerOptionUpdateRequest r, UpdateAnswerOptionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new UpdateAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId), r.Text, r.IsCorrect), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapDelete("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}", async (Guid id, Guid questionId, Guid optionId, RemoveAnswerOptionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new RemoveAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId)), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPatch("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}/order", async (Guid id, Guid questionId, Guid optionId, OrderRequest r, ReorderAnswerOptionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new ReorderAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId), r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapPost("/{id:guid}/publish", async (Guid id, PublishTestCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new PublishTestCommand(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsPublish);
-
-tests.MapPost("/{id:guid}/archive", async (Guid id, ArchiveTestCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new ArchiveTestCommand(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
-
-tests.MapGet("/{id:guid}/editor", async (Guid id, GetTestEditorViewQueryHandler h, CancellationToken ct) =>
-    await h.Handle(new GetTestEditorViewQuery(new TestId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound())
-    .RequireAuthorization(Permissions.TestsWrite);
+tests.MapPost("/", async (CreateTestRequest r, CreateTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CreateTestCommand(r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPatch("/{id:guid}/title", async (Guid id, RenameTestRequest r, RenameTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RenameTestCommand(new TestId(id), r.Title), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPost("/{id:guid}/questions", async (Guid id, QuestionWriteRequest r, AddQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AddQuestionCommand(new TestId(id), r.Text, r.Type, r.Points, r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPut("/{id:guid}/questions/{questionId:guid}", async (Guid id, Guid questionId, QuestionUpdateRequest r, UpdateQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new UpdateQuestionCommand(new TestId(id), new QuestionId(questionId), r.Text, r.Type, r.Points), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapDelete("/{id:guid}/questions/{questionId:guid}", async (Guid id, Guid questionId, RemoveQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RemoveQuestionCommand(new TestId(id), new QuestionId(questionId)), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPatch("/{id:guid}/questions/{questionId:guid}/order", async (Guid id, Guid questionId, OrderRequest r, ReorderQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ReorderQuestionCommand(new TestId(id), new QuestionId(questionId), r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPost("/{id:guid}/questions/{questionId:guid}/options", async (Guid id, Guid questionId, AnswerOptionWriteRequest r, AddAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AddAnswerOptionCommand(new TestId(id), new QuestionId(questionId), r.Text, r.IsCorrect, r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPut("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}", async (Guid id, Guid questionId, Guid optionId, AnswerOptionUpdateRequest r, UpdateAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new UpdateAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId), r.Text, r.IsCorrect), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapDelete("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}", async (Guid id, Guid questionId, Guid optionId, RemoveAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new RemoveAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId)), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPatch("/{id:guid}/questions/{questionId:guid}/options/{optionId:guid}/order", async (Guid id, Guid questionId, Guid optionId, OrderRequest r, ReorderAnswerOptionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ReorderAnswerOptionCommand(new TestId(id), new QuestionId(questionId), new AnswerOptionId(optionId), r.Order), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapPost("/{id:guid}/publish", async (Guid id, PublishTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new PublishTestCommand(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsPublish);
+tests.MapPost("/{id:guid}/archive", async (Guid id, ArchiveTestCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ArchiveTestCommand(new TestId(id)), ct))).RequireAuthorization(Permissions.TestsWrite);
+tests.MapGet("/{id:guid}/editor", async (Guid id, GetTestEditorViewQueryHandler h, CancellationToken ct) => await h.Handle(new GetTestEditorViewQuery(new TestId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound()).RequireAuthorization(Permissions.TestsWrite);
 
 var assignments = app.MapGroup("/api/assignments").RequireAuthorization();
-
 assignments.MapPost("/", async (AssignRequest r, AssignTestCommandHandler h, CancellationToken ct) =>
 {
     ExternalUserId? user = string.IsNullOrWhiteSpace(r.UserId) ? null : ExternalUserId.FromSubject(r.UserId);
     ExternalGroupId? group = string.IsNullOrWhiteSpace(r.GroupId) ? null : ExternalGroupId.FromExternalId(r.GroupId);
     return ToHttp(await h.Handle(new AssignTestCommand(new PublishedTestRevisionId(r.RevisionId), user, group, r.AvailableFrom, r.AvailableUntil, r.AttemptLimit), ct));
 }).RequireAuthorization(Permissions.TestsAssign);
+assignments.MapPatch("/{id:guid}/window", async (Guid id, AssignmentWindowRequest r, ChangeAssignmentWindowCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeAssignmentWindowCommand(new TestAssignmentId(id), r.AvailableFrom, r.AvailableUntil), ct))).RequireAuthorization(Permissions.TestsAssign);
+assignments.MapPatch("/{id:guid}/attempt-limit", async (Guid id, AttemptLimitRequest r, ChangeAssignmentAttemptLimitCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ChangeAssignmentAttemptLimitCommand(new TestAssignmentId(id), r.AttemptLimit), ct))).RequireAuthorization(Permissions.TestsAssign);
+assignments.MapPost("/{id:guid}/cancel", async (Guid id, CancelAssignmentRequest r, CancelAssignmentCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new CancelAssignmentCommand(new TestAssignmentId(id), r.Reason), ct))).RequireAuthorization(Permissions.TestsAssign);
+assignments.MapPost("/{id:guid}/attempts", async (Guid id, StartAttemptRequest r, StartAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new StartAttemptCommand(new TestAssignmentId(id), r.IdempotencyKey), ct)));
 
-assignments.MapPatch("/{id:guid}/window", async (Guid id, AssignmentWindowRequest r, ChangeAssignmentWindowCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new ChangeAssignmentWindowCommand(new TestAssignmentId(id), r.AvailableFrom, r.AvailableUntil), ct))).RequireAuthorization(Permissions.TestsAssign);
-
-assignments.MapPatch("/{id:guid}/attempt-limit", async (Guid id, AttemptLimitRequest r, ChangeAssignmentAttemptLimitCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new ChangeAssignmentAttemptLimitCommand(new TestAssignmentId(id), r.AttemptLimit), ct))).RequireAuthorization(Permissions.TestsAssign);
-
-assignments.MapPost("/{id:guid}/cancel", async (Guid id, CancelAssignmentRequest r, CancelAssignmentCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new CancelAssignmentCommand(new TestAssignmentId(id), r.Reason), ct))).RequireAuthorization(Permissions.TestsAssign);
-
-assignments.MapPost("/{id:guid}/attempts", async (Guid id, StartAttemptCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new StartAttemptCommand(new TestAssignmentId(id)), ct)));
-
-app.MapGet("/api/me/assignments", async (GetMyAssignmentsQueryHandler h, CancellationToken ct) =>
-    Results.Ok(await h.Handle(new GetMyAssignmentsQuery(), ct))).RequireAuthorization();
+app.MapGet("/api/me/assignments", async (GetMyAssignmentsQueryHandler h, CancellationToken ct) => Results.Ok(await h.Handle(new GetMyAssignmentsQuery(), ct))).RequireAuthorization();
 
 var attempts = app.MapGroup("/api/attempts").RequireAuthorization();
-
-attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct)));
-
-attempts.MapDelete("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, ClearAnswerCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new ClearAnswerCommand(new TestAttemptId(id), new QuestionId(questionId)), ct)));
-
-attempts.MapPost("/{id:guid}/submit", async (Guid id, SubmitAttemptCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new SubmitAttemptCommand(new TestAttemptId(id)), ct)));
-
-attempts.MapPost("/{id:guid}/timeout", async (Guid id, TimeoutAttemptCommandHandler h, CancellationToken ct) =>
-    ToHttp(await h.Handle(new TimeoutAttemptCommand(new TestAttemptId(id)), ct))).RequireAuthorization(Permissions.TestsAssign);
-
-attempts.MapGet("/{id:guid}", async (Guid id, GetAttemptQueryHandler h, CancellationToken ct) =>
-    await h.Handle(new GetAttemptQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
-
-attempts.MapGet("/{id:guid}/result", async (Guid id, GetAttemptResultQueryHandler h, CancellationToken ct) =>
-    await h.Handle(new GetAttemptResultQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
+attempts.MapPut("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, AnswerQuestionRequest r, AnswerQuestionCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new AnswerQuestionCommand(new TestAttemptId(id), new QuestionId(questionId), r.OptionIds.Select(x => new AnswerOptionId(x)).ToArray()), ct)));
+attempts.MapDelete("/{id:guid}/answers/{questionId:guid}", async (Guid id, Guid questionId, ClearAnswerCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new ClearAnswerCommand(new TestAttemptId(id), new QuestionId(questionId)), ct)));
+attempts.MapPost("/{id:guid}/submit", async (Guid id, SubmitAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new SubmitAttemptCommand(new TestAttemptId(id)), ct)));
+attempts.MapPost("/{id:guid}/timeout", async (Guid id, TimeoutAttemptCommandHandler h, CancellationToken ct) => ToHttp(await h.Handle(new TimeoutAttemptCommand(new TestAttemptId(id)), ct))).RequireAuthorization(Permissions.TestsAssign);
+attempts.MapGet("/{id:guid}", async (Guid id, GetAttemptQueryHandler h, CancellationToken ct) => await h.Handle(new GetAttemptQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
+attempts.MapGet("/{id:guid}/result", async (Guid id, GetAttemptResultQueryHandler h, CancellationToken ct) => await h.Handle(new GetAttemptResultQuery(new TestAttemptId(id)), ct) is { } value ? Results.Ok(value) : Results.NotFound());
 
 app.Run();
 
 static IResult ToHttp<T>(TestApp.Core.Monads.Result<T, Error> result) where T : notnull => result.Match<IResult>(
     value => Results.Ok(value),
-    error => Results.Problem(
-        statusCode: error.Type switch
-        {
-            ErrorType.Validation => StatusCodes.Status400BadRequest,
-            ErrorType.NotFound => StatusCodes.Status404NotFound,
-            ErrorType.Conflict => StatusCodes.Status409Conflict,
-            ErrorType.Forbidden => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        },
-        title: error.Code,
-        detail: error.Message));
+    error => Results.Problem(statusCode: error.Type switch { ErrorType.Validation => StatusCodes.Status400BadRequest, ErrorType.NotFound => StatusCodes.Status404NotFound, ErrorType.Conflict => StatusCodes.Status409Conflict, ErrorType.Forbidden => StatusCodes.Status403Forbidden, _ => StatusCodes.Status500InternalServerError }, title: error.Code, detail: error.Message));
 
 public static class Permissions
 {
@@ -193,6 +135,7 @@ public sealed record AssignRequest(Guid RevisionId, string? UserId, string? Grou
 public sealed record AssignmentWindowRequest(DateTimeOffset AvailableFrom, DateTimeOffset? AvailableUntil);
 public sealed record AttemptLimitRequest(int? AttemptLimit);
 public sealed record CancelAssignmentRequest(string? Reason);
+public sealed record StartAttemptRequest(Guid IdempotencyKey);
 public sealed record AnswerQuestionRequest(IReadOnlyCollection<Guid> OptionIds);
 
 public partial class Program;
