@@ -93,9 +93,10 @@ public sealed class OutboxDeadLetterManagementTests
         var monitor = new OutboxMonitor(verify);
         var status = await monitor.GetStatusAsync(cancellationToken: ct);
         Assert.Equal(1, status.PendingCount);
-        Assert.Equal(1, status.DeadLetterCount);
+        Assert.Equal(1, status.RetryScheduledCount);
+        Assert.Equal(0, status.DeadLetterCount);
         Assert.Equal(1, status.DiscardedCount);
-        Assert.Contains(status.RecentDeadLetters, x => x.EventId == discardId && x.Error == "dead-letter-probe");
+        Assert.Empty(status.RecentDeadLetters);
     }
 
     private static Task InsertDeadLetterAsync(
