@@ -37,6 +37,7 @@ public sealed class RabbitMqOutboxPublisher : IOutboxPublisher, IAsyncDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
     private IChannel? _channel;
+    private int _disposeState;
 
     public RabbitMqOutboxPublisher(
         IOptions<RabbitMqOutboxOptions> options,
@@ -58,10 +59,12 @@ public sealed class RabbitMqOutboxPublisher : IOutboxPublisher, IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
         ArgumentNullException.ThrowIfNull(payload);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
 
         await _gate.WaitAsync(ct);
         try
         {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
             await EnsureChannelAsync(ct);
 
             var properties = new BasicProperties
@@ -150,6 +153,9 @@ public sealed class RabbitMqOutboxPublisher : IOutboxPublisher, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+            return;
+
         await _gate.WaitAsync();
         try
         {
