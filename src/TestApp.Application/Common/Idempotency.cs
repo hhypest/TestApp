@@ -15,10 +15,10 @@ public static class IdempotencyFingerprint
     public static string Create(params string?[] parts)
     {
         using var buffer = new MemoryStream();
+        Span<byte> length = stackalloc byte[4];
         foreach (var part in parts)
         {
             var bytes = Encoding.UTF8.GetBytes(part ?? string.Empty);
-            Span<byte> length = stackalloc byte[4];
             System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(length, bytes.Length);
             buffer.Write(length);
             buffer.Write(bytes);
