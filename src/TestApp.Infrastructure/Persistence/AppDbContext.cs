@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TestApp.Application.Abstractions;
+using TestApp.Application.Common;
 using TestApp.Domain.Assignments;
 using TestApp.Domain.Attempts;
 using TestApp.Domain.Entities;
@@ -36,20 +37,25 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         var roots = ChangeTracker.Entries()
             .Where(e => e.Entity is IAggregateRoot)
             .Select(e => (IAggregateRoot)e.Entity)
+            .Distinct()
             .ToArray();
 
-        foreach (var integrationEvent in roots
-                     .SelectMany(x => x.DomainEvents)
-                     .OfType<IIntegrationEvent>())
-        {
+        foreach (var integrationEvent in roots.SelectMany(x => x.DomainEvents).OfType<IIntegrationEvent>())
             OutboxMessages.Add(OutboxMessage.From(integrationEvent));
+
+        try
+        {
+            var affected = await base.SaveChangesAsync(ct);
+            foreach (var root in roots)
+                root.ClearDomainEvents();
+            return affected;
         }
-
-        var affected = await base.SaveChangesAsync(ct);
-        foreach (var root in roots)
-            root.ClearDomainEvents();
-
-        return affected;
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyConflictException(
+                "The resource was changed by another request. Reload the current state and retry the operation.",
+                ex);
+        }
     }
 
     async Task IUnitOfWork.SaveChangesAsync(CancellationToken ct)
