@@ -1,230 +1,289 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot**. Этот документ описывает фактическое состояние `beta-ddd` после перехода на MariaDB 12.3.
+> Статус: **Implemented snapshot**. Этот документ описывает фактическое состояние `beta-ddd` после завершения Phase A, Phase B и первых двух задач Phase C.
 
 ## 1. Назначение системы
 
-TestApp — серверная часть системы создания, публикации, назначения и прохождения тестов. Текущая реализация ориентирована на следующие роли:
+TestApp — серверная часть системы создания, публикации, назначения и прохождения тестов. Текущая реализация ориентирована на роли:
 
-- **test-author** — создание/редактирование/публикация тестов, просмотр результатов;
-- **test-admin** — все author-capabilities плюс назначения и operational endpoints;
-- **student/user** — просмотр собственных назначений, запуск попыток, ответы, submit и просмотр собственного результата.
+- **test-author** — управление только собственными тестами и просмотр результатов собственных тестов;
+- **test-admin** — глобальный author/reviewer scope, назначения и operational endpoints;
+- **student/user** — собственные назначения, попытки, ответы, submit и собственный результат.
 
-Пользователи и группы не создаются внутри TestApp: identity source of truth — Keycloak.
+Identity source of truth — Keycloak. TestApp не создаёт локальные user accounts.
 
 ## 2. Реализованные продуктовые возможности
 
 ### 2.1 Authoring
 
-**Implemented:**
-
 - создание `Test`;
-- изменение названия;
-- настройки passing percentage и optional time limit;
-- добавление/обновление/удаление/перестановка вопросов;
-- добавление/обновление/удаление/перестановка вариантов ответа;
-- типы вопросов `SingleChoice` и `MultipleChoice`;
-- публикация теста;
+- immutable `OwnerId` из current Keycloak `sub`;
+- изменение названия и settings;
+- question/answer-option CRUD и reorder;
+- `SingleChoice` и `MultipleChoice`;
+- публикация;
 - immutable revision history;
 - архивирование;
-- catalog read-side с pagination/status/search;
-- editor view;
-- revision list.
+- owner-scoped catalog, editor и revision list;
+- admin global scope.
 
 ### 2.2 Publication model
 
-**Implemented:**
+- `Draft -> Published`;
+- изменение опубликованного working definition возвращает его в `Draft`;
+- PublishedTestRevision неизменяема;
+- повторная публикация без изменений запрещена;
+- Archived test заблокирован для изменения/публикации;
+- revision snapshot содержит title/settings/questions/options/correctness.
 
-- `Draft -> Published` после успешной публикации;
-- изменение опубликованного working `Test` автоматически возвращает его в `Draft`;
-- опубликованные revisions не изменяются после создания;
-- повторный publish без изменений запрещён;
-- archived test нельзя редактировать или повторно публиковать;
-- revision содержит title, settings, ordered questions/options и correctness snapshot.
+### 2.3 Ownership boundary
 
-### 2.3 Assignments
+`Test.OwnerId` является обязательным non-null external user ID.
 
-**Implemented:**
+Для `test-author` SQL/read и Application/write boundary ограничены owner:
 
-- назначение конкретной `PublishedTestRevision`;
-- target: ровно один user или group;
+- catalog;
+- editor;
+- revision list;
+- rename/settings/questions/options;
+- publish/archive;
+- reviewer result list/detail.
+
+`test-admin` имеет global scope.
+
+Migration существующих tests использует специальный owner `__legacy_admin_only__`, после чего DB default удаляется. Такие legacy records не становятся автоматически доступными случайному author.
+
+### 2.4 Assignments
+
+- назначение конкретной immutable revision;
+- target user или group;
 - availability window;
 - optional attempt limit;
-- cancel с actor/time/reason audit fields;
-- изменение окна доступности и attempt limit для active assignment;
+- cancel audit;
+- изменение window/attempt-limit;
 - bulk assignment до 500 targets;
-- deduplication targets внутри bulk request;
-- admin list/detail/attempt statistics;
-- student visibility по direct user target или membership в external group.
+- deduplication targets;
+- admin list/detail/statistics;
+- student visibility по direct target или group claims.
 
-### 2.4 Attempts
+### 2.5 Attempts
 
-**Implemented:**
-
-- start attempt только для target-user/target-group;
-- проверка availability window;
-- database-safe attempt limit;
-- idempotent start по `(AssignmentId, UserId, StartRequestId)`;
-- snapshot question IDs при старте;
-- ответы только option IDs, принадлежащие revision/question;
-- ownership: пользователь не может работать с чужой попыткой;
-- deadline рассчитывается из immutable revision;
-- answer/clear/submit после deadline переводят attempt в timeout либо возвращают conflict согласно use case;
-- background expiration worker переводит просроченные `InProgress` attempts в `TimedOut` без пользовательского запроса;
-- terminal states: `Submitted` и `TimedOut`;
-- outcome: `Passed`/`Failed`;
+- target/availability/attempt-limit validation;
+- idempotent start;
+- deadline из revision snapshot;
+- answer/clear/submit;
+- ownership attempt;
+- background expiration;
+- `Submitted`/`TimedOut`;
+- `Passed`/`Failed`;
 - exact-set scoring;
-- reviewer result detail с correctness;
-- student result без раскрытия correctness.
+- reviewer correctness detail;
+- student-safe result без correct flags.
 
-### 2.5 Reporting/read side
+## 3. Persistence и consistency
 
-**Implemented:**
-
-- `/me/assignments`;
-- `/me/attempts`;
-- attempt detail/result;
-- reviewer result list с фильтрами test/revision/outcome;
-- reviewer detailed result с selected/correct answer breakdown;
-- admin assignment statistics;
-- pagination с нормализацией `page >= 1`, `pageSize = 1..100`.
-
-## 3. Реализованные технические возможности
-
-### Persistence
-
-- MariaDB **12.3** как runtime/CI baseline;
+- MariaDB **12.3** runtime/CI baseline;
 - EF Core 9.0.18 + Pomelo 9.0.0;
 - explicit migrations;
 - production `--migrate` mode;
-- optimistic concurrency через `ConcurrencyVersion` на aggregates;
-- `DbUpdateConcurrencyException -> ConcurrencyConflictException -> HTTP 409`;
-- normalized assignment target (`TargetType`, `TargetId`);
-- normalized mutable attempt responses;
-- JSON snapshot published revision.
+- startup migration разрешена только Development;
+- optimistic concurrency через `ConcurrencyVersion`;
+- `DbUpdateConcurrencyException -> ConcurrencyConflictException`;
+- normalized attempt responses;
+- immutable revision questions JSON snapshot;
+- distributed MariaDB advisory locks для common idempotency и Outbox.
 
-### Idempotency
+## 4. HTTP optimistic concurrency
 
-- persistent idempotency records;
-- MariaDB `GET_LOCK/RELEASE_LOCK` distributed lease;
-- publish, single assign, bulk assign и submit защищены common idempotency store;
-- start attempt защищён отдельным unique DB key и serializable attempt-limit transaction.
+Для mutable authoring resource `Test` реализован HTTP precondition contract.
 
-### Authentication/authorization
+`GET /api/v1/tests/{id}/editor`:
+
+- возвращает `ConcurrencyVersion`;
+- выставляет strong `ETag`, например `"3"`.
+
+Mutating endpoints существующего `Test` требуют `If-Match`:
+
+- rename/settings;
+- question/option CRUD/reorder;
+- publish;
+- archive.
+
+Semantics:
+
+- отсутствует `If-Match` -> `428 concurrency.precondition_required`;
+- malformed/weak/wildcard validator -> `400 concurrency.if_match`;
+- stale ETag -> `412 concurrency.precondition_failed`;
+- valid current ETag -> use case выполняется;
+- EF concurrency token остаётся финальным race guard между precondition check и commit.
+
+## 5. Idempotency
+
+### 5.1 HTTP contract
+
+Основной public contract — header:
+
+```text
+Idempotency-Key: <UUID>
+```
+
+Legacy body `idempotencyKey` временно поддерживается.
+
+Если оба заданы и различаются:
+
+```text
+400 idempotency.key_mismatch
+```
+
+### 5.2 Request fingerprint
+
+Persistent idempotency rows содержат SHA-256 fingerprint логического request payload.
+
+- одинаковый key + тот же request -> replay прежнего result;
+- одинаковый key + другой payload -> `409 idempotency.key_reused`;
+- historical rows с NULL fingerprint сохраняют compatibility replay;
+- publish operation resource-scoped по TestId.
+
+Fingerprint используется publish/single assignment/bulk assignment/submit. Start attempt дополнительно защищён DB unique key `(AssignmentId, UserId, StartRequestId)` и serializable attempt-limit transaction.
+
+## 6. Authentication/authorization
 
 - Keycloak JWT Bearer;
 - `MapInboundClaims=false`;
-- `sub` как primary external user ID;
-- `roles` как role claim;
-- `groups` поддерживаются как scalar или JSON array claims;
-- policies `tests:write`, `tests:publish`, `tests:assign`, `results:review`, `operations:read`.
+- `sub` — external identity;
+- `roles` — role claim;
+- `groups` — group membership;
+- policies `tests:write`, `tests:publish`, `tests:assign`, `results:review`, `operations:read`;
+- coarse role checks дополняются owner/attempt/assignment business authorization в Application/read side.
 
-### HTTP/runtime
+## 7. Production configuration & edge security
 
-- canonical API `/api/v1/*`;
-- compatibility rewrite старого `/api/*` в `/api/v1/*`;
-- OpenAPI `/openapi/v1.json`;
+Phase A реализована.
+
+### Fail-fast configuration
+
+Outside Development:
+
+- `ConnectionStrings:Database` обязателен;
+- startup migrations запрещены;
+- Keycloak config обязателен для HTTP host;
+- HTTPS metadata ожидается по умолчанию;
+- RabbitMQ config валидируется при enabled transport;
+- attempt expiration/outbox/rate limits валидируются;
+- HTTPS redirect/HSTS deployment decision должен быть явным.
+
+Migration-only `--migrate` не требует Keycloak/RabbitMQ.
+
+### Reverse proxy
+
+- ForwardedHeaders opt-in;
+- explicit `KnownProxies/KnownNetworks`;
+- ForwardLimit;
+- untrusted X-Forwarded-* игнорируется.
+
+### CORS/transport headers
+
+- CORS только explicit allow-list;
+- wildcard origin запрещён;
+- optional credentials;
+- configurable HTTPS redirect/HSTS;
+- Kestrel server header выключен;
+- security headers baseline: `nosniff`, `DENY`, `no-referrer`, Permissions-Policy, restrictive CSP.
+
+### Rate limiting
+
+Configuration-driven classes:
+
+- general;
+- student-write;
+- privileged-read;
+- operations.
+
+Partition key = authenticated `sub`, иначе trusted remote IP.
+
+### OpenAPI exposure
+
+- Development: enabled/public по умолчанию;
+- Production: disabled по умолчанию;
+- если Production OpenAPI включён с `AllowAnonymous=false`, требуется `operations:read`.
+
+## 8. Audit/correlation/observability
+
+- canonical `/api/v1/*` + legacy rewrite;
 - ProblemDetails;
-- global fixed-window rate limiter: 120 req/min на `sub`, fallback — remote IP;
 - `X-Correlation-ID`;
-- structured request logging;
-- durable audit trail для POST/PUT/PATCH/DELETE;
-- liveness/readiness endpoints.
-
-### Outbox/RabbitMQ
-
-- transactional Outbox infrastructure;
-- publish только для `IIntegrationEvent`;
-- at-least-once semantics;
-- RabbitMQ publisher confirms;
-- durable topic exchange;
-- persistent messages;
-- `EventId -> MessageId`;
-- retry/backoff/dead-letter;
-- MariaDB advisory lock на OutboxMessage;
-- operational outbox status endpoint;
-- RabbitMQ readiness when transport enabled.
-
-### Observability/deployment
-
-- OpenTelemetry traces/metrics;
-- ASP.NET Core, HttpClient, runtime instrumentation;
+- durable audit для state-changing HTTP methods без body/query/secrets;
+- OpenTelemetry ASP.NET Core/HttpClient/runtime;
 - optional OTLP exporter;
-- multi-stage Docker image;
-- Docker Compose: API + MariaDB 12.3 + RabbitMQ + Keycloak + migration job + OTEL collector;
-- GitHub Actions проверяет build/tests/Compose/image/production-image migration path.
+- `/health/live`;
+- `/health/ready` MariaDB + RabbitMQ при enabled transport.
 
-## 4. Критические текущие ограничения
+## 9. Events / Outbox / RabbitMQ
 
-Следующие пункты **не реализованы** и должны учитываться при проектировании клиентов/production deployment.
+- `IDomainEvent` — internal notification;
+- только explicit `IIntegrationEvent` сохраняется в Outbox;
+- RabbitMQ transport opt-in;
+- publisher confirms;
+- durable topic exchange/persistent messages;
+- EventId -> MessageId;
+- at-least-once delivery;
+- exponential retry/backoff;
+- dead-letter state;
+- MariaDB advisory lock per message;
+- operations Outbox monitoring endpoint;
+- RabbitMQ readiness.
 
-### 4.1 Нет ownership/tenant boundary для Test
+**Ограничение:** production business integration-event catalog ещё не определён. Готовность transport не означает автоматическую публикацию всех domain events.
 
-`Test` не хранит `CreatedBy/OwnerId`, а authoring handlers не проверяют владение. Роль `test-author` в текущем виде даёт доступ к общему authoring catalog и операциям над тестами по известному `TestId`.
+## 10. Deployment / CI
 
-Это допустимо только для доверенной единой author-группы. Для multi-team/multi-tenant эксплуатации требуется отдельная ownership-модель.
+- multi-stage production Docker image;
+- non-root runtime user;
+- Compose: API, MariaDB 12.3, RabbitMQ, Keycloak, migration container, OTEL Collector;
+- CI использует реальные MariaDB/RabbitMQ;
+- MariaDB 12.3 runtime assertion;
+- restore/build/tests;
+- high/critical NuGet vulnerability gate;
+- Compose validation;
+- production image build;
+- `--migrate` из production image.
 
-### 4.2 Integration transport готов, но production integration event contracts ещё не сформированы
+## 11. Главные оставшиеся ограничения
 
-Domain events (`TestPublished`, `TestAssigned`, `AttemptStarted`, `AttemptSubmitted`, `AttemptTimedOut` и др.) являются `IDomainEvent`, но не автоматически `IIntegrationEvent`. `AppDbContext` помещает в Outbox только события, явно реализующие `IIntegrationEvent`.
+### API contract maturity
 
-Следствие: наличие RabbitMQ transport не означает, что все domain events публикуются наружу.
+Следующий блок:
 
-### 4.3 Idempotency key пока находится в JSON body
+- normalization malformed UUID/enum/body/required/max-length errors;
+- richer OpenAPI metadata/examples/errors/headers;
+- formal v1 deprecation/lifecycle policy.
 
-Unsafe operations используют `Guid IdempotencyKey`/`RequestId` в request body. Стандартный HTTP `Idempotency-Key` header пока не является общим API contract.
+### Operational reliability
 
-### 4.4 Rate limit пока hard-coded
+Не завершены:
 
-Global limit — 120 requests/minute, queue limit 0. Нет конфигурируемых policy classes для auth, authoring, student answering, operational endpoints.
+- backup/restore automation и DR drill;
+- retention cleanup audit/idempotency/outbox;
+- dead-letter requeue/drop management;
+- SLO/alerts;
+- container/security scanning beyond NuGet audit;
+- load/capacity tests.
 
-### 4.5 Production configuration пока имеет development fallback
+### Identity/product breadth
 
-`ConnectionStrings:Database` имеет fallback `testapp/testapp` в `Program.cs`. Для production нужен fail-fast validation и исключение insecure fallback вне Development.
+Не реализованы:
 
-### 4.6 Multi-realm identity не реализована
+- multi-realm `(Issuer, Subject)`;
+- Workspace/multi-tenant model;
+- frontend application;
+- non-choice question types;
+- partial/custom scoring;
+- manual grading;
+- notification business events/consumers;
+- advanced analytics.
 
-В домене external user сейчас идентифицируется только Keycloak `sub`. Для нескольких issuers/realms требуется identity key `(Issuer, Subject)` или эквивалентная модель.
+## 12. Текущий архитектурный уровень
 
-### 4.7 Нет полноценного user-facing UI
+Проект уже является production-oriented modular monolith core, а не CRUD prototype: domain invariants, immutable revisions, owner isolation, HTTP/DB concurrency, distributed idempotency, real infrastructure tests, durable Outbox и deployment path реализованы.
 
-Репозиторий содержит backend API/runtime. Отдельный frontend application в текущей solution отсутствует.
-
-### 4.8 Question model ограничен choice-вопросами
-
-`QuestionType` содержит только:
-
-- `SingleChoice`;
-- `MultipleChoice`.
-
-Free-text, numeric, ordering, matching, file upload и manual grading отсутствуют.
-
-### 4.9 Scoring только exact-set
-
-Для MultipleChoice вопрос получает все points только при точном совпадении выбранного множества с correct set. Partial/negative/custom scoring отсутствует.
-
-### 4.10 Нет formal author/reviewer ownership rules
-
-`results:review` разрешён любой роли `test-author`/`test-admin`; filter по owner отсутствует.
-
-## 5. Технический долг, который не должен маскироваться новыми фичами
-
-- production fail-fast configuration/secrets;
-- trusted proxies/forwarded headers/TLS policy;
-- configurable rate limiting;
-- standard HTTP idempotency contract;
-- ownership/authorization model для tests/results;
-- OpenAPI descriptions/examples/version lifecycle;
-- explicit production integration event catalog;
-- migration model snapshot/standardized EF migration workflow;
-- retention policies для audit/idempotency/outbox;
-- backup/restore/DR runbook;
-- load/performance tests;
-- SLO/alerts dashboards;
-- dependency/security scanning в CI.
-
-## 6. Определение текущего архитектурного уровня
-
-Проект уже вышел за рамки CRUD-прототипа: присутствуют aggregate invariants, immutable revisions, application use cases, real DB concurrency, distributed idempotency, integration tests на реальных инфраструктурных сервисах и production-oriented runtime path.
-
-При этом до production-ready 1.0 остаются прежде всего **security/ownership/configuration/operational** вопросы, а не необходимость в микросервисах или новой инфраструктурной сложности.
+До 1.0 остаются прежде всего **API contract maturity и operational reliability**, после чего можно безопасно расширять authoring/assessment capabilities без возврата к фундаментальным security/data-isolation переделкам.
