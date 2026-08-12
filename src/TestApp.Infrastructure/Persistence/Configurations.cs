@@ -17,6 +17,7 @@ public sealed class TestConfiguration : IEntityTypeConfiguration<Test>
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasConversion(x => x.Value, x => new TestId(x));
         b.Property(x => x.Title).HasMaxLength(300).IsRequired();
+        b.Property(x => x.OwnerId).HasConversion(x => x.Value, x => new ExternalUserId(x)).HasMaxLength(256).IsRequired();
         b.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
         b.OwnsOne(x => x.Settings, s =>
         {
@@ -41,6 +42,7 @@ public sealed class TestConfiguration : IEntityTypeConfiguration<Test>
             });
         });
         b.Ignore(x => x.DomainEvents);
+        b.HasIndex(x => new { x.OwnerId, x.Status });
     }
 }
 
