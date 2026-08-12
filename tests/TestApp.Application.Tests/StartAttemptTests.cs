@@ -14,6 +14,36 @@ public sealed class StartAttemptTests
     [Fact]
     public async Task Group_assignment_allows_group_member()
     {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+
+        var result = await fixture.Handler.Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Match(_ => true, _ => false));
+        Assert.NotNull(fixture.Attempts.Value);
+        Assert.Equal(fixture.Revision.Id, fixture.Attempts.Value!.RevisionId);
+        Assert.Equal(requestId, fixture.Attempts.Value.StartRequestId);
+        Assert.Single(fixture.Attempts.Value.Responses);
+    }
+
+    [Fact]
+    public async Task Same_idempotency_key_returns_same_attempt()
+    {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+
+        var first = await fixture.Handler.Handle(new StartAttemptCommand(fixture.Assignment.Id, requestId), TestContext.Current.CancellationToken);
+        var second = await fixture.Handler.Handle(new StartAttemptCommand(fixture.Assignment.Id, requestId), TestContext.Current.CancellationToken);
+
+        var firstId = first.Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
+        var secondId = second.Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
+        Assert.Equal(firstId, secondId);
+    }
+
+    private static Fixture CreateFixture()
+    {
         var now = DateTimeOffset.Parse("2026-08-10T12:00:00Z");
         var group = ExternalGroupId.FromExternalId("students");
         var userId = ExternalUserId.FromSubject("user-1");
@@ -25,30 +55,16 @@ public sealed class StartAttemptTests
         test.Publish(now);
         var revision = PublishedTestRevision.From(test, PublishedTestRevisionId.New(), 1, now);
         var assignment = TestAssignment.Create(
-            TestAssignmentId.New(),
-            revision.Id,
-            new AssignmentTarget.Group(group),
-            userId,
-            now,
-            now.AddHours(-1),
-            now.AddHours(1),
-            1);
-        var assignments = new AssignmentRepo(assignment);
+            TestAssignmentId.New(), revision.Id, new AssignmentTarget.Group(group), userId,
+            now, now.AddHours(-1), now.AddHours(1), 1);
         var attempts = new AttemptRepo();
         var handler = new StartAttemptCommandHandler(
-            assignments,
-            attempts,
-            new RevisionRepo(revision),
-            new Actor(userId, new HashSet<ExternalGroupId> { group }),
-            new Clock(now));
-
-        var result = await handler.Handle(new StartAttemptCommand(assignment.Id), TestContext.Current.CancellationToken);
-
-        Assert.True(result.Match(_ => true, _ => false));
-        Assert.NotNull(attempts.Value);
-        Assert.Equal(revision.Id, attempts.Value!.RevisionId);
-        Assert.Single(attempts.Value.Responses);
+            new AssignmentRepo(assignment), attempts, new RevisionRepo(revision),
+            new Actor(userId, new HashSet<ExternalGroupId> { group }), new Clock(now));
+        return new Fixture(assignment, revision, attempts, handler);
     }
+
+    private sealed record Fixture(TestAssignment Assignment, PublishedTestRevision Revision, AttemptRepo Attempts, StartAttemptCommandHandler Handler);
 
     private sealed class AssignmentRepo(TestAssignment value) : ITestAssignmentRepository
     {
@@ -61,17 +77,15 @@ public sealed class StartAttemptTests
         public TestAttempt? Value;
         public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) => Task.FromResult(Value?.Id == id ? Value : null);
         public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) => Task.FromResult(Value is null ? 0 : 1);
-        public Task AddAsync(TestAttempt attempt, CancellationToken ct = default)
+        public Task AddAsync(TestAttempt attempt, CancellationToken ct = default) { Value = attempt; return Task.CompletedTask; }
+        public Task<TestAttemptId?> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
         {
-            Value = attempt;
-            return Task.CompletedTask;
-        }
-        public Task<bool> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
-        {
+            if (Value is not null && Value.AssignmentId == attempt.AssignmentId && Value.UserId == attempt.UserId && Value.StartRequestId == attempt.StartRequestId)
+                return Task.FromResult<TestAttemptId?>(Value.Id);
             if (attemptLimit is { } limit && Value is not null && limit <= 1)
-                return Task.FromResult(false);
+                return Task.FromResult<TestAttemptId?>(null);
             Value = attempt;
-            return Task.FromResult(true);
+            return Task.FromResult<TestAttemptId?>(attempt.Id);
         }
     }
 
