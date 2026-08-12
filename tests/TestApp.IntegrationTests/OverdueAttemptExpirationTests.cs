@@ -22,7 +22,7 @@ public sealed class OverdueAttemptExpirationTests
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await MariaDbTestDatabase.CreateAsync(ct);
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.Parse("2026-08-12T14:00:00Z");
 
         var test = Test.Create("Expiration test");
         _ = test.ChangeSettings(50m, 1);
@@ -70,7 +70,7 @@ public sealed class OverdueAttemptExpirationTests
         services.AddScoped<IPublishedTestRevisionRepository, PublishedTestRevisionRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ExpireAttemptCommandHandler>();
-        services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IClock>(new FixedClock(now));
 
         await using var provider = services.BuildServiceProvider();
         var processor = new OverdueAttemptProcessor(
@@ -100,4 +100,6 @@ public sealed class OverdueAttemptExpirationTests
             ct);
         Assert.Contains(attempt.Id.Value.ToString(), outbox.Payload, StringComparison.OrdinalIgnoreCase);
     }
+
+    private sealed record FixedClock(DateTimeOffset UtcNow) : IClock;
 }
