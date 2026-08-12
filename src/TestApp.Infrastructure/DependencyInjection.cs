@@ -10,6 +10,7 @@ using TestApp.Application.Attempts;
 using TestApp.Application.Queries;
 using TestApp.Infrastructure.Attempts;
 using TestApp.Infrastructure.Identity;
+using TestApp.Infrastructure.Observability;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
 
@@ -38,10 +39,12 @@ public static class DependencyInjection
         services.AddScoped<OperationalRetentionCleaner>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<OperationalMetrics>();
         services.Configure<AttemptExpirationOptions>(_ => { });
         services.AddSingleton<IConfigureOptions<OperationalRetentionOptions>, OperationalRetentionOptionsSetup>();
         services.AddHostedService<OverdueAttemptProcessor>();
         services.AddHostedService<OperationalRetentionWorker>();
+        services.AddHostedService<OperationalMetricsSampler>();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
         services.AddSingleton<IStartupFilter, HealthEndpointStartupFilter>();
@@ -109,6 +112,7 @@ public static class DependencyInjection
         telemetry.WithMetrics(metrics =>
         {
             metrics
+                .AddMeter(OperationalMetrics.MeterName)
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation();
