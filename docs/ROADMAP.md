@@ -41,7 +41,6 @@ correctness & data isolation
 - distributed idempotency;
 - Minimal API `/api/v1` + legacy rewrite;
 - Keycloak roles/groups;
-- rate limiting baseline;
 - audit/correlation;
 - transactional Outbox;
 - RabbitMQ transport + confirms/retry/dead-letter/readiness;
@@ -50,7 +49,7 @@ correctness & data isolation
 - production migration-only image path;
 - real MariaDB/RabbitMQ CI integration tests.
 
-**Exit gate:** current full CI green on MariaDB 12.3.
+**Exit gate:** full CI green on MariaDB 12.3.
 
 ---
 
@@ -58,66 +57,25 @@ correctness & data isolation
 
 ### Target band: `0.9.0`
 ### Priority: P0
+### Status: **DONE**
 ### Goal: безопасный запуск API вне developer machine.
 
-## A1. Fail-fast configuration
+Реализовано:
 
-Реализовать typed/validated options для:
+- typed/validated runtime configuration для Database, Keycloak, RabbitMQ, Outbox, attempt expiration, rate limiting, OpenAPI, CORS, transport security и reverse proxy;
+- production DB fallback удалён; Development fallback остаётся только в Development;
+- Production запрещает `Database:ApplyMigrationsOnStartup=true`, migrations выполняются через `--migrate`;
+- trusted `ForwardedHeaders` только через configured `KnownProxies/KnownNetworks`;
+- deterministic tests: untrusted forwarded headers игнорируются;
+- explicit Production HTTPS redirect/HSTS decision;
+- CORS allow-list, wildcard origin запрещён;
+- secure response headers (`nosniff`, frame deny, referrer/permissions/CSP baseline);
+- Kestrel server header отключён;
+- rate limit classes: general, student-write, privileged-read, operations;
+- production OpenAPI disabled by default, при включении может быть admin-only;
+- high/critical NuGet vulnerability audit является CI gate (`NU1903/NU1904`).
 
-- Database;
-- Keycloak;
-- RabbitMQ;
-- rate limits;
-- attempt expiration;
-- Outbox delivery;
-- OpenAPI exposure.
-
-Удалить production fallback credentials.
-
-**Acceptance:** Production host не стартует с отсутствующей/невалидной critical config; Development сохраняет удобный local default только явно.
-
-## A2. Trusted reverse proxy
-
-Добавить:
-
-- ForwardedHeaders;
-- `KnownProxies/KnownNetworks` configuration;
-- корректный scheme/client IP;
-- tests для spoofed/untrusted forwarded headers.
-
-**Acceptance:** rate-limit IP partition и HTTPS awareness используют только trusted proxy data.
-
-## A3. TLS/HSTS/CORS/security headers
-
-Определить deployment model:
-
-- TLS termination ingress vs Kestrel;
-- HSTS;
-- HTTPS redirect policy;
-- CORS allow-list;
-- secure header baseline.
-
-**Acceptance:** explicit Production policy, отсутствие wildcard CORS по умолчанию.
-
-## A4. Configurable rate limiting
-
-Разделить минимум:
-
-- general reads;
-- student writes/answers;
-- expensive admin/reviewer queries;
-- operations endpoints.
-
-**Acceptance:** limits configuration-driven, deterministic 429 tests.
-
-## A5. Production OpenAPI policy
-
-Сделать configuration-driven:
-
-- enabled/disabled;
-- anonymous/internal authorization strategy.
-
-**Exit gate Phase A:** security config tests + production image startup/migration smoke.
+**Exit gate: PASSED** — configuration/security tests, boundary E2E, production image и migration smoke зелёные.
 
 ---
 
@@ -125,49 +83,32 @@ correctness & data isolation
 
 ### Target band: `0.9.1`
 ### Priority: P0
+### Status: **DONE**
 ### Goal: исключить cross-author data access.
 
-## B1. Ownership decision
-
-Минимальный вариант:
+Принято решение для текущего single-organization этапа:
 
 ```text
-Test.CreatedBy / OwnerId
+Test.OwnerId = Keycloak sub создавшего автора
 ```
 
-Рекомендуемый эволюционный вариант:
+Workspace остаётся эволюционным следующим шагом, а не обязательной сложностью текущей версии.
 
-```text
-Workspace
-WorkspaceMembership
-Test.WorkspaceId
-```
+Реализовано:
 
-Если product пока single-workspace, можно начать `OwnerId` с migration path к Workspace.
+- `Test.OwnerId` — обязательный immutable owner;
+- новый test получает `OwnerId` из `ICurrentActor.UserId`;
+- authoring commands, publish/archive проверяют ownership в Application;
+- catalog/editor/revision/reviewer list/reviewer detail фильтруются по owner на SQL-side;
+- `test-admin` сохраняет global scope;
+- reviewer DTO с `IsCorrect` не доступен чужому author;
+- migration `TestOwnership` backfill-ит существующие записи owner `__legacy_admin_only__`, затем удаляет DB default;
+- индекс `(OwnerId, Status)`;
+- cross-author E2E: author A не видит и не изменяет test/result author B; admin видит оба.
 
-## B2. Authoring ownership enforcement
+Assignment administration остаётся global `test-admin` policy до появления Workspace scope.
 
-Защитить:
-
-- catalog;
-- editor;
-- rename/settings/questions/options;
-- publish/archive;
-- revision list.
-
-## B3. Reviewer ownership enforcement
-
-`test-author` видит результаты только тестов, которые ему разрешены. `test-admin` может иметь global scope согласно policy.
-
-## B4. Assignment permissions
-
-Определить, может ли admin назначать любой revision или только workspace scope.
-
-## B5. Ownership migration
-
-Existing tests должны получить deterministic owner/admin ownership через explicit migration/backfill policy, не nullable forever.
-
-**Exit gate:** negative E2E между двумя authors + SQL-side visibility filters + migration test.
+**Exit gate: PASSED** — two-author negative E2E, SQL filters и production migration зелёные.
 
 ---
 
@@ -175,26 +116,43 @@ Existing tests должны получить deterministic owner/admin ownership
 
 ### Target band: `0.9.2`
 ### Priority: P0/P1
+### Status: **IN PROGRESS**
 
 ## C1. Standard `Idempotency-Key`
 
-Перенести public retry contract из JSON body в HTTP header.
+**Status: DONE.**
 
-Требуется:
+Реализовано:
 
-- header validation;
-- body compatibility window;
-- request fingerprint;
-- key reuse с другим payload -> 409/422 explicit error;
-- response replay semantics.
+- `Idempotency-Key` header — основной HTTP retry contract;
+- legacy body `idempotencyKey` временно поддерживается;
+- если header и body заданы и не совпадают -> `400 idempotency.key_mismatch`;
+- canonical SHA-256 request fingerprint вычисляется в Application из логических полей команды;
+- fingerprint хранится в `idempotency_records.RequestFingerprint`;
+- один key + другой payload -> `409 idempotency.key_reused`;
+- старые records с `RequestFingerprint = NULL` сохраняют replay compatibility;
+- header-only replay и fingerprint mismatch покрыты MariaDB/API E2E;
+- publish operation дополнительно resource-scoped по TestId.
 
 ## C2. HTTP optimistic concurrency contract
 
-Добавить ETag/version exposure и `If-Match` для mutable resources.
+**Status: DONE.**
 
-Цель: conflict можно предотвращать/объяснять на HTTP уровне, а не только generic 409 после EF exception.
+Реализовано для mutable `Test` authoring:
+
+- editor DTO содержит `ConcurrencyVersion`;
+- `GET /api/v1/tests/{id}/editor` возвращает strong `ETag: "N"`;
+- изменения существующего `Test` требуют `If-Match`;
+- отсутствующий `If-Match` -> `428 concurrency.precondition_required`;
+- weak/wildcard/invalid validator -> `400 concurrency.if_match`;
+- stale strong ETag -> `412 concurrency.precondition_failed`;
+- application handlers проверяют expected aggregate version до mutation;
+- EF Core concurrency token остаётся последней защитой от race между precondition check и commit;
+- ETag/If-Match regression E2E покрывает fresh/stale/missing/invalid validators.
 
 ## C3. Validation normalization
+
+**Status: NEXT.**
 
 Единый transport validation strategy:
 
@@ -202,7 +160,8 @@ Existing tests должны получить deterministic owner/admin ownership
 - required fields;
 - max lengths;
 - body model validation;
-- stable error codes.
+- stable error codes;
+- generic framework binding errors не должны становиться нестабильным публичным контрактом.
 
 ## C4. OpenAPI quality
 
@@ -213,7 +172,7 @@ Existing tests должны получить deterministic owner/admin ownership
 - auth requirements;
 - ProblemDetails schemas;
 - pagination schemas;
-- idempotency header;
+- `Idempotency-Key`/`If-Match`/`ETag` metadata;
 - enum documentation;
 - deprecation metadata.
 
@@ -226,7 +185,7 @@ Existing tests должны получить deterministic owner/admin ownership
 - retirement legacy `/api/*` rewrite;
 - breaking-change rules.
 
-**Exit gate:** generated OpenAPI contract snapshot + boundary E2E.
+**Exit gate Phase C:** generated OpenAPI contract snapshot + full boundary E2E.
 
 ---
 
@@ -277,7 +236,12 @@ Admin command/API:
 
 ## D5. Dependency/security CI
 
-- NuGet vulnerability gate;
+Уже реализовано:
+
+- high/critical NuGet vulnerability gate.
+
+Остаётся:
+
 - container image scanning;
 - secret scanning;
 - SBOM/artifact metadata.
