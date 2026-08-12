@@ -17,9 +17,7 @@ public sealed class PersistenceBehaviorTests
     {
         await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         await using var db = database.CreateContext();
-
         await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
-
         var pending = await db.Database.GetPendingMigrationsAsync(TestContext.Current.CancellationToken);
         Assert.Empty(pending);
     }
@@ -138,6 +136,7 @@ public sealed class PersistenceBehaviorTests
         var actor = ExternalUserId.FromSubject("admin-1");
         var requestId = Guid.NewGuid();
         const string operation = "tests.publish";
+        var fingerprint = IdempotencyFingerprint.Create("same-request");
         var expected = PublishedTestRevisionId.New();
         Task<IAsyncDisposable> competingAcquire;
 
@@ -147,13 +146,35 @@ public sealed class PersistenceBehaviorTests
             await Task.Delay(150, ct);
             Assert.False(competingAcquire.IsCompleted);
 
-            await firstStore.AddResultAsync(operation, actor, requestId, expected, DateTimeOffset.UtcNow, ct);
+            await firstStore.AddResultAsync(operation, actor, requestId, fingerprint, expected, DateTimeOffset.UtcNow, ct);
             await firstDb.SaveChangesAsync(ct);
         }
 
         await using var secondLease = await competingAcquire;
-        var observed = await secondStore.GetResultAsync<PublishedTestRevisionId>(operation, actor, requestId, ct);
-
+        var observed = await secondStore.GetResultAsync<PublishedTestRevisionId>(operation, actor, requestId, fingerprint, ct);
         Assert.Equal(expected, observed);
+    }
+
+    [Fact]
+    public async Task Reusing_idempotency_key_with_different_fingerprint_is_rejected()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var db = database.CreateContext();
+        await db.Database.MigrateAsync(ct);
+
+        var store = new IdempotencyStore(db);
+        var actor = ExternalUserId.FromSubject("admin-1");
+        var requestId = Guid.NewGuid();
+        const string operation = "assignments.create";
+        var originalFingerprint = IdempotencyFingerprint.Create("request-a");
+        var differentFingerprint = IdempotencyFingerprint.Create("request-b");
+        var result = TestAssignmentId.New();
+
+        await store.AddResultAsync(operation, actor, requestId, originalFingerprint, result, DateTimeOffset.UtcNow, ct);
+        await db.SaveChangesAsync(ct);
+
+        await Assert.ThrowsAsync<IdempotencyKeyReuseException>(() =>
+            store.GetResultAsync<TestAssignmentId>(operation, actor, requestId, differentFingerprint, ct));
     }
 }
