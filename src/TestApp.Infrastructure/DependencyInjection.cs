@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TestApp.Application.Abstractions;
@@ -27,6 +28,7 @@ public static class DependencyInjection
         services.AddSingleton<IOutboxPublisher, NullOutboxPublisher>();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
+        services.AddSingleton<IStartupFilter, HealthEndpointStartupFilter>();
         services.AddHostedService<OutboxProcessor>();
         return services;
     }
