@@ -37,7 +37,7 @@ mysql_exec() {
   local sql="$2"
   local args=(
     --rm --network host
-    -e "MARIADB_PWD=$MARIADB_ADMIN_PASSWORD"
+    -e "MYSQL_PWD=$MARIADB_ADMIN_PASSWORD"
     "$MARIADB_IMAGE"
     mariadb
     --host="$MARIADB_HOST"
@@ -60,7 +60,7 @@ mysql_exec "" "DROP DATABASE IF EXISTS \`$target\`; CREATE DATABASE \`$target\` 
 
 echo "Restoring '$backup' into disposable database '$target'..."
 gunzip -c "$backup" | docker run --rm -i --network host \
-  -e MARIADB_PWD="$MARIADB_ADMIN_PASSWORD" \
+  -e MYSQL_PWD="$MARIADB_ADMIN_PASSWORD" \
   "$MARIADB_IMAGE" \
   mariadb \
     --host="$MARIADB_HOST" \
