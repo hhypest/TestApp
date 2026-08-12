@@ -1,3 +1,4 @@
+using TestApp.Application.Abstractions;
 using TestApp.Domain.Assignments;
 using TestApp.Domain.Attempts;
 using TestApp.Domain.Identity;
@@ -125,11 +126,11 @@ public sealed record GetAttemptResultQuery(TestAttemptId AttemptId) : IQuery<Att
 
 public interface IReadModelQueries
 {
-    Task<TestEditorView?> GetTestEditorViewAsync(TestId testId, CancellationToken ct);
+    Task<TestEditorView?> GetTestEditorViewAsync(TestId testId, ExternalUserId? ownerId, CancellationToken ct);
     Task<PagedResult<AssignmentSummary>> GetAssignmentsAsync(ExternalUserId userId, IReadOnlySet<ExternalGroupId> groups, int page, int pageSize, AssignmentStatus? status, CancellationToken ct);
     Task<PagedResult<AttemptSummary>> GetAttemptsAsync(ExternalUserId userId, int page, int pageSize, AttemptStatus? status, CancellationToken ct);
-    Task<PagedResult<ReviewerResultSummary>> GetReviewerResultsAsync(TestId? testId, PublishedTestRevisionId? revisionId, AttemptOutcome? outcome, int page, int pageSize, CancellationToken ct);
-    Task<ReviewerAttemptResultView?> GetReviewerAttemptResultAsync(TestAttemptId attemptId, CancellationToken ct);
+    Task<PagedResult<ReviewerResultSummary>> GetReviewerResultsAsync(TestId? testId, PublishedTestRevisionId? revisionId, AttemptOutcome? outcome, ExternalUserId? ownerId, int page, int pageSize, CancellationToken ct);
+    Task<ReviewerAttemptResultView?> GetReviewerAttemptResultAsync(TestAttemptId attemptId, ExternalUserId? ownerId, CancellationToken ct);
     Task<AttemptView?> GetAttemptAsync(TestAttemptId attemptId, ExternalUserId userId, CancellationToken ct);
     Task<AttemptResultView?> GetAttemptResultAsync(TestAttemptId attemptId, ExternalUserId userId, CancellationToken ct);
 }
@@ -140,13 +141,20 @@ internal static class Paging
         (Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
 }
 
-public sealed class GetTestEditorViewQueryHandler(IReadModelQueries queries)
-    : IQueryHandler<GetTestEditorViewQuery, TestEditorView?>
+internal static class AuthorReadScope
 {
-    public Task<TestEditorView?> Handle(GetTestEditorViewQuery query, CancellationToken ct) => queries.GetTestEditorViewAsync(query.TestId, ct);
+    public static ExternalUserId? OwnerFilter(ICurrentActor actor) =>
+        actor.Roles.Any(x => string.Equals(x, "test-admin", StringComparison.OrdinalIgnoreCase)) ? null : actor.UserId;
 }
 
-public sealed class GetMyAssignmentsQueryHandler(IReadModelQueries queries, TestApp.Application.Abstractions.ICurrentActor actor)
+public sealed class GetTestEditorViewQueryHandler(IReadModelQueries queries, ICurrentActor actor)
+    : IQueryHandler<GetTestEditorViewQuery, TestEditorView?>
+{
+    public Task<TestEditorView?> Handle(GetTestEditorViewQuery query, CancellationToken ct) =>
+        queries.GetTestEditorViewAsync(query.TestId, AuthorReadScope.OwnerFilter(actor), ct);
+}
+
+public sealed class GetMyAssignmentsQueryHandler(IReadModelQueries queries, ICurrentActor actor)
     : IQueryHandler<GetMyAssignmentsQuery, PagedResult<AssignmentSummary>>
 {
     public Task<PagedResult<AssignmentSummary>> Handle(GetMyAssignmentsQuery query, CancellationToken ct)
@@ -156,7 +164,7 @@ public sealed class GetMyAssignmentsQueryHandler(IReadModelQueries queries, Test
     }
 }
 
-public sealed class GetMyAttemptsQueryHandler(IReadModelQueries queries, TestApp.Application.Abstractions.ICurrentActor actor)
+public sealed class GetMyAttemptsQueryHandler(IReadModelQueries queries, ICurrentActor actor)
     : IQueryHandler<GetMyAttemptsQuery, PagedResult<AttemptSummary>>
 {
     public Task<PagedResult<AttemptSummary>> Handle(GetMyAttemptsQuery query, CancellationToken ct)
@@ -166,30 +174,30 @@ public sealed class GetMyAttemptsQueryHandler(IReadModelQueries queries, TestApp
     }
 }
 
-public sealed class GetReviewerResultsQueryHandler(IReadModelQueries queries)
+public sealed class GetReviewerResultsQueryHandler(IReadModelQueries queries, ICurrentActor actor)
     : IQueryHandler<GetReviewerResultsQuery, PagedResult<ReviewerResultSummary>>
 {
     public Task<PagedResult<ReviewerResultSummary>> Handle(GetReviewerResultsQuery query, CancellationToken ct)
     {
         var (page, size) = Paging.Normalize(query.Page, query.PageSize);
-        return queries.GetReviewerResultsAsync(query.TestId, query.RevisionId, query.Outcome, page, size, ct);
+        return queries.GetReviewerResultsAsync(query.TestId, query.RevisionId, query.Outcome, AuthorReadScope.OwnerFilter(actor), page, size, ct);
     }
 }
 
-public sealed class GetReviewerAttemptResultQueryHandler(IReadModelQueries queries)
+public sealed class GetReviewerAttemptResultQueryHandler(IReadModelQueries queries, ICurrentActor actor)
     : IQueryHandler<GetReviewerAttemptResultQuery, ReviewerAttemptResultView?>
 {
     public Task<ReviewerAttemptResultView?> Handle(GetReviewerAttemptResultQuery query, CancellationToken ct) =>
-        queries.GetReviewerAttemptResultAsync(query.AttemptId, ct);
+        queries.GetReviewerAttemptResultAsync(query.AttemptId, AuthorReadScope.OwnerFilter(actor), ct);
 }
 
-public sealed class GetAttemptQueryHandler(IReadModelQueries queries, TestApp.Application.Abstractions.ICurrentActor actor)
+public sealed class GetAttemptQueryHandler(IReadModelQueries queries, ICurrentActor actor)
     : IQueryHandler<GetAttemptQuery, AttemptView?>
 {
     public Task<AttemptView?> Handle(GetAttemptQuery query, CancellationToken ct) => queries.GetAttemptAsync(query.AttemptId, actor.UserId, ct);
 }
 
-public sealed class GetAttemptResultQueryHandler(IReadModelQueries queries, TestApp.Application.Abstractions.ICurrentActor actor)
+public sealed class GetAttemptResultQueryHandler(IReadModelQueries queries, ICurrentActor actor)
     : IQueryHandler<GetAttemptResultQuery, AttemptResultView?>
 {
     public Task<AttemptResultView?> Handle(GetAttemptResultQuery query, CancellationToken ct) => queries.GetAttemptResultAsync(query.AttemptId, actor.UserId, ct);
