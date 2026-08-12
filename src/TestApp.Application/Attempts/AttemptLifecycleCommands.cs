@@ -9,15 +9,12 @@ namespace TestApp.Application.Attempts;
 
 public sealed record AnswerQuestionCommand(TestAttemptId AttemptId, QuestionId QuestionId, IReadOnlyCollection<AnswerOptionId> OptionIds)
     : ICommand<Result<TestAttemptId, Error>>;
-
 public sealed record ClearAnswerCommand(TestAttemptId AttemptId, QuestionId QuestionId)
     : ICommand<Result<TestAttemptId, Error>>;
-
 public sealed record SubmitAttemptCommand(TestAttemptId AttemptId)
     : ICommand<Result<AttemptScore, Error>>;
-
 public sealed record TimeoutAttemptCommand(TestAttemptId AttemptId)
-    : ICommand<Result<TestAttemptId, Error>>;
+    : ICommand<Result<AttemptScore, Error>>;
 
 public sealed class AnswerQuestionCommandHandler(
     ITestAttemptRepository attempts,
@@ -32,18 +29,23 @@ public sealed class AnswerQuestionCommandHandler(
         var attempt = await attempts.GetAsync(command.AttemptId, ct);
         if (attempt is null) return Error.NotFound("attempt.not_found", "Attempt was not found.");
         if (attempt.UserId != actor.UserId) return Error.Forbidden("attempt.forbidden", "Attempt belongs to another user.");
-
         var revision = await revisions.GetAsync(attempt.RevisionId, ct);
         if (revision is null) return Error.NotFound("revision.not_found", "Published test revision was not found.");
-
+        var now = clock.UtcNow;
+        if (attempt.IsExpiredAt(now))
+        {
+            var score = revision.CalculateScore(attempt.Responses);
+            var timedOut = attempt.Timeout(now, score, revision.IsPassed(score));
+            var timeoutError = timedOut.Match<Error?>(_ => null, e => e.ToApplicationError());
+            if (timeoutError is null) await unitOfWork.SaveChangesAsync(ct);
+            return Error.Conflict("attempt.expired", "The attempt deadline has expired.");
+        }
         var validation = revision.ValidateAnswer(command.QuestionId, command.OptionIds);
         var validationError = validation.Match<Error?>(_ => null, error => error.ToApplicationError());
         if (validationError is not null) return validationError;
-
-        var result = attempt.Answer(command.QuestionId, command.OptionIds, clock.UtcNow);
+        var result = attempt.Answer(command.QuestionId, command.OptionIds, now);
         var error = result.Match<Error?>(_ => null, e => e.ToApplicationError());
         if (error is not null) return error;
-
         await unitOfWork.SaveChangesAsync(ct);
         return attempt.Id;
     }
@@ -51,7 +53,9 @@ public sealed class AnswerQuestionCommandHandler(
 
 public sealed class ClearAnswerCommandHandler(
     ITestAttemptRepository attempts,
+    IPublishedTestRevisionRepository revisions,
     ICurrentActor actor,
+    IClock clock,
     IUnitOfWork unitOfWork)
     : ICommandHandler<ClearAnswerCommand, Result<TestAttemptId, Error>>
 {
@@ -60,11 +64,19 @@ public sealed class ClearAnswerCommandHandler(
         var attempt = await attempts.GetAsync(command.AttemptId, ct);
         if (attempt is null) return Error.NotFound("attempt.not_found", "Attempt was not found.");
         if (attempt.UserId != actor.UserId) return Error.Forbidden("attempt.forbidden", "Attempt belongs to another user.");
-
-        var result = attempt.ClearAnswer(command.QuestionId);
+        var now = clock.UtcNow;
+        if (attempt.IsExpiredAt(now))
+        {
+            var revision = await revisions.GetAsync(attempt.RevisionId, ct);
+            if (revision is null) return Error.NotFound("revision.not_found", "Published test revision was not found.");
+            var score = revision.CalculateScore(attempt.Responses);
+            var timedOut = attempt.Timeout(now, score, revision.IsPassed(score));
+            if (timedOut.Match(_ => true, _ => false)) await unitOfWork.SaveChangesAsync(ct);
+            return Error.Conflict("attempt.expired", "The attempt deadline has expired.");
+        }
+        var result = attempt.ClearAnswer(command.QuestionId, now);
         var error = result.Match<Error?>(_ => null, e => e.ToApplicationError());
         if (error is not null) return error;
-
         await unitOfWork.SaveChangesAsync(ct);
         return attempt.Id;
     }
@@ -83,15 +95,15 @@ public sealed class SubmitAttemptCommandHandler(
         var attempt = await attempts.GetAsync(command.AttemptId, ct);
         if (attempt is null) return Error.NotFound("attempt.not_found", "Attempt was not found.");
         if (attempt.UserId != actor.UserId) return Error.Forbidden("attempt.forbidden", "Attempt belongs to another user.");
-
         var revision = await revisions.GetAsync(attempt.RevisionId, ct);
         if (revision is null) return Error.NotFound("revision.not_found", "Published test revision was not found.");
-
+        var now = clock.UtcNow;
         var score = revision.CalculateScore(attempt.Responses);
-        var result = attempt.Submit(clock.UtcNow, score);
+        var result = attempt.IsExpiredAt(now)
+            ? attempt.Timeout(now, score, revision.IsPassed(score))
+            : attempt.Submit(now, score, revision.IsPassed(score));
         var error = result.Match<Error?>(_ => null, e => e.ToApplicationError());
         if (error is not null) return error;
-
         await unitOfWork.SaveChangesAsync(ct);
         return score;
     }
@@ -99,20 +111,22 @@ public sealed class SubmitAttemptCommandHandler(
 
 public sealed class TimeoutAttemptCommandHandler(
     ITestAttemptRepository attempts,
+    IPublishedTestRevisionRepository revisions,
     IClock clock,
     IUnitOfWork unitOfWork)
-    : ICommandHandler<TimeoutAttemptCommand, Result<TestAttemptId, Error>>
+    : ICommandHandler<TimeoutAttemptCommand, Result<AttemptScore, Error>>
 {
-    public async Task<Result<TestAttemptId, Error>> Handle(TimeoutAttemptCommand command, CancellationToken ct)
+    public async Task<Result<AttemptScore, Error>> Handle(TimeoutAttemptCommand command, CancellationToken ct)
     {
         var attempt = await attempts.GetAsync(command.AttemptId, ct);
         if (attempt is null) return Error.NotFound("attempt.not_found", "Attempt was not found.");
-
-        var result = attempt.Timeout(clock.UtcNow);
+        var revision = await revisions.GetAsync(attempt.RevisionId, ct);
+        if (revision is null) return Error.NotFound("revision.not_found", "Published test revision was not found.");
+        var score = revision.CalculateScore(attempt.Responses);
+        var result = attempt.Timeout(clock.UtcNow, score, revision.IsPassed(score));
         var error = result.Match<Error?>(_ => null, e => e.ToApplicationError());
         if (error is not null) return error;
-
         await unitOfWork.SaveChangesAsync(ct);
-        return attempt.Id;
+        return score;
     }
 }
