@@ -1,0 +1,187 @@
+name: performance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - beta-ddd
+    paths:
+      - "src/**"
+      - "performance/**"
+      - "deploy/**"
+      - "Dockerfile"
+      - "compose.yaml"
+      - ".github/workflows/performance.yml"
+  pull_request:
+    branches:
+      - beta-ddd
+    paths:
+      - "src/**"
+      - "performance/**"
+      - "deploy/**"
+      - "Dockerfile"
+      - "compose.yaml"
+      - ".github/workflows/performance.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capacity-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start production-shaped stack
+        run: >-
+          docker compose
+          -f compose.yaml
+          -f performance/compose.performance.yaml
+          up -d --build api
+
+      - name: Wait for Keycloak and API readiness
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://localhost:8081/realms/testapp/.well-known/openid-configuration >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Keycloak did not become ready" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://localhost:8080/health/ready >/dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "API did not become ready" >&2
+              docker compose -f compose.yaml -f performance/compose.performance.yaml logs api
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Run authenticated API capacity scenarios
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/performance
+          docker run --rm --network host \
+            -e BASE_URL=http://localhost:8080 \
+            -e KEYCLOAK_URL=http://localhost:8081 \
+            -e KEYCLOAK_CLIENT_ID=testapp-api \
+            -v "$PWD/performance/k6:/scripts:ro" \
+            -v "$PWD/artifacts/performance:/results" \
+            grafana/k6:0.54.0 \
+            run --summary-export=/results/k6-summary.json /scripts/api-capacity.js
+
+      - name: Verify expiration storm drain
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/performance
+          DB_CONTAINER=$(docker compose -f compose.yaml -f performance/compose.performance.yaml ps -q mariadb)
+          docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -e \
+            "UPDATE test_attempts SET DeadlineAt = UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE WHERE Status = 1;"
+
+          INITIAL=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
+            "SELECT COUNT(*) FROM test_attempts WHERE Status = 1 AND DeadlineAt < UTC_TIMESTAMP(6);")
+          if [ "$INITIAL" -lt 1 ]; then
+            echo "Capacity run did not leave any in-progress attempts for expiration probe" >&2
+            exit 1
+          fi
+
+          START=$(date +%s)
+          REMAINING="$INITIAL"
+          for attempt in $(seq 1 30); do
+            REMAINING=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
+              "SELECT COUNT(*) FROM test_attempts WHERE Status = 1 AND DeadlineAt < UTC_TIMESTAMP(6);")
+            if [ "$REMAINING" -eq 0 ]; then
+              break
+            fi
+            sleep 1
+          done
+          ELAPSED=$(( $(date +%s) - START ))
+
+          if [ "$REMAINING" -ne 0 ]; then
+            echo "Expiration backlog did not drain within 30 seconds: remaining=$REMAINING" >&2
+            exit 1
+          fi
+
+          printf '{"initialOverdue":%s,"remainingOverdue":%s,"drainSeconds":%s}\n' \
+            "$INITIAL" "$REMAINING" "$ELAPSED" > artifacts/performance/expiration.json
+
+      - name: Verify Outbox backlog recovery through RabbitMQ
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/performance
+          DB_CONTAINER=$(docker compose -f compose.yaml -f performance/compose.performance.yaml ps -q mariadb)
+
+          curl --fail --silent --show-error -u testapp:testapp \
+            -H 'content-type: application/json' \
+            -X PUT http://localhost:15672/api/queues/%2F/capacity-probe \
+            -d '{"durable":false,"auto_delete":true,"arguments":{}}' >/dev/null
+          curl --fail --silent --show-error -u testapp:testapp \
+            -H 'content-type: application/json' \
+            -X POST http://localhost:15672/api/bindings/%2F/e/testapp.events/q/capacity-probe \
+            -d '{"routing_key":"testapp.#","arguments":{}}' >/dev/null
+
+          docker exec -i "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp <<'SQL'
+          INSERT INTO outbox_messages
+              (Id, OccurredAt, Type, Payload, ProcessedAt, Error, AttemptCount, LastAttemptAt, NextAttemptAt, DeadLetteredAt, DiscardedAt)
+          SELECT UUID(), UTC_TIMESTAMP(6), 'CapacityProbe', '{"probe":true}', NULL, NULL, 0, NULL, NULL, NULL, NULL
+          FROM information_schema.COLUMNS
+          LIMIT 100;
+          SQL
+
+          INITIAL=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
+            "SELECT COUNT(*) FROM outbox_messages WHERE Type = 'CapacityProbe' AND ProcessedAt IS NULL;")
+          if [ "$INITIAL" -ne 100 ]; then
+            echo "Expected 100 synthetic Outbox messages, found $INITIAL" >&2
+            exit 1
+          fi
+
+          START=$(date +%s)
+          REMAINING="$INITIAL"
+          for attempt in $(seq 1 30); do
+            REMAINING=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
+              "SELECT COUNT(*) FROM outbox_messages WHERE Type = 'CapacityProbe' AND ProcessedAt IS NULL;")
+            if [ "$REMAINING" -eq 0 ]; then
+              break
+            fi
+            sleep 1
+          done
+          ELAPSED=$(( $(date +%s) - START ))
+
+          if [ "$REMAINING" -ne 0 ]; then
+            echo "Outbox backlog did not drain within 30 seconds: remaining=$REMAINING" >&2
+            docker compose -f compose.yaml -f performance/compose.performance.yaml logs api
+            exit 1
+          fi
+
+          printf '{"initialOutbox":%s,"remainingOutbox":%s,"drainSeconds":%s}\n' \
+            "$INITIAL" "$REMAINING" "$ELAPSED" > artifacts/performance/outbox.json
+
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testapp-capacity-results
+          path: artifacts/performance
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -f compose.yaml -f performance/compose.performance.yaml logs --no-color
+
+      - name: Stop performance stack
+        if: always()
+        run: docker compose -f compose.yaml -f performance/compose.performance.yaml down -v --remove-orphans
