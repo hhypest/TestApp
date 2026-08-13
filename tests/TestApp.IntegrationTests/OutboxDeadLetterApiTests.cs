@@ -148,7 +148,7 @@ public sealed class OutboxDeadLetterApiTests
 
         return db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO outbox_messages
-                (Id, OccurredAt, Type, Payload, ProcessedAt, Error, AttemptCount, LastAttemptAt, NextAttemptAt, DeadLetteredAt, DiscardedAt)
+                ("Id", "OccurredAt", "Type", "Payload", "ProcessedAt", "Error", "AttemptCount", "LastAttemptAt", "NextAttemptAt", "DeadLetteredAt", "DiscardedAt")
             VALUES
                 ({id}, {occurredAt}, {type}, {payload}, {processedAt}, {error}, {attempts}, {failedAt}, {nextAttemptAt}, {failedAt}, {discardedAt});
             """, ct);

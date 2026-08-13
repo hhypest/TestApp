@@ -103,7 +103,7 @@ public sealed class OperationalRetentionTests
 
         return db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO outbox_messages
-                (Id, OccurredAt, Type, Payload, ProcessedAt, Error, AttemptCount, LastAttemptAt, NextAttemptAt, DeadLetteredAt)
+                ("Id", "OccurredAt", "Type", "Payload", "ProcessedAt", "Error", "AttemptCount", "LastAttemptAt", "NextAttemptAt", "DeadLetteredAt")
             VALUES
                 ({id}, {occurredAt}, {type}, {payload}, {processedAt}, {error}, {attemptCount}, {lastAttemptAt}, {nextAttemptAt}, {deadLetteredAt});
             """, ct);
