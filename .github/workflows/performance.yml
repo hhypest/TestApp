@@ -74,6 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/performance
+          chmod 0777 artifacts/performance
           docker run --rm --network host \
             -e BASE_URL=http://localhost:8080 \
             -e KEYCLOAK_URL=http://localhost:8081 \
