@@ -134,6 +134,35 @@ public sealed class PersistenceBehaviorTests
     }
 
     [Fact]
+    public async Task Concurrent_starts_do_not_exceed_attempt_limit_on_PostgreSQL()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        await using (var migration = database.CreateContext())
+            await migration.Database.MigrateAsync(ct);
+
+        var assignmentId = TestAssignmentId.New();
+        var revisionId = PublishedTestRevisionId.New();
+        var userId = ExternalUserId.FromSubject("concurrent-user");
+        var now = DateTimeOffset.UtcNow;
+
+        await using var firstDb = database.CreateContext();
+        await using var secondDb = database.CreateContext();
+        var first = TestAttempt.Start(
+            TestAttemptId.New(), assignmentId, revisionId, userId, Guid.NewGuid(), now, null, []);
+        var second = TestAttempt.Start(
+            TestAttemptId.New(), assignmentId, revisionId, userId, Guid.NewGuid(), now, null, []);
+
+        var results = await Task.WhenAll(
+            new TestAttemptRepository(firstDb).TryAddWithinLimitAsync(first, 1, ct),
+            new TestAttemptRepository(secondDb).TryAddWithinLimitAsync(second, 1, ct));
+
+        Assert.Single(results, x => x is not null);
+        await using var verify = database.CreateContext();
+        Assert.Equal(1, await verify.Attempts.CountAsync(ct));
+    }
+
+    [Fact]
     public async Task Idempotency_lease_serializes_competing_PostgreSQL_contexts()
     {
         var ct = TestContext.Current.CancellationToken;

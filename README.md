@@ -168,7 +168,7 @@ API replicas в Production не должны конкурировать за sch
 
 - aggregates используют optimistic `ConcurrencyVersion`;
 - EF concurrency conflict преобразуется в HTTP 409;
-- start attempt защищён unique DB request key + serializable attempt-limit transaction;
+- start attempt защищён unique DB request key + PostgreSQL advisory lease на assignment/user + короткая transaction для replay/count/insert;
 - publish/assign/bulk-assign/submit используют persistent idempotency records + session-level PostgreSQL advisory lease (`pg_try_advisory_lock` / `pg_advisory_unlock`).
 
 Основной HTTP contract использует standard `Idempotency-Key` header; legacy body field временно поддерживается с mismatch validation и request fingerprint. Для publish/start/submit JSON body (`{}`) пока всё ещё обязателен даже при key только в header — настоящий zero-length-body вариант входит в stabilization backlog.

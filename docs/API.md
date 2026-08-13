@@ -221,7 +221,7 @@ same actor + operation + key + different payload -> 409 idempotency.key_reused
 
 Publish operation дополнительно resource-scoped по TestId.
 
-Start attempt использует отдельный unique `(AssignmentId, UserId, StartRequestId)` + serializable transaction. Actor-scoped replay lookup выполняется до загрузки assignment и mutable availability/group-membership checks: уже успешный request возвращает прежний ID после cancellation, expiry или изменения group claim. Для нового key authorization, availability, revision и attempt-limit проверки выполняются полностью.
+Start attempt использует отдельный unique `(AssignmentId, UserId, StartRequestId)` + PostgreSQL advisory lease на assignment/user вокруг replay/count/insert transaction. Actor-scoped replay lookup выполняется до загрузки assignment и mutable availability/group-membership checks: уже успешный request возвращает прежний ID после cancellation, expiry или изменения group claim. Для нового key authorization, availability, revision и attempt-limit проверки выполняются полностью.
 
 ## 9. Pagination
 

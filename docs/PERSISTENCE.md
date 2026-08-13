@@ -68,7 +68,7 @@ UNIQUE (AssignmentId, UserId, StartRequestId)
 (RevisionId, Status, Outcome)
 ```
 
-Unique start key обеспечивает retry-safe start; attempt limit дополнительно защищён serializable transaction.
+Unique start key обеспечивает retry-safe start; attempt limit дополнительно защищён PostgreSQL advisory lease на assignment/user.
 
 `question_responses` имеет PK `(TestAttemptId, Id)`. `selected_answer_options` имеет PK `(TestAttemptId, QuestionId, OptionId)` и cascade FK к response.
 
@@ -154,7 +154,7 @@ UPDATE ... WHERE ConcurrencyVersion = old
 
 После 409 клиент перечитывает state и повторно применяет intent.
 
-Attempt repository в serializable transaction проверяет replay key, current count, limit и insert. Unique start index остаётся дополнительной race protection.
+Attempt repository берёт session-level advisory lease на `(AssignmentId, UserId)`, затем в короткой transaction проверяет replay key, current count, limit и выполняет insert. Unique start index остаётся дополнительной race protection. Lease устраняет PostgreSQL SSI abort storm при одновременных стартах и действует между API replicas.
 
 ## Distributed advisory locks
 

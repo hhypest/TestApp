@@ -144,7 +144,7 @@ Persistent idempotency rows содержат SHA-256 fingerprint логичес�
 - historical rows с NULL fingerprint сохраняют compatibility replay;
 - publish operation resource-scoped по TestId.
 
-Fingerprint используется publish/single assignment/bulk assignment/submit. Start attempt дополнительно защищён DB unique key `(AssignmentId, UserId, StartRequestId)` и serializable attempt-limit transaction.
+Fingerprint используется publish/single assignment/bulk assignment/submit. Start attempt дополнительно защищён DB unique key `(AssignmentId, UserId, StartRequestId)` и PostgreSQL advisory lease на `(AssignmentId, UserId)` вокруг replay/count/insert transaction.
 
 Текущий transport resolver принимает key из header и legacy body. Для publish/start/submit Minimal API всё ещё требует JSON body (`{}` достаточно), даже когда key находится только в header; zero-length body является stabilization gap.
 

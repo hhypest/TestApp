@@ -220,7 +220,7 @@ Provider-specific behavior, которое должно проверяться �
 - `uuid`/`timestamptz`/decimal mappings;
 - composite indexes;
 - unique constraints;
-- serializable transaction behavior;
+- PostgreSQL advisory lease не допускает превышения attempt limit при concurrent starts;
 - `pg_try_advisory_lock/pg_advisory_unlock`;
 - concurrency update semantics;
 - locale/collation behavior;

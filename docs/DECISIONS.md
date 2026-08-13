@@ -141,7 +141,7 @@ General operations:
 Start attempt:
 
 - domain-specific unique request key;
-- serializable attempt-limit transaction.
+- PostgreSQL advisory lease на assignment/user + transaction для replay/count/insert.
 
 **Consequences:** несколько API replicas имеют общую retry semantics.
 

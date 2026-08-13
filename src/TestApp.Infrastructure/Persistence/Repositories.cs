@@ -1,4 +1,3 @@
-using System.Data;
 using Microsoft.EntityFrameworkCore;
 using TestApp.Application.Abstractions;
 using TestApp.Domain.Assignments;
@@ -30,6 +29,8 @@ public sealed class TestAssignmentRepository(AppDbContext db) : ITestAssignmentR
 
 public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptRepository
 {
+    private static readonly TimeSpan StartLockTimeout = TimeSpan.FromSeconds(30);
+
     public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) => db.Attempts.SingleOrDefaultAsync(x => x.Id == id, ct);
 
     public Task<TestAttemptId?> FindIdByStartRequestAsync(
@@ -62,7 +63,16 @@ public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptReposit
 
     public async Task<TestAttemptId?> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var connectionString = db.Database.GetConnectionString()
+            ?? throw new InvalidOperationException("Database connection string is not configured.");
+        var resource = $"attempt-start:{attempt.AssignmentId.Value:N}|{attempt.UserId.Value}";
+        await using var lease = await PostgreSqlAdvisoryLock.TryAcquireAsync(
+                connectionString,
+                resource,
+                StartLockTimeout,
+                ct)
+            ?? throw new TimeoutException("Could not acquire the attempt-start lease.");
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
         var existingId = await db.Attempts
             .Where(x => x.AssignmentId == attempt.AssignmentId && x.UserId == attempt.UserId && x.StartRequestId == attempt.StartRequestId)

@@ -269,9 +269,9 @@ DbUpdateConcurrencyException
 
 - `StartRequestId` хранится в `test_attempts`;
 - unique `(AssignmentId, UserId, StartRequestId)`;
-- attempt limit проверяется внутри serializable transaction.
+- attempt limit проверяется под PostgreSQL advisory lease на `(AssignmentId, UserId)` внутри короткой transaction.
 
-Application handler сначала выполняет actor-scoped replay lookup по `(AssignmentId, UserId, StartRequestId)`. Уже закоммиченный start воспроизводится до загрузки assignment и mutable target/availability checks, поэтому cancellation, expiry и изменение group claim не ломают retry. Для нового key handler выполняет полный eligibility flow, а repository повторяет lookup внутри serializable transaction перед count/insert, закрывая concurrent race.
+Application handler сначала выполняет actor-scoped replay lookup по `(AssignmentId, UserId, StartRequestId)`. Уже закоммиченный start воспроизводится до загрузки assignment и mutable target/availability checks, поэтому cancellation, expiry и изменение group claim не ломают retry. Для нового key handler выполняет полный eligibility flow, а repository берёт session-level PostgreSQL advisory lease на assignment/user и повторяет lookup перед count/insert в transaction, закрывая concurrent race между API replicas без SSI serialization storm.
 
 ### Publish/assign/bulk-assign/submit
 
