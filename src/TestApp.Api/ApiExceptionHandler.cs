@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using TestApp.Application.Common;
+using TestApp.Infrastructure.Observability;
 
 namespace TestApp.Api;
 
-public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExceptionHandler
+public sealed class ApiExceptionHandler(
+    OperationalMetrics metrics,
+    ILogger<ApiExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
@@ -32,6 +35,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         }
         else if (exception is ConcurrencyConflictException concurrency)
         {
+            metrics.RecordApiException("concurrency_conflict");
             logger.LogWarning(concurrency, "Optimistic concurrency conflict for {Method} {Path} TraceId={TraceId}",
                 httpContext.Request.Method, httpContext.Request.Path, httpContext.TraceIdentifier);
 
@@ -46,6 +50,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         }
         else if (exception is IdempotencyKeyReuseException idempotency)
         {
+            metrics.RecordApiException("idempotency_key_reuse");
             logger.LogWarning(idempotency,
                 "Idempotency key reused with a different request for {Method} {Path} Operation={Operation} TraceId={TraceId}",
                 httpContext.Request.Method,
@@ -64,6 +69,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         }
         else
         {
+            metrics.RecordApiException("unhandled");
             logger.LogError(exception, "Unhandled exception for {Method} {Path} TraceId={TraceId}",
                 httpContext.Request.Method, httpContext.Request.Path, httpContext.TraceIdentifier);
 
