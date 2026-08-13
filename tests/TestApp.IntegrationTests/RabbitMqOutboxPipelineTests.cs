@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using TestApp.Domain.Events;
+using TestApp.Infrastructure.Observability;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
 using Xunit;
@@ -52,6 +53,7 @@ public sealed class RabbitMqOutboxPipelineTests
             options.RoutingKeyPrefix = "testapp.pipeline";
             options.ClientProvidedName = "TestApp.PipelineTests";
         });
+        services.AddSingleton<OperationalMetrics>();
         services.AddSingleton<RabbitMqOutboxPublisher>();
         services.AddSingleton<IOutboxPublisher>(sp => sp.GetRequiredService<RabbitMqOutboxPublisher>());
 
@@ -60,6 +62,7 @@ public sealed class RabbitMqOutboxPipelineTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             TimeProvider.System,
             Options.Create(new OutboxDeliveryOptions()),
+            provider.GetRequiredService<OperationalMetrics>(),
             NullLogger<OutboxProcessor>.Instance);
 
         var processedCount = await processor.ProcessBatchAsync(ct);
