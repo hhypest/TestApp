@@ -21,7 +21,7 @@ public sealed class ApiBoundaryContractTests
     public async Task Canonical_and_legacy_routes_share_auth_contract_and_OpenAPI_documents_only_v1()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
 
@@ -42,7 +42,7 @@ public sealed class ApiBoundaryContractTests
     public async Task State_changing_request_echoes_correlation_id_and_is_queryable_in_audit_trail()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
 

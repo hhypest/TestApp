@@ -580,7 +580,7 @@ GET /health/ready
 ```
 
 - live — process liveness;
-- ready — MariaDB; RabbitMQ также проверяется при enabled delivery.
+- ready — PostgreSQL; RabbitMQ также проверяется при enabled delivery.
 
 ---
 

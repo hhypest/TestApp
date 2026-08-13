@@ -31,7 +31,7 @@ public sealed class AuditEntry
         return new AuditEntry
         {
             Id = Guid.CreateVersion7(),
-            OccurredAt = occurredAt,
+            OccurredAt = occurredAt.ToUniversalTime(),
             ActorId = string.IsNullOrWhiteSpace(actorId) ? null : actorId.Trim(),
             Method = method,
             Route = route,
@@ -113,9 +113,15 @@ public sealed class AuditTrail(DbContextOptions<AppDbContext> options, TimeProvi
         if (statusCode is { } status)
             query = query.Where(x => x.StatusCode == status);
         if (from is { } fromValue)
+        {
+            fromValue = fromValue.ToUniversalTime();
             query = query.Where(x => x.OccurredAt >= fromValue);
+        }
         if (to is { } toValue)
+        {
+            toValue = toValue.ToUniversalTime();
             query = query.Where(x => x.OccurredAt <= toValue);
+        }
 
         var totalCount = await query.CountAsync(ct);
         var rows = await query

@@ -9,9 +9,9 @@ namespace TestApp.IntegrationTests;
 public sealed class PublishedRevisionPersistenceTests
 {
     [Fact]
-    public async Task Published_revision_round_trips_through_MariaDB()
+    public async Task Published_revision_round_trips_through_PostgreSQL()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         var ct = TestContext.Current.CancellationToken;
         var now = DateTimeOffset.UtcNow;
         var test = Test.Create("DDD fundamentals", ExternalUserId.FromSubject("author-1"));

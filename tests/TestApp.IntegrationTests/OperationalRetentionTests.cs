@@ -13,7 +13,7 @@ public sealed class OperationalRetentionTests
     public async Task Cleaner_removes_only_expired_safe_operational_records()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var now = DateTimeOffset.UtcNow;
 
         var oldAuditId = Guid.CreateVersion7();

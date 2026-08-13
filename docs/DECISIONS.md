@@ -12,7 +12,7 @@
 
 **Consequences:**
 
-- одна MariaDB transactional boundary;
+- одна PostgreSQL transactional boundary;
 - проще consistency/migrations/testing;
 - modules должны сохранять dependency discipline;
 - service extraction только по реальному organizational/operational pressure.
@@ -81,27 +81,28 @@ Aggregates:
 - business authorization остаётся Application/Domain;
 - multi-realm требует будущего `(issuer, subject)` identity key.
 
-## ADR-007 — MariaDB как production persistence
+## ADR-007 — PostgreSQL как production persistence
 
 **Status:** Accepted.
 
-**Decision:** MariaDB 12.3 runtime/CI baseline.
+**Decision:** PostgreSQL 18 runtime/CI baseline.
 
-**History:** SQLite development provider удалён; migrations rebased на MariaDB baseline.
+**History:** SQLite development provider был удалён при переходе на MariaDB; затем MariaDB contract заменён PostgreSQL, а migrations rebased на PostgreSQL baseline.
 
 **Consequences:**
 
-- persistence tests выполняются на real MariaDB;
-- используются MariaDB advisory locks;
-- CI проверяет actual server version >= 12.3.
+- persistence tests выполняются на real PostgreSQL;
+- используются PostgreSQL advisory locks;
+- CI проверяет `server_version_num >= 180000`;
+- старые MariaDB volumes не удаляются и требуют отдельного ETL, если содержат значимые данные.
 
-## ADR-008 — EF Core 9/Pomelo 9 при net10.0 application
+## ADR-008 — EF Core 9/Npgsql 9 при net10.0 application
 
 **Status:** Accepted current compatibility choice.
 
-**Decision:** Infrastructure использует EF Core 9.0.18 + Pomelo 9.0.0, приложение таргетирует .NET 10.
+**Decision:** Infrastructure использует EF Core 9.0.18 + `Npgsql.EntityFrameworkCore.PostgreSQL` 9.0.4, приложение таргетирует .NET 10.
 
-**Why:** стабильная совместимая provider line для MariaDB.
+**Why:** стабильная совместимая provider line для PostgreSQL.
 
 **Upgrade rule:** provider/EF major обновляется отдельным compatibility step с full migration/integration suite.
 
@@ -109,7 +110,7 @@ Aggregates:
 
 **Status:** Accepted.
 
-**Decision:** commands работают через aggregates/repositories; queries используют отдельные read DTO/projections, но читают ту же MariaDB.
+**Decision:** commands работают через aggregates/repositories; queries используют отдельные read DTO/projections, но читают ту же PostgreSQL.
 
 **Consequences:**
 
@@ -134,7 +135,7 @@ Aggregates:
 General operations:
 
 - persistent result record;
-- MariaDB `GET_LOCK` distributed lease;
+- session-level PostgreSQL `pg_try_advisory_lock` distributed lease с explicit `pg_advisory_unlock`;
 - cache re-check inside lease.
 
 Start attempt:
@@ -261,7 +262,7 @@ Event Sourcing не нужен для:
 
 **Decision:** кеш/Redis вводится после profiling конкретного read/coordination bottleneck.
 
-MariaDB уже обеспечивает consistency, idempotency locks и indexed read queries.
+PostgreSQL уже обеспечивает consistency, idempotency locks и indexed read queries.
 
 ## ADR-024 — Не вводить отдельный broker кроме RabbitMQ без consumer requirement
 

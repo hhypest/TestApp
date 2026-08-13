@@ -15,7 +15,7 @@ public sealed class PersistenceBehaviorTests
     [Fact]
     public async Task Migrations_apply_to_empty_database()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         await using var db = database.CreateContext();
         await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
         var pending = await db.Database.GetPendingMigrationsAsync(TestContext.Current.CancellationToken);
@@ -23,10 +23,10 @@ public sealed class PersistenceBehaviorTests
     }
 
     [Fact]
-    public async Task Test_owner_round_trips_through_MariaDB()
+    public async Task Test_owner_round_trips_through_PostgreSQL()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var owner = ExternalUserId.FromSubject("author-owner");
         var test = Test.Create("Owned test", owner);
 
@@ -43,13 +43,13 @@ public sealed class PersistenceBehaviorTests
     }
 
     [Fact]
-    public async Task Assignment_can_be_persisted_on_MariaDB()
+    public async Task Assignment_can_be_persisted_on_PostgreSQL()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         await using var db = database.CreateContext();
         await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.Parse("2026-08-13T16:00:00+02:00");
         var assignment = TestAssignment.Create(
             TestAssignmentId.New(),
             PublishedTestRevisionId.New(),
@@ -66,13 +66,17 @@ public sealed class PersistenceBehaviorTests
         var persisted = await db.Assignments.AsNoTracking().SingleAsync(x => x.Id == assignment.Id, TestContext.Current.CancellationToken);
         Assert.Equal(AssignmentTargetType.User, persisted.TargetType);
         Assert.Equal("student-1", persisted.TargetId);
+        Assert.Equal(TimeSpan.Zero, persisted.AssignedAt.Offset);
+        Assert.Equal(TimeSpan.Zero, persisted.AvailableFrom.Offset);
+        Assert.Equal(TimeSpan.Zero, persisted.AvailableUntil!.Value.Offset);
+        Assert.Equal(now.ToUniversalTime(), persisted.AssignedAt);
     }
 
     [Fact]
     public async Task Concurrent_aggregate_update_is_rejected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using (var setup = database.CreateContext())
         {
             await setup.Database.MigrateAsync(ct);
@@ -99,7 +103,7 @@ public sealed class PersistenceBehaviorTests
     [Fact]
     public async Task Same_start_request_returns_same_attempt_id()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         await using var db = database.CreateContext();
         await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
 
@@ -130,10 +134,10 @@ public sealed class PersistenceBehaviorTests
     }
 
     [Fact]
-    public async Task Idempotency_lease_serializes_competing_MariaDB_contexts()
+    public async Task Idempotency_lease_serializes_competing_PostgreSQL_contexts()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using (var migration = database.CreateContext())
             await migration.Database.MigrateAsync(ct);
 
@@ -167,7 +171,7 @@ public sealed class PersistenceBehaviorTests
     public async Task Reusing_idempotency_key_with_different_fingerprint_is_rejected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var db = database.CreateContext();
         await db.Database.MigrateAsync(ct);
 

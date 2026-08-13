@@ -19,7 +19,7 @@ public sealed class ConcurrencyHttpContractTests
     public async Task Editor_ETag_tracks_version_and_stale_write_returns_412()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         Authenticate(client, "author-etag", "test-author");
@@ -69,7 +69,7 @@ public sealed class ConcurrencyHttpContractTests
     public async Task Unsupported_IfMatch_validator_returns_400(string ifMatch)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         Authenticate(client, "author-invalid-etag", "test-author");

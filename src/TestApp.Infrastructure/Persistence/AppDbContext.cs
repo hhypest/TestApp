@@ -85,7 +85,7 @@ public sealed class OutboxMessage
     public static OutboxMessage From(IIntegrationEvent e) => new()
     {
         Id = e.EventId,
-        OccurredAt = e.OccurredAt,
+        OccurredAt = e.OccurredAt.ToUniversalTime(),
         Type = e.GetType().AssemblyQualifiedName ?? e.GetType().FullName!,
         Payload = JsonSerializer.Serialize(e, e.GetType())
     };
@@ -101,8 +101,8 @@ public sealed class OutboxMessage
         if (DiscardedAt is not null)
             throw new InvalidOperationException("Discarded Outbox messages cannot be marked as processed.");
 
-        ProcessedAt = at;
-        LastAttemptAt = at;
+        ProcessedAt = at.ToUniversalTime();
+        LastAttemptAt = ProcessedAt;
         NextAttemptAt = null;
         Error = null;
     }
@@ -112,6 +112,7 @@ public sealed class OutboxMessage
         if (DiscardedAt is not null)
             throw new InvalidOperationException("Discarded Outbox messages cannot be retried.");
 
+        at = at.ToUniversalTime();
         AttemptCount++;
         LastAttemptAt = at;
         Error = string.IsNullOrWhiteSpace(error) ? "Unknown outbox publishing error." : error;
@@ -123,7 +124,7 @@ public sealed class OutboxMessage
             return;
         }
 
-        NextAttemptAt = nextAttemptAt;
+        NextAttemptAt = nextAttemptAt?.ToUniversalTime();
     }
 
     public void RequeueDeadLetter(DateTimeOffset at)
@@ -131,14 +132,14 @@ public sealed class OutboxMessage
         EnsureManageableDeadLetter();
         AttemptCount = 0;
         DeadLetteredAt = null;
-        NextAttemptAt = at;
+        NextAttemptAt = at.ToUniversalTime();
         Error = null;
     }
 
     public void DiscardDeadLetter(DateTimeOffset at)
     {
         EnsureManageableDeadLetter();
-        DiscardedAt = at;
+        DiscardedAt = at.ToUniversalTime();
         NextAttemptAt = null;
     }
 

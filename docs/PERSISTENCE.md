@@ -1,158 +1,66 @@
-# Persistence и MariaDB
+# Persistence и PostgreSQL
 
-> Статус: **Implemented persistence contract**. Runtime/CI baseline — MariaDB 12.3.
+> Статус: **implemented persistence contract**. Runtime/CI baseline — PostgreSQL 18.
 
-## 1. Stack
+## Stack
 
-- MariaDB 12.3;
+- PostgreSQL 18;
 - EF Core 9.0.18;
-- Pomelo.EntityFrameworkCore.MySql 9.0.0;
-- MySqlConnector через Pomelo/runtime infrastructure;
-- `ServerVersion.AutoDetect(connectionString)` в production composition root;
-- test baseline `MariaDbServerVersion(12, 3, 0)`.
+- `Npgsql.EntityFrameworkCore.PostgreSQL` 9.0.4;
+- Npgsql 9.0.4;
+- `UseNpgsql(connectionString)`;
+- application target — `net10.0`.
 
-Приложение таргетирует `net10.0`; EF provider сознательно остаётся на совместимой стабильной линии EF Core 9/Pomelo 9.
+EF/Npgsql остаются на compatible stable major line 9. Upgrade до EF/Npgsql 10 должен быть отдельным compatibility change.
 
-## 2. Source of truth
-
-Основной transactional store — MariaDB.
-
-В MariaDB находятся:
-
-- mutable test definitions;
-- published revision snapshots;
-- assignments;
-- attempts/responses;
-- idempotency records;
-- Outbox;
-- audit trail.
-
-Отдельной read database/caching layer сейчас нет.
-
-## 3. Database schema
-
-### 3.1 `tests`
-
-| Column | Тип/semantics |
-|---|---|
-| `Id` | char(36), PK |
-| `OwnerId` | varchar(256), immutable external owner |
-| `Title` | varchar(300) |
-| `Status` | int enum |
-| `ConcurrencyVersion` | bigint concurrency token |
-| `passing_percentage` | decimal(5,2), default 70 |
-| `time_limit_minutes` | nullable int |
-
-Relations:
-
-- `questions` owned collection через FK `TestId`.
-
-Index:
+Development connection:
 
 ```text
-(OwnerId, Status)
+Host=localhost;Port=5432;Database=testapp;Username=testapp;Password=testapp;
 ```
 
-### 3.2 `questions`
+Вне Development `ConnectionStrings:Database` обязателен; production credentials не хранятся в repository.
 
-| Column | Semantics |
+## Source of truth
+
+PostgreSQL — единственный transactional store для mutable tests, immutable revisions, assignments, attempts/responses, idempotency records, Outbox, dead-letter actions и HTTP audit. Отдельной read database/cache layer сейчас нет.
+
+## Provider mappings
+
+| .NET/domain value | PostgreSQL |
 |---|---|
-| `Id` | QuestionId PK |
-| `TestId` | owner test |
-| `Text` | varchar(2000) |
-| `Type` | int QuestionType |
-| `Points` | decimal(18,2) |
-| `Order` | application/domain order |
+| `Guid` и typed IDs | `uuid` |
+| `DateTimeOffset` | `timestamp with time zone` |
+| `bool` | `boolean` |
+| score/percentage | `numeric(precision, scale)` |
+| bounded strings | `character varying(n)` |
+| payload/result/error | `text` |
+| published questions snapshot | `jsonb` |
+| enums | `integer` |
+| concurrency version | `bigint` |
 
-FK `questions -> tests` с cascade delete.
+Имена таблиц lower snake case. Property-derived column names сохраняют EF casing, поэтому raw PostgreSQL SQL должен quote такие identifiers.
 
-### 3.3 `answer_options`
+PostgreSQL `timestamptz` хранит instant, а не исходный timezone. Все сохраняемые `DateTimeOffset` канонизируются через `ToUniversalTime()`; API может принять эквивалентный ISO-8601 offset, но persisted/read representation имеет `+00:00`.
 
-| Column | Semantics |
-|---|---|
-| `Id` | AnswerOptionId PK |
-| `QuestionId` | owner question |
-| `Text` | varchar(2000) |
-| `IsCorrect` | boolean/tinyint |
-| `Order` | domain order |
+## Schema invariants
 
-FK к `questions`, cascade delete.
+### Tests и revisions
 
-### 3.4 `published_test_revisions`
+`tests` хранит owner, title, status, settings и `ConcurrencyVersion`. Index: `(OwnerId, Status)`. Owned `questions` и `answer_options` связаны cascade FK.
 
-| Column | Semantics |
-|---|---|
-| `Id` | PublishedTestRevisionId PK |
-| `TestId` | source TestId |
-| `Version` | revision number |
-| `Title` | title snapshot |
-| `PassingPercentage` | decimal(5,2) snapshot |
-| `TimeLimitMinutes` | nullable settings snapshot |
-| `PublishedAt` | datetime(6) |
-| `questions_json` | longtext immutable snapshot |
-| `ConcurrencyVersion` | aggregate token |
+`published_test_revisions` использует unique `(TestId, Version)` и `questions_json jsonb`. Snapshot immutable; historical question analytics следует строить отдельной projection, не изменяя transactional revision.
 
-Unique index:
+### Assignments и attempts
 
-```text
-(TestId, Version)
-```
-
-### Почему questions snapshot — JSON
-
-Published revision — immutable aggregate snapshot. Его questions/options не редактируются отдельно и всегда читаются как единая revision model. JSON исключает риск изменения historical correctness через mutable authoring tables.
-
-Текущая trade-off:
-
-- удобно для immutable snapshot;
-- сложнее SQL analytics по отдельным historical questions;
-- для heavy analytics в будущем предпочтительно построить отдельную projection/warehouse, а не ломать immutable transactional model.
-
-### 3.5 `test_assignments`
-
-| Column | Semantics |
-|---|---|
-| `Id` | TestAssignmentId PK |
-| `RevisionId` | immutable revision reference |
-| `TargetType` | User/Group enum |
-| `TargetId` | varchar(256) external identity |
-| `AssignedBy` | external user |
-| `AssignedAt` | datetime(6) |
-| `AvailableFrom` | datetime(6) |
-| `AvailableUntil` | nullable datetime(6) |
-| `AttemptLimit` | nullable int |
-| `Status` | Active/Cancelled |
-| cancellation fields | actor/time/reason |
-| `ConcurrencyVersion` | optimistic token |
-
-Indexes:
+Assignment indexes:
 
 ```text
 (TargetType, TargetId, Status)
 RevisionId
 ```
 
-Assignment target специально нормализован в `TargetType + TargetId`, чтобы direct-user/group filtering выполнялся в SQL и индексировался.
-
-### 3.6 `test_attempts`
-
-| Column | Semantics |
-|---|---|
-| `Id` | TestAttemptId PK |
-| `AssignmentId` | assignment |
-| `RevisionId` | immutable revision |
-| `UserId` | external user |
-| `StartRequestId` | start idempotency key |
-| `Status` | InProgress/Submitted/TimedOut |
-| `StartedAt` | datetime(6) |
-| `DeadlineAt` | nullable datetime(6) |
-| `CompletedAt` | nullable datetime(6) |
-| `score_earned` | nullable decimal(18,2) |
-| `score_maximum` | nullable decimal(18,2) |
-| `Outcome` | nullable Passed/Failed |
-| `ConcurrencyVersion` | optimistic token |
-
-Indexes:
+Attempt indexes:
 
 ```text
 (AssignmentId, UserId)
@@ -160,288 +68,127 @@ UNIQUE (AssignmentId, UserId, StartRequestId)
 (RevisionId, Status, Outcome)
 ```
 
-Unique start key обеспечивает retry-safe start attempt. Application выполняет ранний actor-scoped ID lookup для стабильного replay после изменения assignment state; repository повторяет тот же lookup внутри serializable transaction перед проверкой attempt limit и insert.
+Unique start key обеспечивает retry-safe start; attempt limit дополнительно защищён serializable transaction.
 
-### 3.7 `question_responses`
+`question_responses` имеет PK `(TestAttemptId, Id)`. `selected_answer_options` имеет PK `(TestAttemptId, QuestionId, OptionId)` и cascade FK к response.
 
-Composite PK:
+### Idempotency, Outbox и audit
 
-```text
-(TestAttemptId, QuestionId)
-```
+`idempotency_records`:
 
-Хранит `AnsweredAt`.
+- unique `(Operation, ActorId, RequestId)`;
+- optional SHA-256 request fingerprint;
+- serialized result;
+- `CreatedAt` retention index.
 
-### 3.8 `selected_answer_options`
-
-Composite PK:
-
-```text
-(TestAttemptId, QuestionId, OptionId)
-```
-
-FK к `question_responses` с cascade delete.
-
-Correctness здесь не хранится: оно берётся из immutable revision snapshot.
-
-### 3.9 `idempotency_records`
-
-| Column | Semantics |
-|---|---|
-| `Id` | Guid PK |
-| `Operation` | varchar(200) |
-| `ActorId` | varchar(256) |
-| `RequestId` | Guid |
-| `ResultType` | varchar(512) |
-| `ResultJson` | serialized result |
-| `CreatedAt` | datetime(6) |
-| `RequestFingerprint` | nullable varchar(64), SHA-256 canonical request hash |
-
-Unique:
-
-```text
-(Operation, ActorId, RequestId)
-```
-
-### 3.10 `outbox_messages`
-
-Основные поля:
-
-- `Id` = integration `EventId`;
-- `OccurredAt`;
-- `Type`;
-- `Payload`;
-- `ProcessedAt`;
-- `Error`;
-- `AttemptCount`;
-- `LastAttemptAt`;
-- `NextAttemptAt`;
-- `DeadLetteredAt`;
-- `DiscardedAt`.
-
-Queue index:
+`outbox_messages` хранит delivery state; queue index покрывает:
 
 ```text
 (ProcessedAt, DeadLetteredAt, DiscardedAt, NextAttemptAt, OccurredAt)
 ```
 
-### 3.11 `outbox_dead_letter_actions`
+`outbox_dead_letter_actions` — immutable requeue/discard audit. `audit_entries` не хранит request/response bodies и индексируется по occurred time, actor/time и status/time.
 
-Immutable operational audit для explicit `requeue`/`discard`:
+## Migrations
 
-- action ID;
-- event ID;
-- action enum;
-- actor ID;
-- mandatory reason;
-- occurred time;
-- correlation ID.
-
-Indexes: `(EventId, OccurredAt)` и `OccurredAt`.
-
-### 3.12 `audit_entries`
-
-Хранит:
-
-- ID;
-- occurred time;
-- actor ID;
-- HTTP method;
-- route;
-- status code;
-- correlation ID;
-- trace ID;
-- duration ms.
-
-Indexes:
+После смены engine история rebased на PostgreSQL baseline:
 
 ```text
-OccurredAt
-(ActorId, OccurredAt)
-(StatusCode, OccurredAt)
+20260813183117_PostgreSqlBaseline
 ```
 
-Request/response body не хранится.
+Baseline сгенерирован из EF-модели. В repository теперь есть `AppDbContextModelSnapshot`, designer metadata и `AppDbContextDesignFactory`.
 
-## 4. Migrations
+Следующая migration:
 
-Текущая migration chain:
-
-```text
-20260812110000_MariaDbBaseline
-20260812115000_OutboxDeliveryState
-20260812124500_AuditTrail
-20260812133000_TestOwnership
-20260812140000_IdempotencyFingerprint
-20260812150000_OperationalRetentionIndexes
-20260812151000_OutboxDeadLetterManagement
+```bash
+dotnet tool install --global dotnet-ef --version 9.0.18
+dotnet ef migrations add <Name> \
+  --project src/TestApp.Infrastructure \
+  --startup-project src/TestApp.Infrastructure \
+  --context AppDbContext \
+  --output-dir Persistence/Migrations
 ```
 
-`MariaDbBaseline` — новая baseline история после отказа от SQLite development history.
+`TESTAPP_DESIGN_CONNECTION` переопределяет design connection; generation не требует доступной database.
 
-### 4.1 Migration-only mode
+Production migration-only mode:
 
 ```bash
 dotnet TestApp.Api.dll --migrate
 ```
 
-Flow:
+Production запускает отдельный migration/init job до replicas. `Database:ApplyMigrationsOnStartup=true` разрешён только в Development.
 
-1. composition root создаёт app/service provider;
-2. `Database.MigrateAsync()`;
-3. process завершается до HTTP listener.
+Новая migration должна проходить empty-database и production-image gates, соответствовать snapshot и иметь existing-data path для уже развернутой PostgreSQL schema.
 
-Текущий composition root не загружает Keycloak/transport security в migrate-only mode, но всё ещё валидирует RabbitMQ/worker/CORS/rate-limit/OpenAPI/proxy options. Целевой production migration job должен требовать только database configuration; это known stabilization gap.
+## Engine cutover и существующие MariaDB данные
 
-### 4.2 Startup migrations
+PostgreSQL baseline предназначен для новой PostgreSQL database. MariaDB migration history/dump нельзя применить напрямую: engine, SQL dialect и physical types различаются.
 
-Текущее правило:
+Repository не удаляет старые MariaDB volumes и не выполняет скрытый data conversion. Compose создаёт новый `testapp-postgres` volume.
 
-```text
-Database:ApplyMigrationsOnStartup
-```
+Если значимые MariaDB данные существуют:
 
-Если настройка отсутствует:
+1. создать и проверить MariaDB backup;
+2. остановить writes или зафиксировать согласованный snapshot;
+3. применить baseline к пустой PostgreSQL 18 database;
+4. выполнить explicit ETL, включая `char(36) -> uuid`, UTC timestamps и revision JSON;
+5. сохранить FK order и immutable revision/attempt relationships;
+6. сравнить row counts, unique constraints и business invariants;
+7. выполнить create/publish/assign/start/submit smoke flow;
+8. переключить connection string после acceptance;
+9. удерживать MariaDB backup/volume как rollback point до конца retention window.
 
-- Development -> true;
-- Production -> false.
+ETL зависит от реального deployment/data volume и не подменяется PostgreSQL backup scripts.
 
-Production deployment должен запускать отдельный migration job перед replicas.
+## Optimistic и attempt-limit concurrency
 
-### 4.3 Требования к новым migrations
-
-Новая migration должна:
-
-- быть MariaDB-compatible;
-- проходить на пустой database;
-- проходить migration-only CI из production image;
-- иметь явный `[DbContext]` и `[Migration]` metadata;
-- учитывать existing-data upgrade path;
-- не предполагать SQLite semantics;
-- при изменении critical indexes иметь regression integration test.
-
-### Технический долг
-
-Полный стандартный EF `AppDbContextModelSnapshot` workflow пока не зафиксирован. До его внедрения migration files являются explicit source of truth и должны ревьюиться вручную вместе с EF mappings.
-
-## 5. Optimistic concurrency
-
-EF config:
-
-```text
-ConcurrencyVersion.IsConcurrencyToken()
-```
-
-Используется на:
-
-- Test;
-- PublishedTestRevision;
-- TestAssignment;
-- TestAttempt.
-
-`Touch()` увеличивает version на domain mutation.
-
-Conflict path:
+`ConcurrencyVersion` — EF concurrency token для Test, PublishedTestRevision, TestAssignment и TestAttempt:
 
 ```text
 UPDATE ... WHERE ConcurrencyVersion = old
-0 rows affected
--> DbUpdateConcurrencyException
--> ConcurrencyConflictException
--> HTTP 409
+0 rows -> DbUpdateConcurrencyException
+-> ConcurrencyConflictException -> HTTP 409
 ```
 
-### Что обязан делать клиент после 409
+После 409 клиент перечитывает state и повторно применяет intent.
 
-- перечитать current representation;
-- повторно применить intent пользователя;
-- не делать blind infinite retry.
+Attempt repository в serializable transaction проверяет replay key, current count, limit и insert. Unique start index остаётся дополнительной race protection.
 
-## 6. Attempt-limit concurrency
+## Distributed advisory locks
 
-Attempt limit нельзя корректно защитить только `CountAsync + Insert` без transaction.
-
-Repository использует serializable transaction и проверяет:
-
-1. существующий attempt с тем же `(AssignmentId, UserId, StartRequestId)` после раннего handler-level replay lookup;
-2. текущий count для `(AssignmentId, UserId)`;
-3. limit;
-4. insert.
-
-Unique start index является дополнительной защитой retry race.
-
-## 7. Distributed idempotency locks
-
-`IdempotencyStore.AcquireAsync()` открывает отдельное MariaDB connection и использует:
+Idempotency, Outbox и retention используют единый helper с session-level PostgreSQL locks:
 
 ```sql
-SELECT GET_LOCK(@name, 30);
-SELECT RELEASE_LOCK(@name);
+SELECT pg_try_advisory_lock(@key);
+SELECT pg_advisory_unlock(@key);
 ```
 
-Lock key — SHA-256 от:
+Resource material включает database и namespace. SHA-256 детерминированно сокращается до signed 64-bit key. Dedicated Npgsql connection определяет lifetime; explicit unlock выполняется при dispose, а close остаётся safety net.
 
-```text
-database + operation + actorId + requestId
-```
+- idempotency timeout — 30 секунд;
+- Outbox timeout — configured bounded value;
+- retention — immediate try, занятый цикл пропускается.
 
-Преимущества:
+Так replicas получают общую coordination semantics без Redis. Теоретическая 64-bit hash collision приводит к лишней сериализации, не к concurrent critical section.
 
-- работает между несколькими API instances;
-- lock lifetime привязан к dedicated DB connection;
-- serialized cache re-check после lease устраняет concurrent cache miss race.
+## Read-side policy
 
-Ограничение: MariaDB становится coordination dependency для этих unsafe operations, что приемлемо, потому что она уже transactional source of truth.
+Queries используют `AsNoTracking`, SQL-side filtering/count/order/paging, deterministic tie-breakers и не materialize `questions_json` без необходимости. High-cardinality paths требуют query-plan/performance evidence.
 
-## 8. Read-side SQL policy
+## Backup/restore
 
-Read queries должны:
+Repository baseline:
 
-- использовать `AsNoTracking()`;
-- применять filters до `ToArray/ToList`;
-- считать `TotalCount` SQL-side;
-- применять `OrderBy/Skip/Take` SQL-side;
-- не materialize immutable `questions_json`, если list-view этого не требует;
-- вычисляемые non-translatable properties (например score percentage) рассчитывать после materialization из persisted scalar fields.
+- custom-format archive `pg_dump -Fc`;
+- SHA-256 и `pg_restore --list` validation;
+- restore в disposable target;
+- table/migration counts и optional marker;
+- CI recovery drill после production-image migration.
 
-Текущий долг:
+Targets: RPO <= 24h, RTO <= 4h. Snapshots/WAL/PITR, encryption, offsite retention и measured staging restore — deployment responsibility. См. [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
-- часть paged queries сортирует только по timestamp без deterministic ID tie-breaker;
-- reviewer/admin queries сначала materialize matching revision IDs;
-- assignment statistics materialize score rows в process memory.
+## PostgreSQL version policy
 
-До 1.0 эти hot paths должны перейти на stable ordering и SQL joins/aggregates с high-cardinality regression evidence.
-
-## 9. Backup/restore — implemented repository baseline
-
-Реализованы:
-
-- compressed logical MariaDB dump;
-- SHA-256 sidecar и gzip validation;
-- restore только в isolated target database;
-- table-count, EF migration history и optional business-marker verification;
-- CI recovery drill после production-image migration;
-- baseline RPO <= 24h и RTO <= 4h;
-- portable retention guidance.
-
-До production 1.0 deployment owner должен выполнить staging/platform restore drill с measured RTO, настроить schedule/encrypted offsite storage и при более строгом RPO включить provider-native snapshot/binlog/PITR. Подробно: `BACKUP_RESTORE.md`.
-
-## 10. MariaDB version policy
-
-Baseline: **12.3+ в пределах согласованной LTS/compatible line**.
-
-CI выполняет `SELECT VERSION()` regression check и падает при runtime ниже 12.3.
-
-При обновлении major/minor database version требуется полный gate:
-
-```text
-empty migrations
-persistence tests
-concurrency tests
-idempotency/advisory locks
-Outbox tests
-API E2E
-production image --migrate
-```
-
-Не следует обновлять existing production data volume только заменой Docker tag без отдельного tested upgrade/backup plan.
+Baseline — PostgreSQL 18 stable. CI выполняет `SHOW server_version_num` и требует `>= 180000`. Перед major upgrade обязательны verified backup, isolated restore/upgrade, migration/integration/concurrency/lock/Outbox suites, production-image `--migrate` и performance evidence. Смена Docker tag не является production upgrade process.

@@ -10,17 +10,16 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     services:
-      mariadb:
-        image: mariadb:12.3
+      postgres:
+        image: postgres:18
         env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: testapp
-          MARIADB_USER: testapp
-          MARIADB_PASSWORD: testapp
+          POSTGRES_DB: testapp
+          POSTGRES_USER: testapp
+          POSTGRES_PASSWORD: testapp
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-cmd="pg_isready -U testapp -d testapp"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
@@ -37,8 +36,8 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     env:
-      TESTAPP_MARIADB_ROOT: Server=127.0.0.1;Port=3306;User=root;Password=root;
-      ConnectionStrings__Database: Server=127.0.0.1;Port=3306;Database=testapp;User=testapp;Password=testapp;
+      TESTAPP_POSTGRES_ADMIN: Host=127.0.0.1;Port=5432;Username=testapp;Password=testapp;Database=postgres;
+      ConnectionStrings__Database: Host=127.0.0.1;Port=5432;Database=testapp;Username=testapp;Password=testapp;
       TESTAPP_RABBITMQ: amqp://testapp:testapp@127.0.0.1:5672/
     steps:
       - uses: actions/checkout@v4
@@ -71,21 +70,22 @@ jobs:
       - name: Seed backup restore probe
         run: |
           docker run --rm --network host \
-            -e MYSQL_PWD=root \
-            mariadb:12.3 \
-            mariadb \
+            -e PGPASSWORD=testapp \
+            postgres:18 \
+            psql \
               --host=127.0.0.1 \
-              --port=3306 \
-              --user=root \
-              --database=testapp \
-              --execute="INSERT INTO idempotency_records (Id, Operation, ActorId, RequestId, ResultType, ResultJson, CreatedAt, RequestFingerprint) VALUES ('00000000-0000-0000-0000-000000000101', 'ci.backup.restore', 'ci', '00000000-0000-0000-0000-000000000102', 'System.String', '\"probe\"', NOW(6), REPEAT('0', 64));"
-      - name: Create and verify MariaDB backup
+              --port=5432 \
+              --username=testapp \
+              --dbname=testapp \
+              --set=ON_ERROR_STOP=1 \
+              --command="INSERT INTO idempotency_records (\"Id\", \"Operation\", \"ActorId\", \"RequestId\", \"ResultType\", \"ResultJson\", \"CreatedAt\", \"RequestFingerprint\") VALUES ('00000000-0000-0000-0000-000000000101', 'ci.backup.restore', 'ci', '00000000-0000-0000-0000-000000000102', 'System.String', '\"probe\"', CURRENT_TIMESTAMP, repeat('0', 64));"
+      - name: Create and verify PostgreSQL backup
         env:
-          MARIADB_PASSWORD: root
-          MARIADB_ADMIN_PASSWORD: root
-          VERIFY_QUERY: SELECT COUNT(*) FROM idempotency_records WHERE Operation = 'ci.backup.restore';
+          POSTGRES_PASSWORD: testapp
+          POSTGRES_ADMIN_PASSWORD: testapp
+          VERIFY_QUERY: SELECT COUNT(*) FROM idempotency_records WHERE "Operation" = 'ci.backup.restore';
           VERIFY_EXPECTED: '1'
         run: |
-          bash scripts/mariadb-backup.sh /tmp/testapp-ci.sql.gz
-          MARIADB_SOURCE_DATABASE=testapp \
-            bash scripts/mariadb-restore-verify.sh /tmp/testapp-ci.sql.gz testapp_restore_verify
+          bash scripts/postgresql-backup.sh /tmp/testapp-ci.dump
+          POSTGRES_SOURCE_DATABASE=testapp \
+            bash scripts/postgresql-restore-verify.sh /tmp/testapp-ci.dump testapp_restore_verify

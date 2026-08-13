@@ -46,7 +46,7 @@ IIntegrationEvent : IDomainEvent
 2. читает их `DomainEvents`;
 3. фильтрует `.OfType<IIntegrationEvent>()`;
 4. создаёт `OutboxMessage`;
-5. сохраняет бизнес-изменения и Outbox row одной MariaDB transaction;
+5. сохраняет бизнес-изменения и Outbox row одной PostgreSQL transaction;
 6. после успешного `SaveChanges` очищает domain events.
 
 Следствие:
@@ -127,17 +127,17 @@ Order: oldest `OccurredAt` first.
 
 ### 6.2 Multi-instance safety
 
-Для каждого message используется MariaDB advisory lock:
+Для каждого message используется session-level PostgreSQL advisory lock. Resource material:
 
 ```text
-testapp:outbox:{messageId}
+database + outbox:{messageId}
 ```
 
-Через dedicated MySql connection:
+SHA-256 material сокращается до signed 64-bit key. Через dedicated Npgsql connection:
 
 ```sql
-SELECT GET_LOCK(...)
-SELECT RELEASE_LOCK(...)
+SELECT pg_try_advisory_lock(@key);
+SELECT pg_advisory_unlock(@key);
 ```
 
 Это предотвращает одновременную публикацию одного row несколькими API instances.

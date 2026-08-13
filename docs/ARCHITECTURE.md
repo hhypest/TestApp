@@ -10,7 +10,7 @@ TestApp развивается как **modular monolith** на .NET 10. Осн�
 - Clean Architecture для направления зависимостей;
 - CQRS на уровне application/read-side разделения;
 - Minimal API как transport boundary;
-- MariaDB как единственная transactional source of truth;
+- PostgreSQL как единственная transactional source of truth;
 - Keycloak как внешний source of truth для identity;
 - transactional Outbox для будущих/текущих integration events;
 - RabbitMQ как opt-in transport;
@@ -101,16 +101,16 @@ Domain **не должен** ссылаться на:
 - transport-neutral `Error`;
 - CQRS read contracts.
 
-Application не знает о MariaDB SQL, RabbitMQ client и ASP.NET endpoint routing.
+Application не знает о PostgreSQL SQL, RabbitMQ client и ASP.NET endpoint routing.
 
 ### TestApp.Infrastructure
 
 Реализует:
 
-- EF Core/MariaDB persistence;
+- EF Core/PostgreSQL persistence;
 - repositories/read models;
 - optimistic concurrency mapping;
-- MariaDB advisory locks;
+- PostgreSQL advisory locks;
 - persistent idempotency store;
 - Keycloak claim mapping/current actor;
 - Outbox processing;
@@ -146,7 +146,7 @@ sequenceDiagram
     participant Handler as Application Handler
     participant Aggregate as Domain Aggregate
     participant Repo as Repository/EF
-    participant DB as MariaDB
+    participant DB as PostgreSQL
 
     Client->>API: HTTP command
     API->>Handler: typed command
@@ -170,7 +170,7 @@ sequenceDiagram
     participant API
     participant QueryHandler
     participant ReadQueries as Infrastructure projection
-    participant DB as MariaDB
+    participant DB as PostgreSQL
 
     Client->>API: GET
     API->>QueryHandler: query DTO
@@ -240,7 +240,7 @@ Per-attempt exceptions обрабатываются, но initial/batch DB scan 
 - poll interval 5 seconds;
 - retry exponential backoff;
 - max attempts 10;
-- MariaDB advisory lock по OutboxMessage ID;
+- PostgreSQL advisory lock по OutboxMessage ID;
 - at-least-once delivery.
 
 Per-message publish failures получают retry/dead-letter state. Ошибки batch query, advisory lock acquisition либо сохранения failure state могут выйти из worker loop; до 1.0 нужен общий resilient cycle с bounded backoff/health signal.
@@ -278,12 +278,12 @@ Application handler сначала выполняет actor-scoped replay lookup
 Общий `IdempotencyStore`:
 
 1. lookup cached result;
-2. MariaDB `GET_LOCK` по hash(database + operation + actor + requestId);
+2. bounded retry `pg_try_advisory_lock` по deterministic 64-bit hash(database + namespace + operation + actor + requestId);
 3. повторный lookup после lease;
 4. use case;
 5. insert `idempotency_records`;
 6. business result + idempotency result commit одной UoW;
-7. `RELEASE_LOCK`.
+7. explicit `pg_advisory_unlock` и dispose dedicated Npgsql connection.
 
 ## 10. Event boundaries
 
@@ -295,7 +295,7 @@ Aggregate может поднимать `IDomainEvent`. `AppDbContext.SaveChange
 
 ## 11. Runtime dependencies
 
-- MariaDB 12.3 — required;
+- PostgreSQL 18 — required;
 - Keycloak — required для нормальной JWT authentication runtime;
 - RabbitMQ — optional, только если `RabbitMq:Enabled=true`;
 - OTLP collector — optional;

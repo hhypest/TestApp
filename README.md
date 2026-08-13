@@ -7,14 +7,14 @@ Backend-система создания, публикации, назначен�
 | Компонент | Текущее состояние |
 |---|---|
 | Runtime | .NET 10 |
-| Persistence | MariaDB 12.3 |
-| ORM | EF Core 9.0.18 + Pomelo 9.0.0 |
+| Persistence | PostgreSQL 18 |
+| ORM | EF Core 9.0.18 + Npgsql EF provider 9.0.4 |
 | Identity | Keycloak / JWT Bearer |
 | Messaging | Transactional Outbox + RabbitMQ 4.3.x |
 | Observability | OpenTelemetry 1.17.0 |
 | API | Minimal API, canonical `/api/v1` |
 | Deployment | Docker/Compose + migration-only mode |
-| CI | GitHub Actions + real MariaDB/RabbitMQ integration tests |
+| CI | GitHub Actions + real PostgreSQL/RabbitMQ integration tests |
 
 ## Документация
 
@@ -26,7 +26,7 @@ Backend-система создания, публикации, назначен�
 - [Архитектура](docs/ARCHITECTURE.md)
 - [Доменная модель](docs/DOMAIN_MODEL.md)
 - [HTTP API](docs/API.md)
-- [Persistence / MariaDB](docs/PERSISTENCE.md)
+- [Persistence / PostgreSQL](docs/PERSISTENCE.md)
 - [Events / Outbox / RabbitMQ](docs/EVENTS_AND_OUTBOX.md)
 - [Безопасность](docs/SECURITY.md)
 - [Эксплуатация и deployment](docs/OPERATIONS.md)
@@ -140,15 +140,15 @@ GET /health/live
 GET /health/ready
 ```
 
-Readiness проверяет MariaDB, а при включённом RabbitMQ Outbox delivery — также broker connection/channel/exchange.
+Readiness проверяет PostgreSQL, а при включённом RabbitMQ Outbox delivery — также broker connection/channel/exchange.
 
 Полный endpoint catalog: [docs/API.md](docs/API.md).
 
 ## Persistence
 
-Основная СУБД — **MariaDB 12.3**.
+Основная СУБД — **PostgreSQL 18**.
 
-В production composition root используется `ServerVersion.AutoDetect(connectionString)`. CI отдельно проверяет фактический `SELECT VERSION()` и требует MariaDB >= 12.3.
+В composition root используется `UseNpgsql(connectionString)`. CI проверяет `SHOW server_version_num` и требует PostgreSQL 18+ (`>= 180000`).
 
 Migrations:
 
@@ -169,7 +169,7 @@ API replicas в Production не должны конкурировать за sch
 - aggregates используют optimistic `ConcurrencyVersion`;
 - EF concurrency conflict преобразуется в HTTP 409;
 - start attempt защищён unique DB request key + serializable attempt-limit transaction;
-- publish/assign/bulk-assign/submit используют persistent idempotency records + MariaDB `GET_LOCK/RELEASE_LOCK` distributed lease.
+- publish/assign/bulk-assign/submit используют persistent idempotency records + session-level PostgreSQL advisory lease (`pg_try_advisory_lock` / `pg_advisory_unlock`).
 
 Основной HTTP contract использует standard `Idempotency-Key` header; legacy body field временно поддерживается с mismatch validation и request fingerprint. Для publish/start/submit JSON body (`{}`) пока всё ещё обязателен даже при key только в header — настоящий zero-length-body вариант входит в stabilization backlog.
 
@@ -213,18 +213,13 @@ docker compose up --build
 
 - API — `http://localhost:8080`;
 - Keycloak — `http://localhost:8081`;
-- MariaDB 12.3 — `localhost:3306`;
+- PostgreSQL 18 — `localhost:5432`;
 - RabbitMQ AMQP — `localhost:5672`;
 - RabbitMQ management — `http://localhost:15672`;
 - OTLP gRPC — `localhost:4317`;
 - OTLP HTTP — `localhost:4318`.
 
-После перехода со старой MariaDB development volume рекомендуется чистый локальный старт:
-
-```bash
-docker compose down -v
-docker compose up --build
-```
+Compose создаёт новый volume `testapp-postgres`. Старый MariaDB volume не удаляется автоматически. Если в нём есть значимые данные, до переключения выполните отдельный [ETL/cutover](docs/PERSISTENCE.md#engine-cutover-и-существующие-mariadb-данные); обычный PostgreSQL backup script MariaDB dump не конвертирует.
 
 Development credentials находятся в [docs/OPERATIONS.md](docs/OPERATIONS.md) и предназначены только для локальной разработки.
 
@@ -238,7 +233,7 @@ docker compose -f compose.yaml config --quiet
 docker build -t testapp-api:local .
 ```
 
-GitHub Actions поднимает настоящие MariaDB 12.3 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image, запускает этот же image в `--migrate` режиме, проверяет logical backup/restore, выполняет image/secret scan и формирует SBOM. Отдельный performance workflow использует production-shaped stack и real Keycloak; его D6 exit gate пока не пройден полностью.
+GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image, запускает этот же image в `--migrate` режиме, проверяет logical backup/restore, выполняет image/secret scan и формирует SBOM. Отдельный performance workflow использует production-shaped stack и real Keycloak; его D6 exit gate пока не пройден полностью.
 
 ## Приоритет дальнейшего развития
 

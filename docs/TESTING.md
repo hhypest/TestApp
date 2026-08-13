@@ -10,7 +10,7 @@
 - immutable revision history;
 - authorization/data isolation;
 - concurrency/idempotency;
-- MariaDB-specific behavior;
+- PostgreSQL-specific behavior;
 - migrations;
 - Outbox/RabbitMQ delivery;
 - HTTP contract;
@@ -69,11 +69,11 @@ StartAttemptTests.cs
 
 ### Текущий gap
 
-Application unit coverage заметно меньше integration coverage. Новые complex handlers должны получать targeted unit tests, если сценарии можно проверить быстрее и точнее без MariaDB.
+Application unit coverage заметно меньше integration coverage. Новые complex handlers должны получать targeted unit tests, если сценарии можно проверить быстрее и точнее без PostgreSQL.
 
 ## 5. Integration tests
 
-Integration tests являются критической частью проекта и работают против real MariaDB service в CI. RabbitMQ-specific tests работают против real RabbitMQ service.
+Integration tests являются критической частью проекта и работают против real PostgreSQL service в CI. RabbitMQ-specific tests работают против real RabbitMQ service.
 
 Текущие test areas/files включают:
 
@@ -133,9 +133,9 @@ admin operations
 - `OutboxDeadLetterManagementTests.cs` / `OutboxDeadLetterApiTests.cs` — locked audited requeue/discard и payload-safe HTTP contract;
 - `OperationalMetricsTests.cs` — custom low-cardinality metric contract.
 
-### `MariaDbVersionTests.cs`
+### `PostgreSqlVersionTests.cs`
 
-Выполняет `SELECT VERSION()` и требует actual MariaDB runtime >= 12.3.
+Выполняет `SHOW server_version_num` и требует actual PostgreSQL runtime >= 18 (`>= 180000`).
 
 Назначение: Docker tag сам по себе не считается достаточным доказательством runtime baseline.
 
@@ -147,7 +147,7 @@ admin operations
 - assignment persistence;
 - optimistic concurrency conflict;
 - start request idempotency;
-- MariaDB advisory idempotency lease между разными DbContexts.
+- PostgreSQL advisory idempotency lease между разными DbContexts.
 
 ### `PublishedRevisionPersistenceTests.cs`
 
@@ -195,14 +195,14 @@ outbox row
 
 Проверяет active RabbitMQ readiness connection/channel/exchange access.
 
-## 6. MariaDB test database strategy
+## 6. PostgreSQL test database strategy
 
-`MariaDbTestDatabase`:
+`PostgreSqlTestDatabase`:
 
-- подключается root connection к CI/local MariaDB;
+- подключается admin connection из `TESTAPP_POSTGRES_ADMIN` к CI/local PostgreSQL;
 - создаёт уникальную temporary database на test;
-- использует MariaDB 12.3 EF server version baseline;
-- после test удаляет database.
+- использует `UseNpgsql` с pooling disabled для disposable database;
+- после test завершает оставшиеся target sessions и удаляет database.
 
 Преимущества:
 
@@ -213,18 +213,18 @@ outbox row
 
 ## 7. Почему SQLite/in-memory provider запрещён для persistence regressions
 
-Provider-specific behavior, которое должно проверяться на MariaDB:
+Provider-specific behavior, которое должно проверяться на PostgreSQL:
 
 - SQL dialect;
 - DDL/migrations;
-- datetime/decimal mappings;
+- `uuid`/`timestamptz`/decimal mappings;
 - composite indexes;
 - unique constraints;
 - serializable transaction behavior;
-- `GET_LOCK/RELEASE_LOCK`;
+- `pg_try_advisory_lock/pg_advisory_unlock`;
 - concurrency update semantics;
-- charset/collation;
-- JSON longtext converter round-trip.
+- locale/collation behavior;
+- `jsonb` immutable snapshot round-trip.
 
 Поэтому persistence test на SQLite не является эквивалентом production validation.
 
@@ -265,7 +265,7 @@ Keycloak claim mapping должен иметь отдельные integration/un
 
 GitHub Actions `dotnet` workflow:
 
-1. MariaDB 12.3 service container;
+1. PostgreSQL 18 service container;
 2. RabbitMQ 4.3.1 management service;
 3. checkout;
 4. setup .NET 10;
@@ -274,13 +274,13 @@ GitHub Actions `dotnet` workflow:
 7. Release tests;
 8. `docker compose config --quiet`;
 9. build production API image;
-10. run production image `--migrate` against MariaDB;
+10. run production image `--migrate` against PostgreSQL;
 11. create logical backup and verify isolated restore/business marker;
 12. cleanup containers.
 
 Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
 
-Отдельный `performance` workflow поднимает production-shaped API/MariaDB/RabbitMQ/Keycloak stack, получает real JWT и проверяет k6 HTTP scenarios, expiration storm и Outbox recovery.
+Отдельный `performance` workflow поднимает production-shaped API/PostgreSQL/RabbitMQ/Keycloak stack, получает real JWT и проверяет k6 HTTP scenarios, expiration storm и Outbox recovery.
 
 ### Merge/release gate
 
@@ -377,7 +377,7 @@ GitHub Actions `dotnet` workflow:
 ### P2
 
 - endurance/soak Outbox;
-- failover/restart MariaDB/RabbitMQ scenarios;
+- failover/restart PostgreSQL/RabbitMQ scenarios;
 - staging/platform backup restore drill;
 - contract tests for frontend/SDK.
 
@@ -394,7 +394,7 @@ GitHub Actions `dotnet` workflow:
 
 Thresholds и artifacts описаны в `PERFORMANCE.md`.
 
-Текущий verification status: на `ff33a95` HTTP k6 и expiration probe прошли, но RabbitMQ probe topology setup вернул HTTP 400 до создания Outbox backlog. Следовательно, D6 пока не green и Outbox drain этим run не доказан.
+Текущий verification status: database migration инвалидировала предыдущее MariaDB performance evidence. D6 остаётся `VERIFYING`, пока полный k6/expiration/Outbox workflow не пройдёт на exact PostgreSQL implementation HEAD.
 
 Для staging/soak дополнительно измерять:
 
@@ -429,7 +429,7 @@ Processor_marks_message_processed_only_after_RabbitMQ_delivery
 Фича не Done, если:
 
 - нет regression test ключевого business rule;
-- schema change не проверен MariaDB;
+- schema change не проверен PostgreSQL;
 - новый endpoint не имеет auth negative test;
 - sensitive DTO не проверен на leakage;
 - unsafe command не имеет retry/concurrency story;

@@ -22,7 +22,7 @@ public sealed class RabbitMqOutboxPipelineTests
             return;
 
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var exchange = $"testapp.events.pipeline.{Guid.CreateVersion7():N}";
         var integrationEvent = new PipelineIntegrationEvent(Guid.CreateVersion7(), DateTimeOffset.UtcNow, "pipeline-payload");
 
@@ -42,9 +42,7 @@ public sealed class RabbitMqOutboxPipelineTests
 
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<AppDbContext>(o => o.UseMySql(
-            database.ConnectionString,
-            MariaDbTestDatabase.EfServerVersion));
+        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(database.ConnectionString));
         services.Configure<RabbitMqOutboxOptions>(options =>
         {
             options.Enabled = true;

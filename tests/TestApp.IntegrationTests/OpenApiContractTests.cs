@@ -11,7 +11,7 @@ public sealed class OpenApiContractTests
     public async Task OpenApi_documents_security_retry_concurrency_and_error_contracts()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
 

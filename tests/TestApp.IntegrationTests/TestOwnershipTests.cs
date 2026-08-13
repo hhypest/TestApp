@@ -20,7 +20,7 @@ public sealed class TestOwnershipTests
     public async Task Authors_are_isolated_while_admin_has_global_scope()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
 

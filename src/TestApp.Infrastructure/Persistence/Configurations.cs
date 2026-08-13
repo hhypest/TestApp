@@ -63,7 +63,7 @@ public sealed class RevisionConfiguration : IEntityTypeConfiguration<PublishedTe
                 v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
                 v => JsonSerializer.Deserialize<List<PublishedQuestion>>(v, JsonSerializerOptions.Default) ?? new List<PublishedQuestion>())
             .HasColumnName("questions_json")
-            .HasColumnType("longtext");
+            .HasColumnType("jsonb");
         b.Ignore(x => x.DomainEvents);
         b.HasIndex(x => new { x.TestId, x.Version }).IsUnique();
     }

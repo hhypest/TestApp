@@ -13,7 +13,7 @@ public sealed class OutboxDeadLetterManagementTests
     public async Task Manager_requeues_and_discards_dead_letters_with_atomic_audit()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         using var metrics = new OperationalMetrics();
         var requeueId = Guid.NewGuid();
         var discardId = Guid.NewGuid();

@@ -47,7 +47,7 @@ public sealed record ReverseProxyRuntimeOptions(
 public static class RuntimeConfiguration
 {
     private const string DevelopmentDatabase =
-        "Server=localhost;Port=3306;Database=testapp;User=testapp;Password=testapp;";
+        "Host=localhost;Port=5432;Database=testapp;Username=testapp;Password=testapp;";
 
     public static DatabaseRuntimeOptions LoadDatabase(IConfiguration configuration, IHostEnvironment environment)
     {

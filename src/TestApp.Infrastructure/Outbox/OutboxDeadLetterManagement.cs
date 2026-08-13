@@ -58,7 +58,7 @@ public sealed class OutboxDeadLetterAction
             Action = action,
             ActorId = actor.Value,
             Reason = normalizedReason,
-            OccurredAt = occurredAt,
+            OccurredAt = occurredAt.ToUniversalTime(),
             CorrelationId = normalizedCorrelation
         };
     }

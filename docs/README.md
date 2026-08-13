@@ -1,6 +1,6 @@
 # Документация TestApp
 
-> Состояние документации: `beta-ddd`, baseline 2026-08-13. Фактический код и CI сверены на commit `ff33a954b381e0632ade738c88fe3ac386003529`; последующие изменения этого набора являются documentation-only.
+> Состояние документации: `beta-ddd`, baseline 2026-08-13. Persistence/runtime/CI контур переведён на PostgreSQL 18; exact-head evidence определяется последними GitHub Actions runs ветки.
 
 Этот каталог является навигационной точкой по архитектуре, бизнес-модели, API, persistence, безопасности, эксплуатации, тестированию и плану развития TestApp.
 
@@ -30,7 +30,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Модульная архитектура, зависимости проектов, CQRS flow, request pipeline и background workers |
 | [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | Aggregates, value objects, lifecycle, инварианты, scoring и state transitions |
 | [API.md](API.md) | Canonical `/api/v1`, legacy compatibility, endpoints, authorization, DTO, ошибки, pagination и idempotency |
-| [PERSISTENCE.md](PERSISTENCE.md) | MariaDB 12.3, EF mappings, schema, migrations, optimistic concurrency и advisory locks |
+| [PERSISTENCE.md](PERSISTENCE.md) | PostgreSQL 18, EF mappings, schema, migrations, optimistic concurrency и advisory locks |
 | [EVENTS_AND_OUTBOX.md](EVENTS_AND_OUTBOX.md) | Domain/integration events, transactional Outbox, RabbitMQ, retry/dead-letter и delivery semantics |
 | [SECURITY.md](SECURITY.md) | Keycloak/JWT claims, роли/policies, owner isolation, rate limiting, audit и remaining security backlog |
 | [OPERATIONS.md](OPERATIONS.md) | Docker Compose, migrations, health, OpenTelemetry, RabbitMQ, runbooks и конфигурация |
@@ -48,14 +48,14 @@
 
 - .NET 10;
 - DDD + Clean Architecture + CQRS в modular monolith;
-- EF Core 9.0.18 + Pomelo 9.0.0;
-- MariaDB 12.3;
+- EF Core 9.0.18 + Npgsql EF provider 9.0.4;
+- PostgreSQL 18;
 - Keycloak как внешний Identity Provider;
 - Minimal API + JWT Bearer;
 - RabbitMQ 4.3.x transport для Outbox;
 - OpenTelemetry 1.17.0;
 - Docker/Compose;
-- GitHub Actions с реальными MariaDB/RabbitMQ service containers.
+- GitHub Actions с реальными PostgreSQL/RabbitMQ service containers.
 
 ## Базовый словарь
 
@@ -66,8 +66,8 @@
 - **Actor** — пользователь, идентифицированный внешним `sub` из Keycloak.
 - **Domain event** — внутреннее бизнес-событие aggregate.
 - **Integration event** — явно отмеченное событие, разрешённое к выходу через Outbox.
-- **Outbox** — durable запись integration event в той же MariaDB transaction, что и бизнес-изменение.
-- **Idempotency lease** — MariaDB advisory lock, сериализующий повторяемые unsafe operations между API instances.
+- **Outbox** — durable запись integration event в той же PostgreSQL transaction, что и бизнес-изменение.
+- **Idempotency lease** — PostgreSQL advisory lock, сериализующий повторяемые unsafe operations между API instances.
 
 ## Правило актуализации
 

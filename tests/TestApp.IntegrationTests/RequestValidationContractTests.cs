@@ -20,7 +20,7 @@ public sealed class RequestValidationContractTests
     public async Task Malformed_binding_returns_stable_request_invalid_problem()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         Authenticate(client, "author-validation", "test-author");
@@ -43,7 +43,7 @@ public sealed class RequestValidationContractTests
     public async Task Semantic_transport_validation_is_stable_and_does_not_mutate_state()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         Authenticate(client, "author-validation", "test-author");

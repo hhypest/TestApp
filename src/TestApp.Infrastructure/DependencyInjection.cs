@@ -46,7 +46,7 @@ public static class DependencyInjection
         services.AddHostedService<OperationalRetentionWorker>();
         services.AddHostedService<OperationalMetricsSampler>();
         services.AddHealthChecks()
-            .AddCheck<DatabaseHealthCheck>("mariadb", tags: ["ready"]);
+            .AddCheck<DatabaseHealthCheck>("postgresql", tags: ["ready"]);
         services.AddSingleton<IStartupFilter, HealthEndpointStartupFilter>();
         AddObservability(services);
         return services;

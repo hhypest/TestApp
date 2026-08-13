@@ -88,12 +88,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/performance
-          DB_CONTAINER=$(docker compose -f compose.yaml -f performance/compose.performance.yaml ps -q mariadb)
-          docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -e \
-            "UPDATE test_attempts SET DeadlineAt = UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE WHERE Status = 1;"
+          DB_CONTAINER=$(docker compose -f compose.yaml -f performance/compose.performance.yaml ps -q postgres)
+          docker exec -i "$DB_CONTAINER" psql -U testapp -d testapp -v ON_ERROR_STOP=1 <<'SQL'
+          UPDATE test_attempts
+          SET "DeadlineAt" = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+          WHERE "Status" = 1;
+          SQL
 
-          INITIAL=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
-            "SELECT COUNT(*) FROM test_attempts WHERE Status = 1 AND DeadlineAt < UTC_TIMESTAMP(6);")
+          INITIAL=$(docker exec "$DB_CONTAINER" psql -U testapp -d testapp -Atqc \
+            'SELECT COUNT(*) FROM test_attempts WHERE "Status" = 1 AND "DeadlineAt" < CURRENT_TIMESTAMP;')
           if [ "$INITIAL" -lt 1 ]; then
             echo "Capacity run did not leave any in-progress attempts for expiration probe" >&2
             exit 1
@@ -102,8 +105,8 @@ jobs:
           START=$(date +%s)
           REMAINING="$INITIAL"
           for attempt in $(seq 1 30); do
-            REMAINING=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
-              "SELECT COUNT(*) FROM test_attempts WHERE Status = 1 AND DeadlineAt < UTC_TIMESTAMP(6);")
+            REMAINING=$(docker exec "$DB_CONTAINER" psql -U testapp -d testapp -Atqc \
+              'SELECT COUNT(*) FROM test_attempts WHERE "Status" = 1 AND "DeadlineAt" < CURRENT_TIMESTAMP;')
             if [ "$REMAINING" -eq 0 ]; then
               break
             fi
@@ -123,7 +126,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/performance
-          DB_CONTAINER=$(docker compose -f compose.yaml -f performance/compose.performance.yaml ps -q mariadb)
+          DB_CONTAINER=$(docker compose -f compose.yaml -f performance/compose.performance.yaml ps -q postgres)
 
           curl --fail --silent --show-error -u testapp:testapp \
             -H 'content-type: application/json' \
@@ -134,16 +137,15 @@ jobs:
             -X POST http://localhost:15672/api/bindings/%2F/e/testapp.events/q/capacity-probe \
             -d '{"routing_key":"testapp.#","arguments":{}}' >/dev/null
 
-          docker exec -i "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp <<'SQL'
+          docker exec -i "$DB_CONTAINER" psql -U testapp -d testapp -v ON_ERROR_STOP=1 <<'SQL'
           INSERT INTO outbox_messages
-              (Id, OccurredAt, Type, Payload, ProcessedAt, Error, AttemptCount, LastAttemptAt, NextAttemptAt, DeadLetteredAt, DiscardedAt)
-          SELECT UUID(), UTC_TIMESTAMP(6), 'CapacityProbe', '{"probe":true}', NULL, NULL, 0, NULL, NULL, NULL, NULL
-          FROM information_schema.COLUMNS
-          LIMIT 100;
+              ("Id", "OccurredAt", "Type", "Payload", "ProcessedAt", "Error", "AttemptCount", "LastAttemptAt", "NextAttemptAt", "DeadLetteredAt", "DiscardedAt")
+          SELECT gen_random_uuid(), CURRENT_TIMESTAMP, 'CapacityProbe', '{"probe":true}', NULL, NULL, 0, NULL, NULL, NULL, NULL
+          FROM generate_series(1, 100);
           SQL
 
-          INITIAL=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
-            "SELECT COUNT(*) FROM outbox_messages WHERE Type = 'CapacityProbe' AND ProcessedAt IS NULL;")
+          INITIAL=$(docker exec "$DB_CONTAINER" psql -U testapp -d testapp -Atqc \
+            "SELECT COUNT(*) FROM outbox_messages WHERE \"Type\" = 'CapacityProbe' AND \"ProcessedAt\" IS NULL;")
           if [ "$INITIAL" -ne 100 ]; then
             echo "Expected 100 synthetic Outbox messages, found $INITIAL" >&2
             exit 1
@@ -152,8 +154,8 @@ jobs:
           START=$(date +%s)
           REMAINING="$INITIAL"
           for attempt in $(seq 1 30); do
-            REMAINING=$(docker exec "$DB_CONTAINER" mariadb -utestapp -ptestapp testapp -Nse \
-              "SELECT COUNT(*) FROM outbox_messages WHERE Type = 'CapacityProbe' AND ProcessedAt IS NULL;")
+            REMAINING=$(docker exec "$DB_CONTAINER" psql -U testapp -d testapp -Atqc \
+              "SELECT COUNT(*) FROM outbox_messages WHERE \"Type\" = 'CapacityProbe' AND \"ProcessedAt\" IS NULL;")
             if [ "$REMAINING" -eq 0 ]; then
               break
             fi

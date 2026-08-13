@@ -21,7 +21,7 @@ public sealed class OverdueAttemptExpirationTests
     public async Task Processor_transitions_overdue_attempt_to_timed_out()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var now = DateTimeOffset.Parse("2026-08-12T14:00:00Z");
 
         var test = Test.Create("Expiration test", ExternalUserId.FromSubject("author-1"));
@@ -63,9 +63,7 @@ public sealed class OverdueAttemptExpirationTests
         }
 
         var services = new ServiceCollection();
-        services.AddDbContext<AppDbContext>(o => o.UseMySql(
-            database.ConnectionString,
-            MariaDbTestDatabase.EfServerVersion));
+        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(database.ConnectionString));
         services.AddScoped<ITestAttemptRepository, TestAttemptRepository>();
         services.AddScoped<IPublishedTestRevisionRepository, PublishedTestRevisionRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());

@@ -280,9 +280,9 @@ Production recommendation:
 
 Production:
 
-- API DB user без root privileges;
+- API DB role без `SUPERUSER`, database ownership и DDL privileges;
 - migration job может иметь отдельный более привилегированный user;
-- TLS для remote MariaDB;
+- TLS для remote PostgreSQL;
 - backup encryption;
 - credential rotation;
 - network allow-list/private subnet.

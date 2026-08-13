@@ -18,7 +18,7 @@ public sealed class ApiLifecycleContractTests
     public async Task Legacy_alias_emits_deprecation_and_optional_sunset_headers_only_on_legacy_requests()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString, legacyCompatibilityEnabled: true, SunsetAt);
         using var client = factory.CreateClient();
 
@@ -37,7 +37,7 @@ public sealed class ApiLifecycleContractTests
     public async Task Disabled_legacy_compatibility_returns_explicit_gone_problem()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString, legacyCompatibilityEnabled: false, SunsetAt);
         using var client = factory.CreateClient();
 

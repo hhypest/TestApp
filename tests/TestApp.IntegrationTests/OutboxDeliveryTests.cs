@@ -16,7 +16,7 @@ public sealed class OutboxDeliveryTests
     public async Task Successful_delivery_marks_message_processed_and_passes_event_id()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var integrationEvent = new TestIntegrationEvent(Guid.NewGuid(), DateTimeOffset.UtcNow, "payload");
 
         await using (var setup = database.CreateContext())
@@ -46,7 +46,7 @@ public sealed class OutboxDeliveryTests
     public async Task Failed_delivery_is_dead_lettered_and_visible_to_operations_monitor()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var integrationEvent = new TestIntegrationEvent(Guid.NewGuid(), DateTimeOffset.UtcNow, "payload");
 
         await using (var setup = database.CreateContext())
@@ -88,7 +88,7 @@ public sealed class OutboxDeliveryTests
     private static ServiceProvider BuildServices(string connectionString, IOutboxPublisher publisher)
     {
         var services = new ServiceCollection();
-        services.AddDbContext<AppDbContext>(o => o.UseMySql(connectionString, new MariaDbServerVersion(new Version(11, 4, 0))));
+        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connectionString));
         services.AddSingleton<OperationalMetrics>();
         services.AddScoped<IOutboxPublisher>(_ => publisher);
         return services.BuildServiceProvider();

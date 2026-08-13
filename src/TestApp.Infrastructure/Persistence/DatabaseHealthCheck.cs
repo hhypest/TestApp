@@ -11,12 +11,12 @@ public sealed class DatabaseHealthCheck(AppDbContext db) : IHealthCheck
         try
         {
             return await db.Database.CanConnectAsync(cancellationToken)
-                ? HealthCheckResult.Healthy("MariaDB is reachable.")
-                : HealthCheckResult.Unhealthy("MariaDB is not reachable.");
+                ? HealthCheckResult.Healthy("PostgreSQL is reachable.")
+                : HealthCheckResult.Unhealthy("PostgreSQL is not reachable.");
         }
         catch (Exception exception)
         {
-            return HealthCheckResult.Unhealthy("MariaDB readiness check failed.", exception);
+            return HealthCheckResult.Unhealthy("PostgreSQL readiness check failed.", exception);
         }
     }
 }

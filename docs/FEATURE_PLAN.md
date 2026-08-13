@@ -1,6 +1,6 @@
 # Детальный план фич TestApp
 
-> Этот backlog является рабочим планом на code baseline `ff33a95`. `DONE` означает реализовано и покрыто текущим repository baseline; `VERIFYING` — код/automation есть, но обязательный exit gate ещё не green; `PLANNED` — согласованный следующий технический шаг; `DECISION` — требуется продуктово-архитектурное решение до реализации.
+> Этот backlog является рабочим планом ветки `beta-ddd`. `DONE` означает реализовано и покрыто repository baseline; `VERIFYING` — automation есть, но обязательный exact-head gate ещё не green; `PLANNED` — согласованный следующий шаг; `DECISION` — требуется отдельное решение.
 
 ## Обозначения
 
@@ -45,9 +45,10 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | ATT-006 | Own attempt/result reads | DONE | student-safe |
 | RES-001 | Reviewer result list | DONE | test/revision/outcome filters |
 | RES-002 | Reviewer result detail | DONE | correctness breakdown |
-| DB-001 | MariaDB 12.3 | DONE | runtime + CI version assertion |
+| DB-001 | PostgreSQL 18 | DONE | runtime + CI version assertion |
 | DB-002 | Optimistic concurrency | DONE | aggregate version -> 409 |
-| IDEM-001 | Distributed idempotency store | DONE | MariaDB advisory lease |
+| DB-003 | Npgsql schema baseline | DONE | native uuid/timestamptz/jsonb + model snapshot |
+| IDEM-001 | Distributed idempotency store | DONE | PostgreSQL advisory lease |
 | IDEM-002 | Idempotent publish | DONE | persistent result |
 | IDEM-003 | Idempotent assign/bulk | DONE | persistent result |
 | IDEM-004 | Idempotent submit | DONE | cached score |
@@ -67,7 +68,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | OPS-001 | Docker image | DONE | multi-stage/non-root |
 | OPS-002 | Compose stack | DONE | DB/RMQ/Keycloak/OTEL/migrate/API |
 | OPS-003 | Migration-only mode | DONE | `--migrate`; DB-only composition остаётся STAB-005 |
-| TEST-001 | MariaDB integration suite | DONE | real provider |
+| TEST-001 | PostgreSQL integration suite | DONE | real provider |
 | TEST-002 | RabbitMQ integration suite | DONE | real broker |
 | TEST-003 | production image migration CI | DONE | release-path gate |
 
@@ -85,7 +86,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | STAB-006 | P1 | PLANNED | deterministic timestamp + ID pagination order |
 | STAB-007 | P1 | PLANNED | SQL joins/aggregates for reviewer/admin hot queries |
 
-`STAB-004` остаётся `VERIFYING`: на `ff33a95` authenticated k6 и expiration probe прошли, но RabbitMQ Management API вернул HTTP 400 при topology setup до создания synthetic Outbox backlog.
+`STAB-004` остаётся `VERIFYING`: после миграции persistence полный HTTP/expiration/Outbox gate должен заново пройти на exact PostgreSQL implementation HEAD.
 
 ---
 
@@ -1025,9 +1026,9 @@ Introduce `Directory.Packages.props` if package count continues growing.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
-Create repeatable `dotnet ef` workflow while preserving MariaDB-specific review.
+Repeatable `dotnet ef` workflow реализован через `AppDbContextDesignFactory`; PostgreSQL baseline имеет designer metadata и `AppDbContextModelSnapshot`.
 
 ## DEV-003 — Architecture dependency tests
 
@@ -1097,7 +1098,7 @@ Feature можно брать в реализацию, когда известн
 
 - code реализован по layer boundaries;
 - domain invariants unit-tested;
-- MariaDB integration tests при persistence change;
+- PostgreSQL integration tests при persistence change;
 - HTTP E2E happy + negative auth;
 - concurrency/idempotency test если применимо;
 - student correctness boundary проверен;

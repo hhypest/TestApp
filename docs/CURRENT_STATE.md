@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, обновлён после baseline `1dbf4e60e7f55874fb252a7a79c7445a573e4a5f` (2026-08-13). Phase A, B, C, D1–D5 и STAB-001 завершены; D6 реализована, но её exit gate ещё не пройден.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-13. Phase A, B, C, D1–D5, STAB-001 и PostgreSQL migration реализованы; exact-head CI/D6 evidence определяется последними GitHub Actions runs.
 
 ## 1. Назначение системы
 
@@ -82,16 +82,16 @@ Migration существующих tests использует специальн
 
 ## 3. Persistence и consistency
 
-- MariaDB **12.3** runtime/CI baseline;
-- EF Core 9.0.18 + Pomelo 9.0.0;
-- explicit migrations;
+- PostgreSQL **18** runtime/CI baseline;
+- EF Core 9.0.18 + Npgsql EF provider 9.0.4;
+- generated PostgreSQL baseline migration + model snapshot;
 - production `--migrate` mode;
 - startup migration разрешена только Development;
 - optimistic concurrency через `ConcurrencyVersion`;
 - `DbUpdateConcurrencyException -> ConcurrencyConflictException`;
 - normalized attempt responses;
 - immutable revision questions JSON snapshot;
-- distributed MariaDB advisory locks для common idempotency и Outbox.
+- session-level PostgreSQL advisory locks для common idempotency, Outbox и retention.
 
 ## 4. HTTP optimistic concurrency
 
@@ -222,7 +222,7 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - custom `TestApp.Operations` metrics для Outbox, expiration, retention и bounded API exception categories;
 - optional OTLP exporter;
 - `/health/live`;
-- `/health/ready` MariaDB + RabbitMQ при enabled transport.
+- `/health/ready` PostgreSQL + RabbitMQ при enabled transport.
 
 **Известное ограничение:** из-за текущего порядка `UseExceptionHandler`/`CorrelationAuditMiddleware` некоторые exceptions, позже корректно преобразованные в HTTP `400/409`, могут сохраниться в audit как `500`. Response для клиента остаётся корректным, но operational audit status требует исправления.
 
@@ -238,7 +238,7 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - exponential retry/backoff;
 - dead-letter state;
 - admin-only safe dead-letter detail/requeue/discard с mandatory reason и action audit;
-- MariaDB advisory lock per message;
+- PostgreSQL advisory lock per message;
 - operations Outbox monitoring endpoint;
 - RabbitMQ readiness.
 
@@ -250,9 +250,9 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 - multi-stage production Docker image;
 - non-root runtime user;
-- Compose: API, MariaDB 12.3, RabbitMQ, Keycloak, migration container, OTEL Collector;
-- CI использует реальные MariaDB/RabbitMQ;
-- MariaDB 12.3 runtime assertion;
+- Compose: API, PostgreSQL 18, RabbitMQ, Keycloak, migration container, OTEL Collector;
+- CI использует реальные PostgreSQL/RabbitMQ;
+- PostgreSQL 18 runtime assertion;
 - restore/build/tests;
 - high/critical NuGet vulnerability gate;
 - Compose validation;
@@ -284,7 +284,7 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 Не завершены:
 
-- D6: последний exact-head `performance` run упал на RabbitMQ Management API topology setup до создания synthetic Outbox backlog; полного green evidence ещё нет;
+- D6: прежнее MariaDB evidence не подтверждает новый PostgreSQL baseline; требуется полный green exact-head run;
 - staging/platform restore drill с измеренным RTO;
 - реальные dashboards/alert routes и alert drill;
 - deployment-owned secret store, backup scheduling/PITR/offsite policy;

@@ -2,7 +2,7 @@
 
 > Scope: `beta-ddd`. Эти значения являются CI regression gates, а не production SLA и не аппаратно-независимым обещанием throughput.
 
-> Verification status на code baseline `ff33a95`: **VERIFYING**. [`performance` run 31668024062](https://github.com/hhypest/TestApp/actions/runs/31668024062) прошёл production-shaped startup, authenticated k6 и expiration storm, но RabbitMQ Management API вернул HTTP 400 во время probe queue/binding setup до вставки synthetic Outbox rows. Полного green D6 evidence пока нет.
+> Verification status: **VERIFYING**. Смена database engine инвалидировала прежний MariaDB capacity baseline. Полный D6 gate должен быть заново пройден на exact PostgreSQL implementation HEAD.
 
 ## Цель D6
 
@@ -15,7 +15,7 @@ Capacity baseline защищает наиболее важные пути:
 - overdue-attempt expiration drain;
 - Outbox backlog recovery через RabbitMQ.
 
-Workflow `.github/workflows/performance.yml` использует production Docker image и реальные MariaDB 12.3, RabbitMQ и Keycloak. HTTP-сценарии находятся в `performance/k6/api-capacity.js` и получают JWT через локальный Keycloak realm.
+Workflow `.github/workflows/performance.yml` использует production Docker image и реальные PostgreSQL 18, RabbitMQ и Keycloak. HTTP-сценарии находятся в `performance/k6/api-capacity.js` и получают JWT через локальный Keycloak realm.
 
 ## HTTP regression gates
 
@@ -34,13 +34,13 @@ Workflow `.github/workflows/performance.yml` использует production Doc
 
 ### Expiration storm
 
-После HTTP-нагрузки оставшиеся `InProgress` attempts переводятся в overdue в изолированной CI MariaDB. Реальный expiration worker должен уменьшить backlog до нуля не более чем за 30 секунд. В performance environment poll interval равен 1 секунде.
+После HTTP-нагрузки оставшиеся `InProgress` attempts переводятся в overdue в изолированной CI PostgreSQL. Реальный expiration worker должен уменьшить backlog до нуля не более чем за 30 секунд. В performance environment poll interval равен 1 секунде.
 
 ### Outbox recovery
 
 Workflow создаёт временную RabbitMQ queue, связанную с `testapp.events`, и добавляет 100 synthetic `CapacityProbe` Outbox rows в изолированную CI database. Реальный `OutboxProcessor` с publisher confirms должен отметить все 100 сообщений как processed не более чем за 30 секунд.
 
-Topology setup является частью gate: при ошибке workflow должен сохранять HTTP status/response body, явно проверить exchange/queue/binding и не интерпретировать setup failure как application backlog failure.
+Topology setup является частью gate: setup failure нельзя интерпретировать как application backlog failure.
 
 ## Evidence
 
@@ -54,4 +54,4 @@ Topology setup является частью gate: при ошибке workflow 
 
 GitHub-hosted runner — shared и шумная среда. Эти thresholds предназначены для поиска крупных регрессий. Перед 1.0 staging soak должен отдельно зафиксировать production-like topology, CPU/RAM, dataset size, concurrent students, p95/p99, DB pool behavior и sustained Outbox traffic.
 
-При падении gate сначала сравниваются artifacts и service logs с последним зелёным baseline. Если failure произошёл до создания workload (как на `ff33a95`), отдельно исправляется/диагностируется test harness. Threshold нельзя повышать только ради зелёного CI без документированного изменения capacity expectation.
+При падении gate сначала сравниваются artifacts и service logs с последним зелёным PostgreSQL baseline. Если failure произошёл до создания workload, отдельно диагностируется test harness. Threshold нельзя повышать только ради зелёного CI без документированного изменения capacity expectation.

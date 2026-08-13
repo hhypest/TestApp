@@ -46,6 +46,7 @@ public sealed class TestAttemptRepository(AppDbContext db) : ITestAttemptReposit
     public async Task<IReadOnlyCollection<TestAttemptId>> GetExpiredInProgressIdsAsync(DateTimeOffset now, int limit, CancellationToken ct = default)
     {
         if (limit < 1) return Array.Empty<TestAttemptId>();
+        now = now.ToUniversalTime();
 
         return await db.Attempts
             .AsNoTracking()

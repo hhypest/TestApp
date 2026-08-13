@@ -70,6 +70,8 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
 
     private TestAttempt(TestAttemptId id, TestAssignmentId assignmentId, PublishedTestRevisionId revisionId, ExternalUserId userId, Guid startRequestId, DateTimeOffset startedAt, DateTimeOffset? deadlineAt, IEnumerable<QuestionId> questionIds) : base(id)
     {
+        startedAt = startedAt.ToUniversalTime();
+        deadlineAt = deadlineAt?.ToUniversalTime();
         if (startRequestId == Guid.Empty) throw new ArgumentException("Start request id cannot be empty.", nameof(startRequestId));
         if (deadlineAt is not null && deadlineAt <= startedAt) throw new ArgumentException("Deadline must be later than start time.", nameof(deadlineAt));
         AssignmentId = assignmentId;
@@ -86,7 +88,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     {
         ArgumentNullException.ThrowIfNull(questionIds);
         var attempt = new TestAttempt(id, assignmentId, revisionId, userId, startRequestId, startedAt, deadlineAt, questionIds);
-        attempt.Raise(new AttemptStarted(id, assignmentId, revisionId, userId, startRequestId, startedAt));
+        attempt.Raise(new AttemptStarted(id, assignmentId, revisionId, userId, startRequestId, attempt.StartedAt));
         return attempt;
     }
 
@@ -94,6 +96,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
 
     public Result<TestAttempt, DomainError> Answer(QuestionId questionId, IEnumerable<AnswerOptionId> optionIds, DateTimeOffset answeredAt)
     {
+        answeredAt = answeredAt.ToUniversalTime();
         var active = EnsureWritable(answeredAt); if (active.Match(_ => false, _ => true)) return active;
         ArgumentNullException.ThrowIfNull(optionIds);
         var selected = optionIds.Distinct().ToArray();
@@ -105,6 +108,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
 
     public Result<TestAttempt, DomainError> ClearAnswer(QuestionId questionId, DateTimeOffset now)
     {
+        now = now.ToUniversalTime();
         var active = EnsureWritable(now); if (active.Match(_ => false, _ => true)) return active;
         var response = _responses.SingleOrDefault(x => x.Id == questionId);
         if (response is null) return DomainError.NotFound("attempt.question.not_found", "Question is not part of this attempt.");
@@ -113,6 +117,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
 
     public Result<TestAttempt, DomainError> Submit(DateTimeOffset submittedAt, AttemptScore score, bool passed)
     {
+        submittedAt = submittedAt.ToUniversalTime();
         var active = EnsureInProgress(); if (active.Match(_ => false, _ => true)) return active;
         if (submittedAt < StartedAt) return DomainError.Validation("attempt.completed_at", "Completion time cannot be earlier than start time.");
         if (IsExpiredAt(submittedAt)) return DomainError.Conflict("attempt.expired", "The attempt deadline has expired.");
@@ -123,6 +128,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
 
     public Result<TestAttempt, DomainError> Timeout(DateTimeOffset timedOutAt, AttemptScore score, bool passed)
     {
+        timedOutAt = timedOutAt.ToUniversalTime();
         var active = EnsureInProgress(); if (active.Match(_ => false, _ => true)) return active;
         if (timedOutAt < StartedAt) return DomainError.Validation("attempt.completed_at", "Completion time cannot be earlier than start time.");
         Complete(AttemptStatus.TimedOut, timedOutAt, score, passed);
@@ -153,7 +159,7 @@ public sealed class QuestionResponse : Entity<QuestionId>
     private QuestionResponse() { }
     private QuestionResponse(QuestionId questionId) : base(questionId) { }
     internal static QuestionResponse Create(QuestionId questionId) => new(questionId);
-    internal void Answer(IEnumerable<AnswerOptionId> optionIds, DateTimeOffset answeredAt) { _selectedOptions.Clear(); _selectedOptions.AddRange(optionIds.Select(SelectedAnswerOption.Create)); AnsweredAt = answeredAt; }
+    internal void Answer(IEnumerable<AnswerOptionId> optionIds, DateTimeOffset answeredAt) { _selectedOptions.Clear(); _selectedOptions.AddRange(optionIds.Select(SelectedAnswerOption.Create)); AnsweredAt = answeredAt.ToUniversalTime(); }
     internal void Clear() { _selectedOptions.Clear(); AnsweredAt = null; }
 }
 

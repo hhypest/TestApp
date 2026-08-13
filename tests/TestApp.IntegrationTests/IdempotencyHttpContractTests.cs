@@ -19,7 +19,7 @@ public sealed class IdempotencyHttpContractTests
     public async Task Header_only_publish_replays_same_result()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         Authenticate(client, "author-header", "test-author");
@@ -43,7 +43,7 @@ public sealed class IdempotencyHttpContractTests
     public async Task Different_header_and_body_keys_are_rejected_before_use_case()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         Authenticate(client, "author-mismatch", "test-author");
@@ -67,7 +67,7 @@ public sealed class IdempotencyHttpContractTests
     public async Task Reusing_assignment_key_with_different_payload_returns_conflict()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
 

@@ -57,7 +57,7 @@ Meter: `TestApp.Operations`
 | `testapp.attempt.oldest_overdue_lag` | gauge, seconds | none | Age past deadline of the oldest overdue attempt |
 | `testapp.retention.deleted` | counter | `kind` | Records deleted by retention (`audit`, `idempotency`, `processed_outbox`) |
 
-The backlog gauges are sampled from MariaDB every 30 seconds and therefore remain meaningful across multiple API replicas.
+The backlog gauges are sampled from PostgreSQL every 30 seconds and therefore remain meaningful across multiple API replicas.
 
 ## 4. Alert policy
 
@@ -90,7 +90,7 @@ Trigger a non-paging warning when:
 
 Check in order:
 
-1. MariaDB reachability and connection saturation;
+1. PostgreSQL reachability and connection saturation;
 2. RabbitMQ readiness when transport is enabled;
 3. deployment/configuration errors;
 4. dependency/network incident;

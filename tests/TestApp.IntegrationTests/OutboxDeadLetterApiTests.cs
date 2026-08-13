@@ -20,7 +20,7 @@ public sealed class OutboxDeadLetterApiTests
     public async Task Admin_can_inspect_requeue_and_discard_without_payload_exposure()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var requeueId = Guid.NewGuid();
         var discardId = Guid.NewGuid();
         const string secretPayload = "{\"secret\":\"must-not-leak\"}";

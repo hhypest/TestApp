@@ -51,7 +51,7 @@ public sealed class PublishedTestRevision : AggregateRoot<PublishedTestRevisionI
         Title = title;
         PassingPercentage = passingPercentage;
         TimeLimitMinutes = timeLimitMinutes;
-        PublishedAt = publishedAt;
+        PublishedAt = publishedAt.ToUniversalTime();
         _questions.AddRange(questions);
     }
 

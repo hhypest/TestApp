@@ -120,7 +120,7 @@ if (!migrateOnly)
 }
 
 builder.Services.AddInfrastructure(o =>
-    o.UseMySql(databaseOptions.ConnectionString, ServerVersion.AutoDetect(databaseOptions.ConnectionString)));
+    o.UseNpgsql(databaseOptions.ConnectionString));
 builder.Services.Configure<AttemptExpirationOptions>(options =>
 {
     options.BatchSize = expirationOptions.BatchSize;

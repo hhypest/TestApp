@@ -1,6 +1,6 @@
 # Дорожная карта развития TestApp
 
-> Baseline: `beta-ddd`, code snapshot `ff33a95`, 2026-08-13. Roadmap задаёт последовательность и acceptance gates, а не календарные обещания.
+> Baseline: `beta-ddd`, 2026-08-13. Roadmap задаёт последовательность и acceptance gates, а exact-head evidence определяется GitHub Actions ветки.
 
 ## 0. Принцип развития
 
@@ -33,11 +33,11 @@ correctness & data isolation
 - user/group assignments, windows, attempt limits, bulk assignment;
 - attempt start/answer/clear/submit/timeout;
 - reviewer/admin/student read models;
-- MariaDB 12.3 runtime/CI baseline;
+- PostgreSQL 18 runtime/CI baseline;
 - Keycloak authentication/roles/groups;
 - transactional Outbox + RabbitMQ transport;
 - Docker/Compose + migration-only startup;
-- real MariaDB/RabbitMQ integration tests.
+- real PostgreSQL/RabbitMQ integration tests.
 
 ---
 
@@ -99,7 +99,7 @@ Test.OwnerId = Keycloak sub создавшего автора
 - header/body mismatch -> `400 idempotency.key_mismatch`;
 - canonical SHA-256 request fingerprint;
 - same key + different logical request -> `409 idempotency.key_reused`;
-- distributed MariaDB advisory lock;
+- distributed PostgreSQL advisory lock;
 - publish/single assignment/bulk assignment/submit covered.
 
 Phase C завершила header resolution/fingerprint contract. Настоящий zero-length body для no-payload publish/start/submit выделен в `0.9.4`: сейчас при key только в header требуется JSON `{}` из-за Minimal API binding.
@@ -160,15 +160,15 @@ Legacy `/api/*` compatibility является управляемым lifecycle 
 
 Реализовано:
 
-- logical MariaDB backup script;
-- gzip + SHA-256;
+- logical PostgreSQL backup script;
+- PostgreSQL custom-format archive + SHA-256;
 - restore verification в отдельной database;
 - schema/table count + EF migration history verification;
 - application data marker verification;
 - CI restore drill;
 - documented baseline RPO/RTO expectations.
 
-Logical backup является portability/recovery baseline; более жёсткий production RPO требует provider-native snapshot/PITR.
+Logical backup является portability/recovery baseline; более жёсткий production RPO требует provider-native snapshot/WAL/PITR.
 
 ## D2. Retention / cleanup — DONE
 
@@ -181,7 +181,7 @@ Logical backup является portability/recovery baseline; более жёс
 - idempotency retention;
 - processed Outbox retention;
 - required cleanup indexes;
-- MariaDB safety regression tests.
+- PostgreSQL safety regression tests.
 
 **Не удаляются автоматически:** pending, retrying и active dead-letter Outbox rows.
 
@@ -195,7 +195,7 @@ Logical backup является portability/recovery baseline; более жёс
 - mandatory reason;
 - atomic manager audit: actor/action/reason/correlation;
 - shared lock boundary с publisher;
-- API/MariaDB/OpenAPI E2E.
+- API/PostgreSQL/OpenAPI E2E.
 
 ## D4. SLO / operational metrics — DONE
 
@@ -228,7 +228,7 @@ Logical backup является portability/recovery baseline; более жёс
 
 - `.github/workflows/performance.yml`;
 - authenticated k6 через реальный local Keycloak;
-- production-shaped stack: API + MariaDB 12.3 + RabbitMQ + Keycloak;
+- production-shaped stack: API + PostgreSQL 18 + RabbitMQ + Keycloak;
 - performance-only rate-limit ceilings;
 - scenario-specific p95 gates;
 - artifact `testapp-capacity-results`.
@@ -253,7 +253,7 @@ Worker critical scenarios:
 
 ### Текущий verification status
 
-На code baseline `ff33a95` workflows `dotnet` и `security` завершились успешно. [`performance` run 31668024062](https://github.com/hhypest/TestApp/actions/runs/31668024062) прошёл stack startup, authenticated k6 и expiration storm, но упал при создании RabbitMQ probe queue/binding с HTTP 400 **до** вставки synthetic Outbox rows. Поэтому Outbox drain не был проверен, D6 и Phase D остаются незавершёнными. Следующий run должен сохранять RabbitMQ response body/topology diagnostics и завершиться green на exact implementation head.
+Смена database engine инвалидировала прежний MariaDB performance baseline. D6 и Phase D остаются незавершёнными до полного green PostgreSQL run (HTTP, expiration и Outbox) с artifacts на exact implementation head.
 
 ---
 
@@ -452,7 +452,7 @@ Microservices не являются roadmap milestone сами по себе.
 
 - Domain/Application semantics завершены;
 - authorization/data-isolation проверены;
-- MariaDB migration path проверен;
+- PostgreSQL migration path проверен;
 - automated tests добавлены;
 - public HTTP/OpenAPI contract синхронизирован;
 - production image собирается;

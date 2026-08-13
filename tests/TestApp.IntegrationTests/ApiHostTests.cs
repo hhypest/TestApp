@@ -24,7 +24,7 @@ public sealed class ApiHostTests
     [Fact]
     public async Task Protected_endpoint_rejects_anonymous_request()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
 
@@ -36,7 +36,7 @@ public sealed class ApiHostTests
     [Fact]
     public async Task Full_author_publish_assign_attempt_submit_and_review_flow_succeeds()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         var ct = TestContext.Current.CancellationToken;
@@ -139,7 +139,7 @@ public sealed class ApiHostTests
     public async Task Bulk_assignment_is_idempotent_and_admin_queries_expose_statistics()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
 
@@ -198,7 +198,7 @@ public sealed class ApiHostTests
     [Fact]
     public async Task Author_cannot_use_admin_assignment_endpoint()
     {
-        await using var database = await MariaDbTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         await using var factory = CreateFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         Authenticate(client, "author-1", "test-author");

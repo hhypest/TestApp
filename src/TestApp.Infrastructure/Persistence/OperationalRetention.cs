@@ -1,12 +1,9 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MySqlConnector;
 
 namespace TestApp.Infrastructure.Persistence;
 
@@ -73,37 +70,31 @@ public sealed class OperationalRetentionCleaner(
 
         var connectionString = db.Database.GetConnectionString()
             ?? throw new InvalidOperationException("Database connection string is not configured.");
-        await using var lockConnection = new MySqlConnection(connectionString);
-        await lockConnection.OpenAsync(ct);
-        var lockName = CreateLockName(lockConnection.Database);
-
-        if (!await TryAcquireLockAsync(lockConnection, lockName, ct))
+        await using var lease = await PostgreSqlAdvisoryLock.TryAcquireAsync(
+            connectionString,
+            "operational-retention",
+            TimeSpan.Zero,
+            ct);
+        if (lease is null)
             return new OperationalRetentionResult(false, 0, 0, 0);
 
-        try
-        {
-            var now = time.GetUtcNow();
-            var auditDeleted = await DeleteAuditAsync(now.AddDays(-_options.AuditRetentionDays), ct);
-            var idempotencyDeleted = await DeleteIdempotencyAsync(now.AddDays(-_options.IdempotencyRetentionDays), ct);
-            var outboxDeleted = await DeleteProcessedOutboxAsync(now.AddDays(-_options.ProcessedOutboxRetentionDays), ct);
+        var now = time.GetUtcNow();
+        var auditDeleted = await DeleteAuditAsync(now.AddDays(-_options.AuditRetentionDays), ct);
+        var idempotencyDeleted = await DeleteIdempotencyAsync(now.AddDays(-_options.IdempotencyRetentionDays), ct);
+        var outboxDeleted = await DeleteProcessedOutboxAsync(now.AddDays(-_options.ProcessedOutboxRetentionDays), ct);
 
-            var result = new OperationalRetentionResult(true, auditDeleted, idempotencyDeleted, outboxDeleted);
-            if (result.TotalDeleted > 0)
-            {
-                logger.LogInformation(
-                    "Operational retention deleted {TotalDeleted} records (audit={AuditDeleted}, idempotency={IdempotencyDeleted}, processedOutbox={ProcessedOutboxDeleted})",
-                    result.TotalDeleted,
-                    result.AuditDeleted,
-                    result.IdempotencyDeleted,
-                    result.ProcessedOutboxDeleted);
-            }
-
-            return result;
-        }
-        finally
+        var result = new OperationalRetentionResult(true, auditDeleted, idempotencyDeleted, outboxDeleted);
+        if (result.TotalDeleted > 0)
         {
-            await ReleaseLockAsync(lockConnection, lockName);
+            logger.LogInformation(
+                "Operational retention deleted {TotalDeleted} records (audit={AuditDeleted}, idempotency={IdempotencyDeleted}, processedOutbox={ProcessedOutboxDeleted})",
+                result.TotalDeleted,
+                result.AuditDeleted,
+                result.IdempotencyDeleted,
+                result.ProcessedOutboxDeleted);
         }
+
+        return result;
     }
 
     private Task<int> DeleteAuditAsync(DateTimeOffset cutoff, CancellationToken ct) =>
@@ -163,31 +154,6 @@ public sealed class OperationalRetentionCleaner(
         return deleted;
     }
 
-    private static string CreateLockName(string database)
-    {
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(database))).ToLowerInvariant();
-        return $"testapp:retention:{hash[..40]}";
-    }
-
-    private static async Task<bool> TryAcquireLockAsync(MySqlConnection connection, string lockName, CancellationToken ct)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT GET_LOCK(@name, 0);";
-        command.Parameters.AddWithValue("@name", lockName);
-        var value = await command.ExecuteScalarAsync(ct);
-        return value is not null && value is not DBNull && Convert.ToInt32(value) == 1;
-    }
-
-    private static async Task ReleaseLockAsync(MySqlConnection connection, string lockName)
-    {
-        if (connection.State != System.Data.ConnectionState.Open)
-            return;
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT RELEASE_LOCK(@name);";
-        command.Parameters.AddWithValue("@name", lockName);
-        await command.ExecuteScalarAsync();
-    }
 }
 
 public sealed class OperationalRetentionWorker(

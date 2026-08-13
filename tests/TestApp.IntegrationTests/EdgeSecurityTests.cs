@@ -53,7 +53,7 @@ public sealed class EdgeSecurityTests
     public async Task Production_OpenAPI_can_be_enabled_as_admin_only()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using (var db = database.CreateContext())
             await db.Database.MigrateAsync(ct);
 
@@ -81,7 +81,7 @@ public sealed class EdgeSecurityTests
     public async Task Operations_rate_limit_is_independent_and_returns_correlation_on_429()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using (var db = database.CreateContext())
             await db.Database.MigrateAsync(ct);
 
@@ -107,7 +107,7 @@ public sealed class EdgeSecurityTests
     public async Task Cors_preflight_allows_only_configured_origin()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using (var db = database.CreateContext())
             await db.Database.MigrateAsync(ct);
 
@@ -132,7 +132,7 @@ public sealed class EdgeSecurityTests
     public async Task Security_headers_are_emitted_when_enabled()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await MariaDbTestDatabase.CreateAsync(ct);
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         await using (var db = database.CreateContext())
             await db.Database.MigrateAsync(ct);
 

@@ -9,7 +9,7 @@
 ```mermaid
 graph TD
     Client --> API[TestApp API :8080]
-    API --> DB[MariaDB 12.3 :3306]
+    API --> DB[PostgreSQL 18 :5432]
     API --> KC[Keycloak 26.7 :8080 internal / :8081 host]
     API --> RMQ[RabbitMQ 4.3.1 :5672]
     API --> OTEL[OTEL Collector :4317]
@@ -18,7 +18,7 @@ graph TD
 
 Compose services:
 
-- `mariadb`;
+- `postgres`;
 - `rabbitmq`;
 - `keycloak`;
 - `otel-collector`;
@@ -38,12 +38,7 @@ Compose services:
 docker compose up --build
 ```
 
-После смены major database baseline либо при необходимости чистого окружения:
-
-```bash
-docker compose down -v
-docker compose up --build
-```
+PostgreSQL использует новый volume `testapp-postgres`. Старый MariaDB volume не удаляется автоматически. Не применяйте `docker compose down -v`, пока не подтверждены backup/cutover и допустимость удаления всех Compose volumes.
 
 ### Host ports
 
@@ -51,7 +46,7 @@ docker compose up --build
 |---|---|
 | API | `http://localhost:8080` |
 | Keycloak | `http://localhost:8081` |
-| MariaDB | `localhost:3306` |
+| PostgreSQL | `localhost:5432` |
 | RabbitMQ AMQP | `localhost:5672` |
 | RabbitMQ management | `http://localhost:15672` |
 | OTLP gRPC | `localhost:4317` |
@@ -61,12 +56,7 @@ docker compose up --build
 
 **Только local development. Не использовать в production.**
 
-MariaDB:
-
-```text
-root/root
-testapp/testapp
-```
+PostgreSQL: `testapp / testapp` (локальный Compose superuser; в production application и migration roles должны быть разделены).
 
 RabbitMQ:
 
@@ -122,7 +112,7 @@ docker run ... testapp-api:<tag> --migrate
 ### 5.2 Local Compose order
 
 ```text
-MariaDB healthy
+PostgreSQL healthy
     ↓
 migrate container --migrate
     ↓
@@ -235,7 +225,7 @@ Options загружаются/валидируются из секции `Outbo
 GET /health/live
 ```
 
-Назначение: процесс способен отвечать. Не должен зависеть от MariaDB/RabbitMQ, иначе transient dependency failure может вызвать restart loop.
+Назначение: процесс способен отвечать. Не должен зависеть от PostgreSQL/RabbitMQ, иначе transient dependency failure может вызвать restart loop.
 
 ### Readiness
 
@@ -245,7 +235,7 @@ GET /health/ready
 
 Проверяет:
 
-- MariaDB connectivity;
+- PostgreSQL connectivity;
 - RabbitMQ connection/channel/exchange access, **только если RabbitMQ delivery включён**.
 
 При critical dependency failure readiness должна вернуть unhealthy/503 и исключить instance из traffic.
@@ -342,7 +332,7 @@ Audit не содержит body/query payload.
 Repository-level bounded cleanup реализован для audit, idempotency и processed Outbox rows:
 
 - typed retention periods/batch size/poll interval;
-- MariaDB advisory lock между replicas;
+- PostgreSQL advisory lock между replicas;
 - index-friendly bounded deletes;
 - pending/retrying/active dead-letter Outbox rows не удаляются;
 - deleted-row counters экспортируются через `TestApp.Operations`.
@@ -411,13 +401,13 @@ Worker batch-based и eventual: изменение не обязано прои�
 
 Per-attempt processing exceptions логируются, но initial/batch DB scan не имеет cycle-level recovery boundary. Аналогичный gap есть у Outbox batch query/lock/failure-state persistence. Transient dependency failure может завершить hosted worker/process; до 1.0 нужны bounded backoff, cancellation-safe retry и worker last-success/consecutive-failure signal.
 
-## 14. MariaDB 12.3 operational policy
+## 14. PostgreSQL 18 operational policy
 
-CI гарантирует minimum runtime version 12.3.
+CI выполняет `SHOW server_version_num` и гарантирует PostgreSQL 18+ (`>= 180000`).
 
 ### Upgrade rule
 
-Перед изменением MariaDB line:
+Перед изменением PostgreSQL line:
 
 1. backup;
 2. проверить vendor upgrade path;
@@ -425,7 +415,7 @@ CI гарантирует minimum runtime version 12.3.
 4. прогнать migrations;
 5. прогнать полный integration suite;
 6. проверить advisory locks;
-7. проверить charset/collation/indexes;
+7. проверить locale/collation/extensions/indexes;
 8. выполнить production-image `--migrate`;
 9. только после этого менять production.
 
@@ -435,8 +425,8 @@ CI гарантирует minimum runtime version 12.3.
 
 Repository baseline реализован:
 
-- `scripts/mariadb-backup.sh` создаёт transaction-consistent gzip dump + SHA-256;
-- `scripts/mariadb-restore-verify.sh` восстанавливает только в disposable target database;
+- `scripts/postgresql-backup.sh` создаёт consistent custom-format archive + SHA-256;
+- `scripts/postgresql-restore-verify.sh` восстанавливает только в disposable target database;
 - проверяются table counts, EF migration history и optional business marker;
 - основной CI выполняет recovery drill после migration production image;
 - engineering targets: RPO <= 24h, RTO <= 4h.
@@ -445,7 +435,7 @@ Repository baseline реализован:
 
 - настроить schedule, encrypted offsite storage и retention;
 - выполнить staging/platform restore drill и записать actual RTO;
-- для более строгого RPO включить provider-native snapshot/binlog/PITR;
+- для более строгого RPO включить provider-native snapshot/WAL/PITR;
 - определить credential/Keycloak realm restore и rotation;
 - уметь пересоздать RabbitMQ topology; broker не является единственным source of truth благодаря Outbox.
 
@@ -453,7 +443,7 @@ Repository baseline реализован:
 
 ### D6 performance verification
 
-На code baseline `ff33a95` authenticated k6 и expiration-storm probe прошли. Outbox probe не начался: RabbitMQ Management API вернул HTTP 400 во время queue/binding setup до вставки synthetic rows. D6 остаётся `VERIFYING`; topology step должен сохранять response body, проверять exchange/queue/binding и завершиться полным green run с artifacts.
+Предыдущее performance evidence было получено до смены database engine и не подтверждает PostgreSQL baseline. D6 остаётся `VERIFYING`: workflow должен полностью пройти на exact PostgreSQL implementation HEAD и сохранить k6, expiration и Outbox artifacts.
 
 ## 16. Deployment smoke checklist
 
@@ -465,7 +455,7 @@ Repository baseline реализован:
 /openapi/v1.json -> согласно production policy
 JWT auth -> работает
 GET /api/v1/me/assignments -> expected auth behavior
-MariaDB version -> expected
+PostgreSQL version -> expected
 migration history -> no pending migrations
 Outbox status -> no unexpected backlog
 OTEL -> traces/metrics arrive
@@ -475,7 +465,7 @@ OTEL -> traces/metrics arrive
 
 ## 17. Scaling model
 
-API можно горизонтально масштабировать при общей MariaDB/RabbitMQ/Keycloak инфраструктуре.
+API можно горизонтально масштабировать при общей PostgreSQL/RabbitMQ/Keycloak инфраструктуре.
 
 Cross-instance safety уже предусмотрена для:
 

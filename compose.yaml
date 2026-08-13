@@ -1,17 +1,16 @@
 services:
-  mariadb:
-    image: mariadb:12.3
+  postgres:
+    image: postgres:18
     environment:
-      MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: testapp
-      MARIADB_USER: testapp
-      MARIADB_PASSWORD: testapp
+      POSTGRES_DB: testapp
+      POSTGRES_USER: testapp
+      POSTGRES_PASSWORD: testapp
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - testapp-mariadb:/var/lib/mysql
+      - testapp-postgres:/var/lib/postgresql
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "pg_isready -U testapp -d testapp"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -64,12 +63,12 @@ services:
     command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__Database: Server=mariadb;Port=3306;Database=testapp;User=testapp;Password=testapp;
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=testapp;Username=testapp;Password=testapp;
       Database__ApplyMigrationsOnStartup: "false"
       Keycloak__Authority: http://keycloak:8080/realms/testapp
       Keycloak__Audience: testapp-api
     depends_on:
-      mariadb:
+      postgres:
         condition: service_healthy
     restart: "no"
 
@@ -81,7 +80,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
-      ConnectionStrings__Database: Server=mariadb;Port=3306;Database=testapp;User=testapp;Password=testapp;
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=testapp;Username=testapp;Password=testapp;
       Database__ApplyMigrationsOnStartup: "false"
       Keycloak__Authority: http://keycloak:8080/realms/testapp
       Keycloak__Audience: testapp-api
@@ -95,7 +94,7 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      mariadb:
+      postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -107,5 +106,5 @@ services:
         condition: service_started
 
 volumes:
-  testapp-mariadb:
+  testapp-postgres:
   testapp-rabbitmq:

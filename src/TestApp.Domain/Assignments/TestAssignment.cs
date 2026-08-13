@@ -99,6 +99,9 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         DateTimeOffset? availableUntil,
         int? attemptLimit) : base(id)
     {
+        assignedAt = assignedAt.ToUniversalTime();
+        availableFrom = availableFrom.ToUniversalTime();
+        availableUntil = availableUntil?.ToUniversalTime();
         if (availableUntil is not null && availableUntil <= availableFrom)
             throw new ArgumentException("Availability end must be later than availability start.", nameof(availableUntil));
         if (attemptLimit is <= 0)
@@ -131,7 +134,7 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
     {
         ArgumentNullException.ThrowIfNull(target);
         var assignment = new TestAssignment(id, revisionId, target, assignedBy, assignedAt, availableFrom, availableUntil, attemptLimit);
-        assignment.Raise(new TestAssigned(id, revisionId, target, assignedBy, assignedAt));
+        assignment.Raise(new TestAssigned(id, revisionId, target, assignedBy, assignment.AssignedAt));
         return assignment;
     }
 
@@ -148,6 +151,8 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
 
     public Result<TestAssignment, DomainError> ChangeAvailability(DateTimeOffset availableFrom, DateTimeOffset? availableUntil)
     {
+        availableFrom = availableFrom.ToUniversalTime();
+        availableUntil = availableUntil?.ToUniversalTime();
         if (Status != AssignmentStatus.Active)
             return DomainError.Conflict("assignment.cancelled", "Cancelled assignments cannot be changed.");
         if (availableUntil is not null && availableUntil <= availableFrom)
@@ -173,6 +178,7 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
 
     public Result<TestAssignment, DomainError> Cancel(ExternalUserId cancelledBy, DateTimeOffset cancelledAt, string? reason)
     {
+        cancelledAt = cancelledAt.ToUniversalTime();
         if (Status == AssignmentStatus.Cancelled)
             return DomainError.Conflict("assignment.cancelled", "Assignment is already cancelled.");
         if (cancelledAt < AssignedAt)
