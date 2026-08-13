@@ -115,9 +115,17 @@ public sealed class PersistenceBehaviorTests
 
         var firstId = await repository.TryAddWithinLimitAsync(first, 2, TestContext.Current.CancellationToken);
         var secondId = await repository.TryAddWithinLimitAsync(second, 2, TestContext.Current.CancellationToken);
+        var replayedId = await repository.FindIdByStartRequestAsync(assignmentId, userId, requestId, TestContext.Current.CancellationToken);
+        var foreignId = await repository.FindIdByStartRequestAsync(
+            assignmentId,
+            ExternalUserId.FromSubject("user-2"),
+            requestId,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(firstId);
         Assert.Equal(firstId, secondId);
+        Assert.Equal(firstId, replayedId);
+        Assert.Null(foreignId);
         Assert.Equal(1, await db.Attempts.CountAsync(TestContext.Current.CancellationToken));
     }
 

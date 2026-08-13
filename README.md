@@ -245,7 +245,7 @@ GitHub Actions поднимает настоящие MariaDB 12.3 и RabbitMQ se
 Ближайший порядок работ:
 
 ```text
-1. correctness stabilization: StartAttempt replay, audit final status, resilient workers
+1. correctness stabilization: audit final status and resilient workers
 2. true empty-body Idempotency-Key commands + database-only migrate mode
 3. green performance/Outbox D6 evidence on exact implementation head
 4. deterministic pagination, SQL reporting queries, domain error/value-object cleanup

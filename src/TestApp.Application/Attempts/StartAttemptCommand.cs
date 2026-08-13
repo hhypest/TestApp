@@ -21,6 +21,14 @@ public sealed class StartAttemptCommandHandler(
         if (command.StartRequestId == Guid.Empty)
             return Error.Validation("attempt.start_request_id", "A non-empty idempotency key is required.");
 
+        var replayedId = await attempts.FindIdByStartRequestAsync(
+            command.AssignmentId,
+            actor.UserId,
+            command.StartRequestId,
+            ct);
+        if (replayedId is not null)
+            return replayedId.Value;
+
         var assignment = await assignments.GetAsync(command.AssignmentId, ct);
         if (assignment is null)
             return Error.NotFound("assignment.not_found", "Test assignment was not found.");

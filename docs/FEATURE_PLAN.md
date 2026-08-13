@@ -77,7 +77,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 | ID | Priority | Status | Scope |
 |---|---:|---|---|
-| STAB-001 | P0 | PLANNED | stable StartAttempt replay before mutable assignment checks |
+| STAB-001 | P0 | DONE | actor-scoped StartAttempt replay before mutable assignment checks + cancellation/expiry/group regression tests |
 | STAB-002 | P0 | PLANNED | audit stores final handled HTTP status |
 | STAB-003 | P0 | PLANNED | cycle-level Outbox/expiration worker recovery |
 | STAB-004 | P0 | VERIFYING | diagnostic RabbitMQ capacity probe + full green D6 run |

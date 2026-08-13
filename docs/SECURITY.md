@@ -291,22 +291,23 @@ Production:
 
 Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы.
 
+Actor-scoped `StartAttempt` replay также реализован: lookup включает current `UserId`, поэтому изменение assignment/group state не ломает retry владельца и не раскрывает attempt другого пользователя.
+
 P0/P1 до 1.0:
 
 1. исправить audit final-status mismatch;
-2. сделать `StartAttempt` replay стабильным после изменения assignment/group state, не раскрывая чужой attempt;
-3. добавить настоящий zero-length-body `Idempotency-Key` contract и regression tests;
-4. изолировать migration-only mode от unrelated secrets/config;
-5. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
-6. pin GitHub Actions/container dependencies immutable SHA/digest;
-7. выполнить staging alert/restore/rollback security rehearsal.
+2. добавить настоящий zero-length-body `Idempotency-Key` contract и regression tests;
+3. изолировать migration-only mode от unrelated secrets/config;
+4. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
+5. pin GitHub Actions/container dependencies immutable SHA/digest;
+6. выполнить staging alert/restore/rollback security rehearsal.
 
 Business-triggered/после 1.0:
 
-8. `(Issuer, Subject)` identity при multi-realm;
-9. sensitive-data classification до первого integration event consumer;
-10. Workspace/Tenant/ACL только при multi-organization requirement;
-11. compliance-grade immutable external audit sink, если он требуется нормативно.
+7. `(Issuer, Subject)` identity при multi-realm;
+8. sensitive-data classification до первого integration event consumer;
+9. Workspace/Tenant/ACL только при multi-organization requirement;
+10. compliance-grade immutable external audit sink, если он требуется нормативно.
 
 ## 19. Security review checklist для новой фичи
 

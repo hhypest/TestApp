@@ -63,7 +63,9 @@ StartAttemptTests.cs
 - availability;
 - attempt limit behavior через abstractions;
 - request validation;
-- handler-level business mapping.
+- handler-level business mapping;
+- actor-scoped idempotent replay после cancellation, expiry и потери group membership;
+- повторная eligibility validation для нового key и изоляция key между actors.
 
 ### Текущий gap
 
@@ -355,7 +357,6 @@ GitHub Actions `dotnet` workflow:
 
 ### P0
 
-- stable StartAttempt replay после expiry/cancellation/group membership change;
 - audit response/audit status equality для handled `400/409/412` и real `500`;
 - Outbox/expiration cycle recovery после DB/query/lock failure;
 - настоящий zero-length-body `Idempotency-Key` contract;

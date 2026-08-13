@@ -271,7 +271,7 @@ DbUpdateConcurrencyException
 - unique `(AssignmentId, UserId, StartRequestId)`;
 - attempt limit проверяется внутри serializable transaction.
 
-Текущий replay lookup выполняется после повторной проверки assignment target/availability. Если первый start был закоммичен, а retry пришёл после cancellation/expiry или изменения group claim, прежний ID может не воспроизвестись. Целевой порядок: actor-scoped replay lookup до mutable eligibility checks, а все checks сохраняются для нового key.
+Application handler сначала выполняет actor-scoped replay lookup по `(AssignmentId, UserId, StartRequestId)`. Уже закоммиченный start воспроизводится до загрузки assignment и mutable target/availability checks, поэтому cancellation, expiry и изменение group claim не ломают retry. Для нового key handler выполняет полный eligibility flow, а repository повторяет lookup внутри serializable transaction перед count/insert, закрывая concurrent race.
 
 ### Publish/assign/bulk-assign/submit
 
@@ -319,7 +319,6 @@ Aggregate может поднимать `IDomainEvent`. `AppDbContext.SaveChange
 - `Test.OwnerId` и owner-scoped writes/reads реализованы; tenant/workspace boundary сознательно отсутствует до business requirement;
 - handlers регистрируются напрямую в API, общего command/query dispatcher pipeline нет; это допустимо, пока cross-cutting duplication остаётся управляемым;
 - standard `Idempotency-Key` resolver/fingerprint реализован, но no-payload publish/start/submit всё ещё требуют JSON body (`{}`), а не настоящий zero-length body;
-- replay `StartAttempt` зависит от текущей assignment availability/group membership;
 - audit middleware может записать handled `400/409` как `500`;
 - Outbox/expiration workers не имеют cycle-level recovery для DB/query/lock failures;
 - migration-only composition всё ещё загружает unrelated RabbitMQ/CORS/rate-limit/proxy options;

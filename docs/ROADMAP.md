@@ -264,7 +264,7 @@ Worker critical scenarios:
 
 Перед 1.0 RC необходимо закрыть findings текущего exact-head review:
 
-1. stable `StartAttempt` replay до повторной проверки mutable assignment availability/group membership;
+1. **DONE:** actor-scoped `StartAttempt` replay до повторной проверки mutable assignment availability/group membership, с regression tests для cancellation/expiry/group change и нового key;
 2. audit должен сохранять итоговый HTTP status после exception mapping, а не промежуточный `500`;
 3. Outbox/expiration hosted workers должны переживать transient cycle-level DB/query/lock failures;
 4. publish/start/submit должны принимать настоящий zero-length body при валидном `Idempotency-Key` header;

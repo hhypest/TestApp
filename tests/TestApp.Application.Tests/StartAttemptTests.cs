@@ -1,5 +1,7 @@
 using TestApp.Application.Abstractions;
 using TestApp.Application.Attempts;
+using TestApp.Application.Common;
+using TestApp.Core.Monads;
 using TestApp.Domain.Assignments;
 using TestApp.Domain.Attempts;
 using TestApp.Domain.Identity;
@@ -17,15 +19,15 @@ public sealed class StartAttemptTests
         var fixture = CreateFixture();
         var requestId = Guid.NewGuid();
 
-        var result = await fixture.Handler.Handle(
+        var result = await fixture.CreateHandler().Handle(
             new StartAttemptCommand(fixture.Assignment.Id, requestId),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Match(_ => true, _ => false));
-        Assert.NotNull(fixture.Attempts.Value);
-        Assert.Equal(fixture.Revision.Id, fixture.Attempts.Value!.RevisionId);
-        Assert.Equal(requestId, fixture.Attempts.Value.StartRequestId);
-        Assert.Single(fixture.Attempts.Value.Responses);
+        var attempt = Assert.Single(fixture.Attempts.Values);
+        Assert.Equal(fixture.Revision.Id, attempt.RevisionId);
+        Assert.Equal(requestId, attempt.StartRequestId);
+        Assert.Single(attempt.Responses);
     }
 
     [Fact]
@@ -34,12 +36,121 @@ public sealed class StartAttemptTests
         var fixture = CreateFixture();
         var requestId = Guid.NewGuid();
 
-        var first = await fixture.Handler.Handle(new StartAttemptCommand(fixture.Assignment.Id, requestId), TestContext.Current.CancellationToken);
-        var second = await fixture.Handler.Handle(new StartAttemptCommand(fixture.Assignment.Id, requestId), TestContext.Current.CancellationToken);
+        var handler = fixture.CreateHandler();
+        var first = await handler.Handle(new StartAttemptCommand(fixture.Assignment.Id, requestId), TestContext.Current.CancellationToken);
+        var second = await handler.Handle(new StartAttemptCommand(fixture.Assignment.Id, requestId), TestContext.Current.CancellationToken);
 
-        var firstId = first.Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
-        var secondId = second.Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
-        Assert.Equal(firstId, secondId);
+        Assert.Equal(Success(first), Success(second));
+        Assert.Single(fixture.Attempts.Values);
+    }
+
+    [Fact]
+    public async Task Same_idempotency_key_replays_after_assignment_is_cancelled()
+    {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+        var handler = fixture.CreateHandler();
+        var first = await handler.Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+        var cancelled = fixture.Assignment.Cancel(
+            ExternalUserId.FromSubject("admin-1"),
+            fixture.Now.AddMinutes(1),
+            "Schedule changed");
+
+        var replay = await handler.Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(cancelled.Match(_ => true, _ => false));
+        Assert.Equal(Success(first), Success(replay));
+        Assert.Single(fixture.Attempts.Values);
+    }
+
+    [Fact]
+    public async Task Same_idempotency_key_replays_after_assignment_expires()
+    {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+        var first = await fixture.CreateHandler().Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+
+        var replay = await fixture.CreateHandler(now: fixture.Now.AddHours(2)).Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(Success(first), Success(replay));
+        Assert.Single(fixture.Attempts.Values);
+    }
+
+    [Fact]
+    public async Task Same_idempotency_key_replays_after_group_membership_is_removed()
+    {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+        var first = await fixture.CreateHandler().Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+
+        var replay = await fixture.CreateHandler(groups: new HashSet<ExternalGroupId>()).Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(Success(first), Success(replay));
+        Assert.Single(fixture.Attempts.Values);
+    }
+
+    [Fact]
+    public async Task New_idempotency_key_still_rejects_cancelled_assignment()
+    {
+        var fixture = CreateFixture();
+        var cancelled = fixture.Assignment.Cancel(
+            ExternalUserId.FromSubject("admin-1"),
+            fixture.Now,
+            "Schedule changed");
+
+        var result = await fixture.CreateHandler().Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, Guid.NewGuid()),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(cancelled.Match(_ => true, _ => false));
+        Assert.Equal("assignment.unavailable", Failure(result).Code);
+        Assert.Empty(fixture.Attempts.Values);
+    }
+
+    [Fact]
+    public async Task New_idempotency_key_still_rejects_removed_group_member()
+    {
+        var fixture = CreateFixture();
+
+        var result = await fixture.CreateHandler(groups: new HashSet<ExternalGroupId>()).Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, Guid.NewGuid()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("assignment.forbidden", Failure(result).Code);
+        Assert.Empty(fixture.Attempts.Values);
+    }
+
+    [Fact]
+    public async Task Same_idempotency_key_does_not_reveal_attempt_to_another_actor()
+    {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+        var first = await fixture.CreateHandler().Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+        var otherUser = ExternalUserId.FromSubject("user-2");
+
+        var second = await fixture.CreateHandler(
+            userId: otherUser,
+            groups: new HashSet<ExternalGroupId>()).Handle(
+            new StartAttemptCommand(fixture.Assignment.Id, requestId),
+            TestContext.Current.CancellationToken);
+
+        _ = Success(first);
+        Assert.Equal("assignment.forbidden", Failure(second).Code);
+        Assert.Single(fixture.Attempts.Values);
     }
 
     private static Fixture CreateFixture()
@@ -57,14 +168,44 @@ public sealed class StartAttemptTests
         var assignment = TestAssignment.Create(
             TestAssignmentId.New(), revision.Id, new AssignmentTarget.Group(group), userId,
             now, now.AddHours(-1), now.AddHours(1), 1);
-        var attempts = new AttemptRepo();
-        var handler = new StartAttemptCommandHandler(
-            new AssignmentRepo(assignment), attempts, new RevisionRepo(revision),
-            new Actor(userId, new HashSet<ExternalGroupId> { group }), new Clock(now));
-        return new Fixture(assignment, revision, attempts, handler);
+        return new Fixture(
+            assignment,
+            revision,
+            new AssignmentRepo(assignment),
+            new AttemptRepo(),
+            new RevisionRepo(revision),
+            userId,
+            group,
+            now);
     }
 
-    private sealed record Fixture(TestAssignment Assignment, PublishedTestRevision Revision, AttemptRepo Attempts, StartAttemptCommandHandler Handler);
+    private static TestAttemptId Success(Result<TestAttemptId, Error> result) =>
+        result.Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
+
+    private static Error Failure(Result<TestAttemptId, Error> result) =>
+        result.Match(_ => throw new Xunit.Sdk.XunitException("Expected the command to fail."), error => error);
+
+    private sealed record Fixture(
+        TestAssignment Assignment,
+        PublishedTestRevision Revision,
+        AssignmentRepo Assignments,
+        AttemptRepo Attempts,
+        RevisionRepo Revisions,
+        ExternalUserId UserId,
+        ExternalGroupId Group,
+        DateTimeOffset Now)
+    {
+        public StartAttemptCommandHandler CreateHandler(
+            ExternalUserId? userId = null,
+            IReadOnlySet<ExternalGroupId>? groups = null,
+            DateTimeOffset? now = null) =>
+            new(
+                Assignments,
+                Attempts,
+                Revisions,
+                new Actor(userId ?? UserId, groups ?? new HashSet<ExternalGroupId> { Group }),
+                new Clock(now ?? Now));
+    }
 
     private sealed class AssignmentRepo(TestAssignment value) : ITestAssignmentRepository
     {
@@ -74,19 +215,45 @@ public sealed class StartAttemptTests
 
     private sealed class AttemptRepo : ITestAttemptRepository
     {
-        public TestAttempt? Value;
-        public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) => Task.FromResult(Value?.Id == id ? Value : null);
+        public List<TestAttempt> Values { get; } = [];
+
+        public Task<TestAttempt?> GetAsync(TestAttemptId id, CancellationToken ct = default) =>
+            Task.FromResult(Values.SingleOrDefault(value => value.Id == id));
+
+        public Task<TestAttemptId?> FindIdByStartRequestAsync(
+            TestAssignmentId assignmentId,
+            ExternalUserId userId,
+            Guid startRequestId,
+            CancellationToken ct = default) =>
+            Task.FromResult<TestAttemptId?>(Values
+                .Where(value => value.AssignmentId == assignmentId && value.UserId == userId && value.StartRequestId == startRequestId)
+                .Select(value => (TestAttemptId?)value.Id)
+                .SingleOrDefault());
+
         public Task<IReadOnlyCollection<TestAttemptId>> GetExpiredInProgressIdsAsync(DateTimeOffset now, int limit, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyCollection<TestAttemptId>>(Array.Empty<TestAttemptId>());
-        public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) => Task.FromResult(Value is null ? 0 : 1);
-        public Task AddAsync(TestAttempt attempt, CancellationToken ct = default) { Value = attempt; return Task.CompletedTask; }
+
+        public Task<int> CountAttemptsAsync(TestAssignmentId assignmentId, ExternalUserId userId, CancellationToken ct = default) =>
+            Task.FromResult(Values.Count(value => value.AssignmentId == assignmentId && value.UserId == userId));
+
+        public Task AddAsync(TestAttempt attempt, CancellationToken ct = default)
+        {
+            Values.Add(attempt);
+            return Task.CompletedTask;
+        }
+
         public Task<TestAttemptId?> TryAddWithinLimitAsync(TestAttempt attempt, int? attemptLimit, CancellationToken ct = default)
         {
-            if (Value is not null && Value.AssignmentId == attempt.AssignmentId && Value.UserId == attempt.UserId && Value.StartRequestId == attempt.StartRequestId)
-                return Task.FromResult<TestAttemptId?>(Value.Id);
-            if (attemptLimit is { } limit && Value is not null && limit <= 1)
+            var existing = Values.SingleOrDefault(value =>
+                value.AssignmentId == attempt.AssignmentId &&
+                value.UserId == attempt.UserId &&
+                value.StartRequestId == attempt.StartRequestId);
+            if (existing is not null)
+                return Task.FromResult<TestAttemptId?>(existing.Id);
+            if (attemptLimit is { } limit && Values.Count(value =>
+                    value.AssignmentId == attempt.AssignmentId && value.UserId == attempt.UserId) >= limit)
                 return Task.FromResult<TestAttemptId?>(null);
-            Value = attempt;
+            Values.Add(attempt);
             return Task.FromResult<TestAttemptId?>(attempt.Id);
         }
     }

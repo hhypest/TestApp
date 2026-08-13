@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** на code baseline `ff33a954b381e0632ade738c88fe3ac386003529` (2026-08-13). Phase A, B, C и D1–D5 завершены; D6 реализована, но её exit gate ещё не пройден.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, обновлён после baseline `1dbf4e60e7f55874fb252a7a79c7445a573e4a5f` (2026-08-13). Phase A, B, C, D1–D5 и STAB-001 завершены; D6 реализована, но её exit gate ещё не пройден.
 
 ## 1. Назначение системы
 
@@ -148,7 +148,7 @@ Fingerprint используется publish/single assignment/bulk assignment/s
 
 Текущий transport resolver принимает key из header и legacy body. Для publish/start/submit Minimal API всё ещё требует JSON body (`{}` достаточно), даже когда key находится только в header; zero-length body является stabilization gap.
 
-Также replay уже созданного start attempt выполняется внутри repository после повторной проверки текущей availability/group membership. Поэтому retry с тем же key после cancellation/expiry либо изменения group claim сейчас может вернуть `409/403` вместо прежнего attempt ID. Это correctness gap до 1.0.
+Actor-scoped lookup уже созданного start attempt выполняется до загрузки assignment и mutable availability/group-membership checks. Поэтому retry того же пользователя с тем же key возвращает прежний attempt ID после cancellation, expiry или изменения group claim. Новый key по-прежнему проходит все актуальные eligibility checks; транзакционная повторная проверка в repository сохраняет race safety.
 
 ## 6. Authentication/authorization
 
@@ -270,7 +270,6 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 До 1.0 необходимо закрыть:
 
-- stable replay `StartAttempt` до mutable assignment checks;
 - audit final-status correctness для handled `400/409/412`;
 - cycle-level resilience Outbox/expiration workers;
 - настоящий zero-body header-only contract для no-payload commands;

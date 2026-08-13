@@ -500,7 +500,6 @@ Background attempt expiration может выполняться на неско�
 
 До production 1.0 закрыть:
 
-- stable StartAttempt replay после mutable assignment/group changes;
 - audit final-status correctness;
 - cycle-level worker resilience;
 - database-only migration composition;

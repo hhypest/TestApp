@@ -160,7 +160,7 @@ UNIQUE (AssignmentId, UserId, StartRequestId)
 (RevisionId, Status, Outcome)
 ```
 
-Unique start key обеспечивает retry-safe start attempt.
+Unique start key обеспечивает retry-safe start attempt. Application выполняет ранний actor-scoped ID lookup для стабильного replay после изменения assignment state; repository повторяет тот же lookup внутри serializable transaction перед проверкой attempt limit и insert.
 
 ### 3.7 `question_responses`
 
@@ -363,8 +363,8 @@ Attempt limit нельзя корректно защитить только `Cou
 
 Repository использует serializable transaction и проверяет:
 
-1. существующий attempt с тем же `(AssignmentId, UserId, StartRequestId)`;
-2. текущий count;
+1. существующий attempt с тем же `(AssignmentId, UserId, StartRequestId)` после раннего handler-level replay lookup;
+2. текущий count для `(AssignmentId, UserId)`;
 3. limit;
 4. insert.
 

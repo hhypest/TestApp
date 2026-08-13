@@ -221,7 +221,7 @@ same actor + operation + key + different payload -> 409 idempotency.key_reused
 
 Publish operation дополнительно resource-scoped по TestId.
 
-Start attempt использует отдельный unique `(AssignmentId, UserId, StartRequestId)` + serializable transaction. Текущий replay lookup выполняется после повторной проверки assignment availability/group membership; retry после изменения этого state может вернуть `409/403` вместо прежнего ID и должен быть исправлен до 1.0.
+Start attempt использует отдельный unique `(AssignmentId, UserId, StartRequestId)` + serializable transaction. Actor-scoped replay lookup выполняется до загрузки assignment и mutable availability/group-membership checks: уже успешный request возвращает прежний ID после cancellation, expiry или изменения group claim. Для нового key authorization, availability, revision и attempt-limit проверки выполняются полностью.
 
 ## 9. Pagination
 
@@ -600,7 +600,6 @@ GET /health/ready
 Ближайший stabilization scope:
 
 - настоящий zero-length-body header-only publish/start/submit;
-- stable `StartAttempt` replay до mutable assignment checks;
 - audit final-status correctness;
 - deterministic paging tie-breakers;
 - SQL-scalable reviewer/admin read queries;
