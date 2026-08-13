@@ -1,6 +1,6 @@
 # Дорожная карта развития TestApp
 
-> Baseline: `beta-ddd`, 2026-08-13. Roadmap задаёт последовательность и acceptance gates, а не календарные обещания.
+> Baseline: `beta-ddd`, code snapshot `ff33a95`, 2026-08-13. Roadmap задаёт последовательность и acceptance gates, а не календарные обещания.
 
 ## 0. Принцип развития
 
@@ -43,7 +43,7 @@ correctness & data isolation
 
 # 2. `0.9.0` — Phase A: Production configuration & edge security
 
-**Priority: P0**  
+**Priority: P0**
 **Status: DONE**
 
 Реализовано:
@@ -65,7 +65,7 @@ correctness & data isolation
 
 # 3. `0.9.1` — Phase B: Resource ownership
 
-**Priority: P0**  
+**Priority: P0**
 **Status: DONE**
 
 Текущая single-organization модель:
@@ -101,6 +101,8 @@ Test.OwnerId = Keycloak sub создавшего автора
 - same key + different logical request -> `409 idempotency.key_reused`;
 - distributed MariaDB advisory lock;
 - publish/single assignment/bulk assignment/submit covered.
+
+Phase C завершила header resolution/fingerprint contract. Настоящий zero-length body для no-payload publish/start/submit выделен в `0.9.4`: сейчас при key только в header требуется JSON `{}` из-за Minimal API binding.
 
 ## C2. HTTP optimistic concurrency — DONE
 
@@ -249,9 +251,32 @@ Worker critical scenarios:
 
 **Phase D exit gate:** D6 green + основной `dotnet` и `security` workflows green на совместимом head.
 
+### Текущий verification status
+
+На code baseline `ff33a95` workflows `dotnet` и `security` завершились успешно. [`performance` run 31668024062](https://github.com/hhypest/TestApp/actions/runs/31668024062) прошёл stack startup, authenticated k6 и expiration storm, но упал при создании RabbitMQ probe queue/binding с HTTP 400 **до** вставки synthetic Outbox rows. Поэтому Outbox drain не был проверен, D6 и Phase D остаются незавершёнными. Следующий run должен сохранять RabbitMQ response body/topology diagnostics и завершиться green на exact implementation head.
+
 ---
 
-# 6. `1.0.0` — Phase E: Stabilization / production release candidate
+# 6. `0.9.4` — Phase D7: Correctness/stabilization fixes
+
+**Priority: P0**
+**Status: IN PROGRESS**
+
+Перед 1.0 RC необходимо закрыть findings текущего exact-head review:
+
+1. stable `StartAttempt` replay до повторной проверки mutable assignment availability/group membership;
+2. audit должен сохранять итоговый HTTP status после exception mapping, а не промежуточный `500`;
+3. Outbox/expiration hosted workers должны переживать transient cycle-level DB/query/lock failures;
+4. publish/start/submit должны принимать настоящий zero-length body при валидном `Idempotency-Key` header;
+5. `--migrate` должен загружать только database-required configuration;
+6. RabbitMQ performance probe topology должен быть диагностируемым и дать полный green D6 run;
+7. documentation source of truth должна оставаться синхронизированной с code/tests/CI.
+
+**Exit gate:** regression tests для пунктов 1–5, полный `dotnet`/`security`/`performance` green на одном implementation HEAD, сохранённый D6 artifact и отсутствие открытых P0 correctness findings.
+
+---
+
+# 7. `1.0.0` — Phase E: Stabilization / production release candidate
 
 **Priority: P0**  
 **Status: NEXT AFTER PHASE D**
@@ -269,15 +294,27 @@ Worker critical scenarios:
 9. integration-event catalog explicitly documented;
 10. release notes + rollback/forward-fix runbook;
 11. dependency/container/SBOM evidence attached to release process;
-12. SLO dashboards/alerts exercised against staging.
+12. SLO dashboards/alerts exercised against staging;
+13. deterministic pagination order (`timestamp + ID`) на всех paged read models;
+14. reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;
+15. domain/application error и value-object invariants имеют единый ожидаемый failure contract.
 
 **1.0 definition:** production-safe core assessment workflow, а не максимальное число типов вопросов.
 
 ---
 
-# 7. `1.1.x` — Phase F: Authoring productivity
+# 8. `1.1.x` — Phase F: Student journey & authoring productivity
 
 **Priority: P1**
+
+## F0. Student-safe attempt presentation/resume
+
+Первая product vertical после 1.0:
+
+- question/option presentation из immutable attempt revision;
+- saved responses, status и deadline;
+- запрет `IsCorrect`/answer-key leakage;
+- ownership/OpenAPI/contract tests.
 
 ## F1. Clone test / draft from revision
 
@@ -307,7 +344,7 @@ Worker critical scenarios:
 
 ---
 
-# 8. `1.2.x` — Phase G: Advanced assessment behavior
+# 9. `1.2.x` — Phase G: Advanced assessment behavior
 
 **Priority: P1/P2**
 
@@ -354,7 +391,7 @@ Submitted -> AwaitingReview -> Graded
 
 ---
 
-# 9. `1.3.x` — Phase H: Assignment orchestration & notifications
+# 10. `1.3.x` — Phase H: Assignment orchestration & notifications
 
 **Priority: P1/P2**
 
@@ -366,7 +403,7 @@ Submitted -> AwaitingReview -> Graded
 
 ---
 
-# 10. `1.4.x` — Phase I: Reporting & analytics
+# 11. `1.4.x` — Phase I: Reporting & analytics
 
 **Priority: P1/P2**
 
@@ -378,7 +415,7 @@ Submitted -> AwaitingReview -> Graded
 
 ---
 
-# 11. `2.x` / business-triggered — Phase J: Workspace / multi-tenant evolution
+# 12. `2.x` / business-triggered — Phase J: Workspace / multi-tenant evolution
 
 Не форсируется без требования нескольких организаций/isolated workspaces.
 
@@ -393,7 +430,7 @@ Submitted -> AwaitingReview -> Graded
 
 ---
 
-# 12. Phase K: Scale extraction triggers
+# 13. Phase K: Scale extraction triggers
 
 Microservices не являются roadmap milestone сами по себе.
 
@@ -409,7 +446,7 @@ Microservices не являются roadmap milestone сами по себе.
 
 ---
 
-# 13. Общие gates
+# 14. Общие gates
 
 Каждый пункт считается DONE только если применимо выполнены:
 

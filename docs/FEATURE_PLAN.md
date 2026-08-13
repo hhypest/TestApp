@@ -1,6 +1,6 @@
 # Детальный план фич TestApp
 
-> Этот backlog является рабочим планом. `DONE` означает реализовано в текущем `beta-ddd`; `PLANNED` — согласованный следующий технический шаг; `DECISION` — требуется продуктово-архитектурное решение до реализации.
+> Этот backlog является рабочим планом на code baseline `ff33a95`. `DONE` означает реализовано и покрыто текущим repository baseline; `VERIFYING` — код/automation есть, но обязательный exit gate ещё не green; `PLANNED` — согласованный следующий технический шаг; `DECISION` — требуется продуктово-архитектурное решение до реализации.
 
 ## Обозначения
 
@@ -66,23 +66,39 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | OBS-003 | OpenTelemetry | DONE | ASP.NET/HttpClient/runtime |
 | OPS-001 | Docker image | DONE | multi-stage/non-root |
 | OPS-002 | Compose stack | DONE | DB/RMQ/Keycloak/OTEL/migrate/API |
-| OPS-003 | Migration-only mode | DONE | `--migrate` |
+| OPS-003 | Migration-only mode | DONE | `--migrate`; DB-only composition остаётся STAB-005 |
 | TEST-001 | MariaDB integration suite | DONE | real provider |
 | TEST-002 | RabbitMQ integration suite | DONE | real broker |
 | TEST-003 | production image migration CI | DONE | release-path gate |
 
 ---
 
-# B. Production hardening backlog
+## Current `0.9.4` stabilization backlog
+
+| ID | Priority | Status | Scope |
+|---|---:|---|---|
+| STAB-001 | P0 | PLANNED | stable StartAttempt replay before mutable assignment checks |
+| STAB-002 | P0 | PLANNED | audit stores final handled HTTP status |
+| STAB-003 | P0 | PLANNED | cycle-level Outbox/expiration worker recovery |
+| STAB-004 | P0 | VERIFYING | diagnostic RabbitMQ capacity probe + full green D6 run |
+| STAB-005 | P0 | PLANNED | database-only `--migrate` configuration path |
+| STAB-006 | P1 | PLANNED | deterministic timestamp + ID pagination order |
+| STAB-007 | P1 | PLANNED | SQL joins/aggregates for reviewer/admin hot queries |
+
+`STAB-004` остаётся `VERIFYING`: на `ff33a95` authenticated k6 и expiration probe прошли, но RabbitMQ Management API вернул HTTP 400 при topology setup до создания synthetic Outbox backlog.
+
+---
+
+# B. Production hardening baseline
 
 ## CFG-001 — Fail-fast Database configuration
 
 - **Priority:** P0
 - **Effort:** S
-- **Status:** PLANNED
+- **Status:** DONE
 - **Dependencies:** none
 
-### Scope
+### Implemented scope
 
 - убрать production fallback `testapp/testapp`;
 - Development default оставить только явно;
@@ -98,7 +114,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 - **Priority:** P0
 - **Effort:** S
-- **Status:** PLANNED
+- **Status:** DONE
 
 ### Acceptance
 
@@ -110,7 +126,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 - **Priority:** P1
 - **Effort:** S
-- **Status:** PLANNED
+- **Status:** DONE
 
 Bind/validate:
 
@@ -122,7 +138,7 @@ Bind/validate:
 
 - **Priority:** P0
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 ### Acceptance
 
@@ -134,7 +150,7 @@ Bind/validate:
 
 - **Priority:** P0 if browser frontend deployed
 - **Effort:** S
-- **Status:** PLANNED
+- **Status:** DONE
 
 ### Acceptance
 
@@ -146,7 +162,7 @@ Bind/validate:
 
 - **Priority:** P0
 - **Effort:** S/M
-- **Status:** PLANNED
+- **Status:** DONE
 
 Document and test ingress termination behavior.
 
@@ -154,7 +170,7 @@ Document and test ingress termination behavior.
 
 - **Priority:** P0
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 ### Policies
 
@@ -173,7 +189,7 @@ Document and test ingress termination behavior.
 
 - **Priority:** P0
 - **Effort:** S
-- **Status:** PLANNED
+- **Status:** DONE
 
 Configuration decides public/internal/disabled.
 
@@ -181,7 +197,7 @@ Configuration decides public/internal/disabled.
 
 - **Priority:** P0
 - **Effort:** S/M
-- **Status:** PLANNED
+- **Status:** DONE
 
 - NuGet vulnerability check;
 - fail on high/critical agreed policy.
@@ -190,7 +206,7 @@ Configuration decides public/internal/disabled.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 ---
 
@@ -200,7 +216,7 @@ Configuration decides public/internal/disabled.
 
 - **Priority:** P0
 - **Effort:** L
-- **Status:** DECISION -> PLANNED after model choice
+- **Status:** DONE — selected `OwnerId` model for current single-organization scope
 
 ### Options
 
@@ -220,6 +236,7 @@ Configuration decides public/internal/disabled.
 - **Priority:** P0
 - **Effort:** M
 - **Dependencies:** AUTHZ-001
+- **Status:** DONE
 
 Author sees only allowed scope; admin behavior explicitly defined.
 
@@ -228,6 +245,7 @@ Author sees only allowed scope; admin behavior explicitly defined.
 - **Priority:** P0
 - **Effort:** M
 - **Dependencies:** AUTHZ-001
+- **Status:** DONE
 
 Protect rename/settings/question/option/publish/archive.
 
@@ -236,12 +254,14 @@ Protect rename/settings/question/option/publish/archive.
 - **Priority:** P0
 - **Effort:** S/M
 - **Dependencies:** AUTHZ-001
+- **Status:** DONE
 
 ## AUTHZ-005 — Reviewer result isolation
 
 - **Priority:** P0
 - **Effort:** M
 - **Dependencies:** AUTHZ-001
+- **Status:** DONE
 
 Two-author E2E negative test mandatory.
 
@@ -249,9 +269,9 @@ Two-author E2E negative test mandatory.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** DECISION
+- **Status:** DONE — `test-admin` has explicit global scope
 
-Decide global admin vs workspace admin.
+Decision: current `test-admin` scope is global. Workspace admin is reconsidered only with a Workspace/Tenant model.
 
 ## ID-001 — `(Issuer, Subject)` external identity
 
@@ -277,7 +297,7 @@ Decide global admin vs workspace admin.
 
 - **Priority:** P0/P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE — header resolver/fingerprint compatibility; see API-009 for zero-length body
 
 ### Scope
 
@@ -294,11 +314,14 @@ Decide global admin vs workspace admin.
 - generated OpenAPI;
 - stable validation error.
 
+Current transport limitation: publish/start/submit still require a JSON body (`{}` is sufficient) because their Minimal API body parameter is non-nullable. The key may live only in the header, but a truly empty body is tracked separately as API-009.
+
 ## API-002 — Idempotency request fingerprint
 
 - **Priority:** P0/P1
 - **Effort:** M
 - **Dependencies:** API-001
+- **Status:** DONE
 
 Same key + different payload must not silently replay unrelated result.
 
@@ -308,7 +331,7 @@ Store canonical request hash with record.
 
 - **Priority:** P1
 - **Effort:** M/L
-- **Status:** PLANNED
+- **Status:** DONE
 
 Expose aggregate version on mutable author/admin resources.
 
@@ -322,7 +345,7 @@ Expose aggregate version on mutable author/admin resources.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 Length/range/required/enum validation before handler where transport-specific.
 
@@ -330,7 +353,7 @@ Length/range/required/enum validation before handler where transport-specific.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 - descriptions;
 - examples;
@@ -345,6 +368,7 @@ Length/range/required/enum validation before handler where transport-specific.
 - **Priority:** P1
 - **Effort:** S/M
 - **Dependencies:** API-005
+- **Status:** DONE
 
 Detect accidental breaking changes.
 
@@ -352,7 +376,7 @@ Detect accidental breaking changes.
 
 - **Priority:** P2
 - **Effort:** S
-- **Status:** PLANNED
+- **Status:** DONE — lifecycle headers/retirement behavior implemented; rewrite removal remains a future compatibility decision
 
 ### Steps
 
@@ -369,6 +393,15 @@ Detect accidental breaking changes.
 
 Needed before richer catalogs/reporting.
 
+## API-009 — True empty-body header-only commands
+
+- **Priority:** P0/P1
+- **Effort:** S/M
+- **Status:** PLANNED
+- **Dependencies:** API-001
+
+Publish/start/submit должны принимать zero-length body при валидном `Idempotency-Key` header. Нужны реальные empty-body HTTP tests и соответствующий OpenAPI contract.
+
 ---
 
 # E. Operational reliability
@@ -377,23 +410,24 @@ Needed before richer catalogs/reporting.
 
 - **Priority:** P0
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE — repository logical baseline; provider PITR/scheduling remain deployment-owned
 
-Define RPO/RTO, backup schedule, encrypted retention.
+Repository baseline defines engineering RPO/RTO and portable retention; concrete schedule/encrypted storage/PITR remain deployment-owned.
 
 ## OPS-011 — Automated restore verification
 
 - **Priority:** P0
 - **Effort:** M/L
 - **Dependencies:** OPS-010
+- **Status:** DONE
 
-CI/scheduled job restores backup to isolated environment and verifies schema/read.
+CI restores each generated backup to an isolated database and verifies schema, migration history and business marker.
 
 ## OPS-012 — Audit retention cleanup
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 Batch delete/archive with index-friendly range.
 
@@ -401,7 +435,7 @@ Batch delete/archive with index-friendly range.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 Retention must exceed maximum retry window/client guarantees.
 
@@ -409,7 +443,7 @@ Retention must exceed maximum retry window/client guarantees.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 Do not delete pending/dead-letter rows blindly.
 
@@ -417,7 +451,7 @@ Do not delete pending/dead-letter rows blindly.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 ### Acceptance
 
@@ -432,7 +466,7 @@ Do not delete pending/dead-letter rows blindly.
 
 - **Priority:** P2
 - **Effort:** M
-- **Status:** DECISION
+- **Status:** DONE — explicit audited `discard` terminal state selected
 
 Needed only if operations requires permanent suppression state.
 
@@ -440,25 +474,26 @@ Needed only if operations requires permanent suppression state.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
 ## OBS-011 — Attempt expiration lag metric
 
 - **Priority:** P1
 - **Effort:** S/M
-- **Status:** PLANNED
+- **Status:** DONE
 
 ## OBS-012 — API SLO dashboard
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** PLANNED — application metrics/SLO contract done; backend dashboard is deployment-owned
 
 ## OBS-013 — Alerts
 
 - **Priority:** P1
 - **Effort:** M
 - **Dependencies:** OBS-010..012
+- **Status:** PLANNED — thresholds/runbook documented; routes and staging drill remain
 
 Alert on:
 
@@ -473,7 +508,7 @@ Alert on:
 
 - **Priority:** P0 before sized production launch
 - **Effort:** L
-- **Status:** PLANNED
+- **Status:** VERIFYING
 
 Scenarios documented in `TESTING.md`.
 
@@ -998,7 +1033,7 @@ Create repeatable `dotnet ef` workflow while preserving MariaDB-specific review.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE — assembly reference direction baseline
 
 Automate Domain-no-EF/API and layer reference constraints.
 
@@ -1021,24 +1056,23 @@ Automate Domain-no-EF/API and layer reference constraints.
 Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
 
 ```text
-1  CFG-001/002 + EDGE-001/003/004 + API-SEC-001
-2  AUTHZ-001 -> AUTHZ-005
-3  API-001 -> API-006
-4  OPS-010/011 + OPS-012/013/014 + OBS-010..013
-5  PERF-001 + CI-SEC-001/002 + DEV-002/003/005
-6  1.0 stabilization
-7  AUTHOR-001/002/003 + tags/catalog
-8  UX-001 + frontend-driven API refinements
-9  REP-010/014
-10 EVT catalog only when first real consumer appears
-11 advanced assessment features selected by product decision
+1  STAB-001..005 + API-009 + full green PERF-001/D6
+2  STAB-006/007 + error/value-object invariant normalization
+3  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze
+4  ATT-010/011 + UX-001 student presentation/resume
+5  AUTHOR-001/002/003 + selected tags/catalog + versioned JSON import/export
+6  reporting hot paths REP-010/014 after SQL scalability work
+7  EVT catalog only when first real consumer appears
+8  assignment orchestration/notifications selected by product need
+9  advanced assessment features one versioned vertical slice at a time
 ```
 
 ## Почему так
 
-- ownership/security нельзя откладывать после массового product expansion;
-- standard API contracts лучше стабилизировать до SDK/frontend proliferation;
-- backup/restore/retention нужны до real production data;
+- ownership/security/API/operational repository baseline уже реализованы;
+- оставшиеся correctness gaps нельзя переносить за 1.0 freeze;
+- student presentation завершает текущий end-to-end product flow раньше новых question types;
+- backup/restore/retention требуют deployment rehearsal поверх уже существующей automation;
 - integration events должны появляться от конкретного consumer need;
 - advanced question types существенно расширяют domain и должны строиться на стабильной платформе.
 

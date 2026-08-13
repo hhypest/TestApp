@@ -1,6 +1,6 @@
 # Безопасность TestApp
 
-> Статус: базовая authentication/authorization/audit инфраструктура **Implemented**; production hardening и ownership isolation — **Planned/P0**.
+> Статус: authentication/authorization, owner isolation и repository-level production hardening **Implemented**. Ниже отдельно отмечены remaining stabilization и deployment-owned controls.
 
 ## 1. Security model overview
 
@@ -99,39 +99,24 @@ attempt.UserId == currentActor.UserId
 
 Manual timeout защищён `tests:assign` и не использует student ownership.
 
-## 7. Critical ownership gap
+## 7. Resource ownership isolation
 
-### Текущее состояние
-
-`Test` не хранит `OwnerId/CreatedBy/TeamId/TenantId`.
-
-Следствия:
-
-- `test-author` catalog не фильтруется по владельцу;
-- write handlers получают test по `TestId`, но не сравнивают owner;
-- `results:review` не ограничивается тестами конкретного автора.
-
-### Риск
-
-Для доверенной единой author-группы это может быть допустимо. Для нескольких независимых подразделений/клиентов — это data isolation vulnerability.
-
-### Planned P0/P1 fix
-
-Ввести явную ownership model. Минимальный вариант:
+Текущая single-organization модель:
 
 ```text
-Test.CreatedBy / OwnerId = ExternalUserIdentity
+Test.OwnerId = Keycloak sub создавшего автора
 ```
 
-Более масштабируемый вариант:
+Реализованы:
 
-```text
-Workspace/Tenant/Team
-Test.WorkspaceId
-WorkspaceMembership + role
-```
+- immutable mandatory owner при создании Test;
+- owner filtering catalog/editor/revisions/reviewer list/detail в SQL;
+- owner checks для rename/settings/questions/options/publish/archive;
+- `test-admin` global scope;
+- legacy backfill `__legacy_admin_only__`;
+- cross-author negative E2E, включая correctness detail.
 
-Решение должно быть принято до multi-tenant production.
+Workspace/Tenant/Team и ACL не реализованы сознательно. Они становятся P0 только при multi-organization deployment; текущий `OwnerId` не следует ошибочно называть tenant boundary.
 
 ## 8. Multi-realm gap
 
@@ -180,32 +165,16 @@ Regression tests должны проверять этот boundary при изм
 
 ## 10. Rate limiting
 
-**Implemented:** fixed-window global limiter.
-
-- partition: `sub`, fallback remote IP;
-- 120 requests/minute;
-- queue 0;
-- 429 on rejection.
-
-### Current weaknesses
-
-- hard-coded values;
-- одинаковая policy для GET catalog и high-frequency answer PUT;
-- нет отдельной auth/operations policy;
-- remote IP может быть неверным за reverse proxy без trusted forwarded headers.
-
-### Planned
-
-Конфигурация:
+**Implemented:** configuration-driven fixed-window policies:
 
 ```text
-RateLimiting:Global:PermitLimit
-RateLimiting:Global:WindowSeconds
+RateLimiting:General:...
 RateLimiting:StudentWrite:...
+RateLimiting:PrivilegedRead:...
 RateLimiting:Operations:...
 ```
 
-Плюс trusted proxy configuration до использования client IP как security partition.
+Partition = authenticated `sub`; fallback = effective remote IP после trusted forwarded-header processing. `KnownProxies/KnownNetworks` и `ForwardLimit` конфигурируются явно, untrusted forwarded headers игнорируются. Rejection возвращает `429`, correlation header сохраняется.
 
 ## 11. Correlation и audit
 
@@ -234,9 +203,11 @@ Audit содержит metadata, но **не request/response body**.
 - PII из будущих форм;
 - secrets.
 
-### Current audit limitation
+### Current audit limitations
 
 Audit entry создаётся best-effort после request execution. Ошибка audit persistence логируется, но не меняет business response. Это правильная availability trade-off для текущего уровня, но compliance-сценарий может потребовать другую гарантию.
+
+Из-за текущего middleware order handled binding/concurrency/idempotency exceptions могут записываться как audit `500`, хотя финальный response уже преобразован в `400/409`. Это operational truthfulness defect до 1.0, а не information-disclosure issue.
 
 ## 12. ProblemDetails и information disclosure
 
@@ -259,47 +230,38 @@ Domain/application validation messages являются частью business co
 
 Compose использует простые credentials `testapp/testapp` и dev Keycloak credentials. Они предназначены **только для local development**.
 
-### Critical current gap
+### Production behavior
 
-`Program.cs` имеет fallback MariaDB connection string с development credentials, если `ConnectionStrings:Database` отсутствует.
-
-Production должен перейти на fail-fast:
-
-- вне Development connection string обязателен;
-- Keycloak authority/audience обязательны;
+- вне Development database connection string обязателен; dev fallback там не применяется;
+- Keycloak authority/audience обязательны для HTTP runtime;
 - если RabbitMQ enabled — broker connection обязателен;
-- secrets не должны находиться в committed production config;
-- environment/secret store injection.
+- HTTPS metadata требуется по умолчанию;
+- secrets не логируются и должны поступать через environment/deployment secret store.
+
+Оставшийся gap: `--migrate` уже не требует Keycloak, но пока загружает unrelated RabbitMQ/CORS/rate-limit/proxy options. Migration job должен быть изолирован до database-only configuration.
 
 ## 14. TLS / reverse proxy
 
-### Implemented
+### Implemented repository contract
 
-JWT metadata HTTPS required вне Development.
+- JWT metadata HTTPS required вне Development;
+- opt-in `UseForwardedHeaders` с explicit `KnownProxies/KnownNetworks` и `ForwardLimit`;
+- configurable HTTPS redirect/HSTS;
+- explicit CORS allow-list без wildcard origin;
+- proxy-aware rate-limit partition;
+- disabled Kestrel server banner;
+- `nosniff`, `DENY`, `no-referrer`, Permissions-Policy и restrictive CSP baseline.
 
-### Not yet formalized
-
-- `UseForwardedHeaders` с KnownProxies/KnownNetworks;
-- HSTS policy;
-- HTTPS redirection strategy за ingress;
-- secure headers/CSP для будущего UI;
-- CORS allow-list;
-- external base URL;
-- proxy-aware rate limiting.
-
-Эти задачи входят в P0 production hardening.
+Конкретная TLS termination, external base URL, certificate rotation и ingress/network policy остаются deployment-owned.
 
 ## 15. OpenAPI exposure
 
-Сейчас `/openapi/v1.json` anonymous.
+Runtime policy configuration-driven:
 
-Для production требуется явное решение:
-
-- public documentation — оставить anonymous;
-- private API — ограничить/отключить в Production;
-- internal gateway — защищать network boundary.
-
-Это policy decision, не должно оставаться случайным default.
+- Development: enabled/anonymous по умолчанию;
+- Production: disabled по умолчанию;
+- если включён с `AllowAnonymous=false`, endpoint требует `operations:read`;
+- anonymous production exposure возможен только как явная configuration decision.
 
 ## 16. RabbitMQ security
 
@@ -325,28 +287,26 @@ Production:
 - credential rotation;
 - network allow-list/private subnet.
 
-## 18. Security backlog before 1.0
+## 18. Security/stability backlog before 1.0
 
-P0:
+Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы.
 
-1. fail-fast production configuration;
-2. remove insecure DB fallback outside Development;
-3. trusted forwarded headers/proxy setup;
-4. explicit CORS/TLS/HSTS policy;
-5. configuration-driven rate limits;
-6. OpenAPI production exposure policy;
-7. ownership boundary для tests/results;
-8. secret handling documentation + deployment injection;
-9. dependency vulnerability scanning in CI.
+P0/P1 до 1.0:
 
-P1:
+1. исправить audit final-status mismatch;
+2. сделать `StartAttempt` replay стабильным после изменения assignment/group state, не раскрывая чужой attempt;
+3. добавить настоящий zero-length-body `Idempotency-Key` contract и regression tests;
+4. изолировать migration-only mode от unrelated secrets/config;
+5. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
+6. pin GitHub Actions/container dependencies immutable SHA/digest;
+7. выполнить staging alert/restore/rollback security rehearsal.
 
-10. `(Issuer, Subject)` identity;
-11. standard `Idempotency-Key` header validation;
-12. security regression matrix by role/resource owner;
-13. audit retention and access review;
-14. sensitive-data classification for integration events;
-15. optional workspace/tenant model.
+Business-triggered/после 1.0:
+
+8. `(Issuer, Subject)` identity при multi-realm;
+9. sensitive-data classification до первого integration event consumer;
+10. Workspace/Tenant/ACL только при multi-organization requirement;
+11. compliance-grade immutable external audit sink, если он требуется нормативно.
 
 ## 19. Security review checklist для новой фичи
 

@@ -37,6 +37,7 @@ Multi-realm identity key `(Issuer, Subject)` не реализован. Сейч
 Содержит:
 
 - `TestId`;
+- immutable `OwnerId` (`ExternalUserId` текущего автора при создании);
 - `Title`;
 - `TestStatus`;
 - `TestSettings`;
@@ -75,18 +76,27 @@ stateDiagram-v2
 
 Изменение settings на `Published` переводит working test обратно в `Draft`.
 
-### 3.5 Question ordering
+### 3.5 Ownership
+
+`Test.OwnerId` обязателен, immutable и устанавливается из current actor `sub` при создании.
+
+- `test-author` read/write scope ограничен owned tests;
+- reviewer author видит результаты только revisions собственных tests;
+- `test-admin` имеет явно глобальный scope;
+- legacy rows migration backfill получает owner `__legacy_admin_only__` и не становится доступным случайному author.
+
+### 3.6 Question ordering
 
 - `Order >= 0`;
 - order уникален внутри `Test`;
 - reorder запрещает collision.
 
-### 3.6 Question points
+### 3.7 Question points
 
 - `Points > 0`;
 - persistence precision: 18,2.
 
-### 3.7 Question types
+### 3.8 Question types
 
 Текущая enum:
 
@@ -430,17 +440,21 @@ Base `DomainEvent`:
 
 Следовательно, перечисленные выше domain events не должны считаться внешними contracts без отдельного явного решения.
 
-## 10. Aggregate ownership gap
+## 10. Ownership model и её границы
 
-Текущий `Test` не содержит:
+Текущая single-organization модель реализована через:
 
-- creator/owner;
-- team/tenant;
-- ACL.
+```text
+Test.OwnerId = Keycloak sub создавшего автора
+```
 
-Это означает, что role-level author authorization пока не ограничивает конкретного author только его тестами.
+Она обеспечивает resource isolation между авторами без локального User aggregate. В текущем домене намеренно отсутствуют:
 
-Эта проблема относится не к transport security, а к domain/application authorization model и входит в P0/P1 roadmap.
+- Workspace/Tenant/Team aggregate;
+- membership/ACL model;
+- `(Issuer, Subject)` identity key.
+
+Эти concepts вводятся только при реальном multi-organization/multi-realm requirement, поскольку затрагивают aggregate keys, authorization queries, idempotency, audit, events и migrations.
 
 ## 11. Не реализованные domain concepts
 
@@ -461,3 +475,12 @@ Base `DomainEvent`:
 - tenant/team ownership.
 
 Эти concepts перечислены в `FEATURE_PLAN.md` как planned/decision-required и не являются частью текущего domain contract.
+
+### Известные invariant gaps до 1.0
+
+- positional constructors strong IDs позволяют создать `Guid.Empty`, а `ExternalUserId`/`ExternalGroupId` позволяют обойти validating factory;
+- `AttemptScore` сам не запрещает negative values или `Earned > Maximum`;
+- admin `Timeout` принимает вычисленный caller score/outcome и не требует, чтобы deadline уже наступил;
+- string validation в части `Result<..., DomainError>` methods всё ещё может выбросить `ArgumentException`.
+
+Application/API сейчас поставляют корректные значения и validation boundary, но aggregate/value-object contract должен стать self-validating и единообразным до public 1.0 freeze.

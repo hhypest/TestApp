@@ -1,6 +1,6 @@
 # Архитектурные решения TestApp
 
-> Формат: компактный ADR register. Статус `Accepted` означает действующее решение; `Transitional` — временный контракт, который уже имеет planned replacement.
+> Формат: компактный ADR register. `Accepted` означает действующее решение; `Transitional` — временный совместимый контракт; `Superseded` — историческое решение, заменённое новым текущим contract.
 
 ## ADR-001 — Modular monolith вместо микросервисов
 
@@ -205,6 +205,8 @@ Mechanisms:
 
 **Consequences:** deployment pipeline содержит explicit migration gate.
 
+**Current limitation:** migrate-only composition пока загружает часть unrelated RabbitMQ/CORS/rate-limit/proxy options. Это implementation gap, а не изменение решения: целевой job остаётся database-only.
+
 ## ADR-018 — Canonical API path `/api/v1`
 
 **Status:** Accepted.
@@ -219,23 +221,27 @@ Legacy `/api/*` rewrite сохранён временно.
 
 **Decision:** старые routes переписываются в canonical v1 до routing.
 
-**Exit criteria:** формальная version/deprecation policy и migration clients.
+**Current lifecycle:** enable/disable configuration, `Deprecation`, optional `Sunset`, configured retirement -> `410 api.version.retired` реализованы.
+
+**Exit criteria:** telemetry/client migration и объявленная дата удаления rewrite.
 
 ## ADR-020 — Body-based idempotency key
 
-**Status:** Transitional.
+**Status:** Superseded by standard `Idempotency-Key` header contract.
 
-**Decision:** текущие commands принимают `idempotencyKey` в JSON request body.
+**Historical decision:** commands первоначально принимали `idempotencyKey` в JSON request body.
 
-**Target:** standard HTTP `Idempotency-Key` header + request fingerprint semantics.
+**Current decision:** primary contract — `Idempotency-Key` header; legacy body field временно поддерживается, header/body mismatch валидируется, common operations используют request fingerprint. Для publish/start/submit JSON body (`{}`) пока обязателен из-за endpoint binding; zero-length body остаётся отдельным implementation gap.
 
 ## ADR-021 — Role authorization не заменяет resource ownership
 
-**Status:** Accepted principle; implementation incomplete.
+**Status:** Accepted; current `OwnerId` implementation complete for single-organization scope.
 
 **Decision:** Keycloak roles — coarse permission. Resource ownership/eligibility должен проверяться отдельно.
 
-**Current gap:** Test ownership ещё не смоделирован.
+**Current implementation:** `Test.OwnerId = current Keycloak sub`, owner-scoped author/reviewer reads/writes, global `test-admin`, safe legacy backfill.
+
+**Remaining decision:** Workspace/Tenant/ACL и `(issuer, subject)` вводятся только при multi-organization/multi-realm requirement.
 
 ## ADR-022 — Не добавлять Event Sourcing без отдельной причины
 

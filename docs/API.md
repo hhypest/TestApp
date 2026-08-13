@@ -16,7 +16,14 @@ Legacy compatibility middleware временно переписывает:
 /api/... -> /api/v1/...
 ```
 
-Legacy rewrite не является полноценной lifecycle/versioning policy. Формальный срок retirement ещё должен быть определён в Phase C5.
+Legacy compatibility является управляемым lifecycle layer:
+
+- enable/disable configuration;
+- RFC-style `Deprecation` header;
+- optional `Sunset`;
+- после configured retirement legacy path возвращает `410 api.version.retired`.
+
+Конкретная дата отключения rewrite ещё не назначена и должна учитывать telemetry/client migration.
 
 ## 2. OpenAPI
 
@@ -30,7 +37,7 @@ Runtime policy:
 - Production: disabled по умолчанию;
 - если `OpenApi:Enabled=true` и `OpenApi:AllowAnonymous=false`, требуется `operations:read`.
 
-Текущий OpenAPI генерируется ASP.NET Core Minimal API metadata. Расширенные examples/error/header schemas относятся к Phase C4.
+OpenAPI обогащается document/operation/schema transformers и содержит Bearer security scheme, operation IDs, summaries/descriptions, authorization requirements, `Idempotency-Key`/`If-Match`/`ETag`, ProblemDetails responses и examples/enum metadata. Serialized document защищён contract test.
 
 ## 3. Authentication
 
@@ -105,6 +112,8 @@ X-Correlation-ID
 ```
 
 Клиентский ID принимается при длине <=128, иначе генерируется current TraceId/Guid v7. Correlation ID используется в audit/logging/telemetry.
+
+Известный operational gap: при exception, который позже преобразуется exception handler в `400/409`, текущий audit middleware может сохранить промежуточный `500`. Это не меняет клиентский ProblemDetails, но требует исправления до 1.0.
 
 ## 7. HTTP optimistic concurrency: ETag / If-Match
 
@@ -189,13 +198,15 @@ Legacy JSON field:
 
 пока поддерживается.
 
-Правила:
+Правила key resolution:
 
-- header-only — supported;
+- key только в header — supported;
 - body-only — supported transitional;
 - оба одинаковые — supported;
 - оба непустые, но разные -> `400 idempotency.key_mismatch`;
 - invalid/empty required key -> `400 idempotency.key`.
+
+Для publish/start/submit key может находиться только в header, но endpoint binding пока всё равно требует JSON body (`{}` или legacy DTO с empty GUID). HTTP request с zero-length body сейчас получает binding `400`; это tracked stabilization gap API-009, поэтому «header-only» не следует трактовать как «body отсутствует» на текущем baseline.
 
 ### Request fingerprint
 
@@ -209,6 +220,8 @@ same actor + operation + key + different payload -> 409 idempotency.key_reused
 ```
 
 Publish operation дополнительно resource-scoped по TestId.
+
+Start attempt использует отдельный unique `(AssignmentId, UserId, StartRequestId)` + serializable transaction. Текущий replay lookup выполняется после повторной проверки assignment availability/group membership; retry после изменения этого state может вернуть `409/403` вместо прежнего ID и должен быть исправлен до 1.0.
 
 ## 9. Pagination
 
@@ -228,6 +241,8 @@ pageSize default 20; clamp 1..100
   "totalPages": 0
 }
 ```
+
+Текущий offset paging не во всех read models имеет secondary ID ordering при одинаковом timestamp. До 1.0 ordering должен стать deterministic (`timestamp`, затем `Id`); cursor pagination требуется только при измеренном concurrent-churn use case.
 
 ## 10. Rate limiting
 
@@ -545,12 +560,15 @@ Detailed reviewer DTO включает:
 ```http
 GET /api/v1/operations/outbox?deadLetterLimit=20
 GET /api/v1/operations/audit?actorId=&statusCode=&from=&to=&page=&pageSize=
+GET /api/v1/operations/outbox/dead-letters/{eventId}
+POST /api/v1/operations/outbox/dead-letters/{eventId}/requeue
+POST /api/v1/operations/outbox/dead-letters/{eventId}/discard
 Authorization: operations:read
 ```
 
 Operational rate-limit policy применяется отдельно от general API.
 
-Outbox endpoint не раскрывает event payload.
+Outbox/dead-letter endpoints не раскрывают event payload. Requeue/discard требуют непустой reason, используют shared message lock и сохраняют actor/action/reason/correlation audit.
 
 ---
 
@@ -579,11 +597,13 @@ GET /health/ready
 
 # 19. Следующие изменения API
 
-Phase C3/C4/C5:
+Ближайший stabilization scope:
 
-- normalization malformed UUID/enum/body/required/max-length errors;
-- stable validation codes;
-- richer OpenAPI descriptions/examples/ProblemDetails/header schemas;
-- formal API v1 deprecation/version lifecycle;
-- последующее удаление legacy body `idempotencyKey` только через объявленное compatibility window;
-- последующее retirement legacy `/api/*` rewrite только через объявленную deprecation policy.
+- настоящий zero-length-body header-only publish/start/submit;
+- stable `StartAttempt` replay до mutable assignment checks;
+- audit final-status correctness;
+- deterministic paging tie-breakers;
+- SQL-scalable reviewer/admin read queries;
+- student-safe attempt presentation/resume DTO без correctness leakage.
+
+Legacy body `idempotencyKey` и `/api/*` rewrite удаляются только через объявленное compatibility window и lifecycle telemetry.

@@ -36,6 +36,7 @@
 | Column | Тип/semantics |
 |---|---|
 | `Id` | char(36), PK |
+| `OwnerId` | varchar(256), immutable external owner |
 | `Title` | varchar(300) |
 | `Status` | int enum |
 | `ConcurrencyVersion` | bigint concurrency token |
@@ -45,6 +46,12 @@
 Relations:
 
 - `questions` owned collection через FK `TestId`.
+
+Index:
+
+```text
+(OwnerId, Status)
+```
 
 ### 3.2 `questions`
 
@@ -188,6 +195,7 @@ Correctness здесь не хранится: оно берётся из immutab
 | `ResultType` | varchar(512) |
 | `ResultJson` | serialized result |
 | `CreatedAt` | datetime(6) |
+| `RequestFingerprint` | nullable varchar(64), SHA-256 canonical request hash |
 
 Unique:
 
@@ -208,15 +216,30 @@ Unique:
 - `AttemptCount`;
 - `LastAttemptAt`;
 - `NextAttemptAt`;
-- `DeadLetteredAt`.
+- `DeadLetteredAt`;
+- `DiscardedAt`.
 
 Queue index:
 
 ```text
-(ProcessedAt, DeadLetteredAt, NextAttemptAt, OccurredAt)
+(ProcessedAt, DeadLetteredAt, DiscardedAt, NextAttemptAt, OccurredAt)
 ```
 
-### 3.11 `audit_entries`
+### 3.11 `outbox_dead_letter_actions`
+
+Immutable operational audit для explicit `requeue`/`discard`:
+
+- action ID;
+- event ID;
+- action enum;
+- actor ID;
+- mandatory reason;
+- occurred time;
+- correlation ID.
+
+Indexes: `(EventId, OccurredAt)` и `OccurredAt`.
+
+### 3.12 `audit_entries`
 
 Хранит:
 
@@ -248,6 +271,10 @@ Request/response body не хранится.
 20260812110000_MariaDbBaseline
 20260812115000_OutboxDeliveryState
 20260812124500_AuditTrail
+20260812133000_TestOwnership
+20260812140000_IdempotencyFingerprint
+20260812150000_OperationalRetentionIndexes
+20260812151000_OutboxDeadLetterManagement
 ```
 
 `MariaDbBaseline` — новая baseline история после отказа от SQLite development history.
@@ -263,6 +290,8 @@ Flow:
 1. composition root создаёт app/service provider;
 2. `Database.MigrateAsync()`;
 3. process завершается до HTTP listener.
+
+Текущий composition root не загружает Keycloak/transport security в migrate-only mode, но всё ещё валидирует RabbitMQ/worker/CORS/rate-limit/OpenAPI/proxy options. Целевой production migration job должен требовать только database configuration; это known stabilization gap.
 
 ### 4.2 Startup migrations
 
@@ -375,19 +404,27 @@ Read queries должны:
 - не materialize immutable `questions_json`, если list-view этого не требует;
 - вычисляемые non-translatable properties (например score percentage) рассчитывать после materialization из persisted scalar fields.
 
-## 9. Backup/restore — planned operational requirement
+Текущий долг:
 
-Перед production 1.0 должны быть определены:
+- часть paged queries сортирует только по timestamp без deterministic ID tie-breaker;
+- reviewer/admin queries сначала materialize matching revision IDs;
+- assignment statistics materialize score rows в process memory.
 
-- backup cadence;
-- point-in-time recovery/RPO;
-- restore verification;
-- encryption/secret management;
-- retention;
-- restore drill в отдельное окружение;
-- schema migration rollback/forward-fix policy.
+До 1.0 эти hot paths должны перейти на stable ordering и SQL joins/aggregates с high-cardinality regression evidence.
 
-См. `ROADMAP.md`, OPS backlog.
+## 9. Backup/restore — implemented repository baseline
+
+Реализованы:
+
+- compressed logical MariaDB dump;
+- SHA-256 sidecar и gzip validation;
+- restore только в isolated target database;
+- table-count, EF migration history и optional business-marker verification;
+- CI recovery drill после production-image migration;
+- baseline RPO <= 24h и RTO <= 4h;
+- portable retention guidance.
+
+До production 1.0 deployment owner должен выполнить staging/platform restore drill с measured RTO, настроить schedule/encrypted offsite storage и при более строгом RPO включить provider-native snapshot/binlog/PITR. Подробно: `BACKUP_RESTORE.md`.
 
 ## 10. MariaDB version policy
 

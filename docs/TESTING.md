@@ -112,7 +112,24 @@ admin operations
 
 ### `ArchitectureAndIdentityTests.cs`
 
-Проверяет architectural/identity constraints, включая Keycloak claim mapping.
+Проверяет assembly dependency direction и Keycloak claim mapping.
+
+### API contract suites
+
+- `ApiLifecycleContractTests.cs` — legacy enable/deprecation/sunset/retirement;
+- `ConcurrencyHttpContractTests.cs` — ETag/If-Match/428/412/409;
+- `IdempotencyHttpContractTests.cs` — header/body compatibility, mismatch и fingerprint reuse;
+- `RequestValidationContractTests.cs` — malformed binding/DataAnnotations/enum normalization;
+- `OpenApiContractTests.cs` — serialized enriched document;
+- `EdgeSecurityTests.cs` — forwarded headers, CORS, transport headers, rate limits и OpenAPI exposure;
+- `TestOwnershipTests.cs` — cross-author write/read/reviewer isolation.
+
+### Operational suites
+
+- `RuntimeConfigurationTests.cs` — fail-fast typed configuration;
+- `OperationalRetentionTests.cs` — bounded cleanup и protected Outbox states;
+- `OutboxDeadLetterManagementTests.cs` / `OutboxDeadLetterApiTests.cs` — locked audited requeue/discard и payload-safe HTTP contract;
+- `OperationalMetricsTests.cs` — custom low-cardinality metric contract.
 
 ### `MariaDbVersionTests.cs`
 
@@ -256,7 +273,12 @@ GitHub Actions `dotnet` workflow:
 8. `docker compose config --quiet`;
 9. build production API image;
 10. run production image `--migrate` against MariaDB;
-11. cleanup containers.
+11. create logical backup and verify isolated restore/business marker;
+12. cleanup containers.
+
+Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
+
+Отдельный `performance` workflow поднимает production-shaped API/MariaDB/RabbitMQ/Keycloak stack, получает real JWT и проверяет k6 HTTP scenarios, expiration storm и Outbox recovery.
 
 ### Merge/release gate
 
@@ -333,12 +355,12 @@ GitHub Actions `dotnet` workflow:
 
 ### P0
 
-- production configuration validation tests;
-- forwarded headers/proxy behavior;
-- configurable rate limit tests;
-- owner/resource authorization после введения ownership;
-- CORS/TLS policy tests;
-- standard Idempotency-Key header contract.
+- stable StartAttempt replay после expiry/cancellation/group membership change;
+- audit response/audit status equality для handled `400/409/412` и real `500`;
+- Outbox/expiration cycle recovery после DB/query/lock failure;
+- настоящий zero-length-body `Idempotency-Key` contract;
+- migration-only startup с database-only configuration;
+- полный green performance D6 run с RabbitMQ topology diagnostics.
 
 ### P1
 
@@ -346,32 +368,34 @@ GitHub Actions `dotnet` workflow:
 - application handler suite beyond StartAttempt;
 - concurrency test submit vs background timeout;
 - multiple API replicas idempotency scenario;
-- audit retention/cleanup;
-- dead-letter requeue once feature exists;
+- deterministic pagination при одинаковых timestamps;
+- high-cardinality reviewer/admin query regression + query-plan evidence;
+- strong-ID/AttemptScore/error mapping invariants;
 - real Keycloak smoke integration.
 
 ### P2
 
-- load tests;
 - endurance/soak Outbox;
 - failover/restart MariaDB/RabbitMQ scenarios;
-- backup/restore smoke;
+- staging/platform backup restore drill;
 - contract tests for frontend/SDK.
 
-## 14. Performance testing plan
+## 14. Performance testing baseline
 
-Перед production traffic profile определить representative workloads:
+Реализованный D6 workflow покрывает:
 
-- catalog read;
 - bulk assignments;
-- group assignment lookup;
 - simultaneous attempt starts;
 - high-frequency answer writes;
 - mass deadline expiration;
 - reviewer result pagination;
 - Outbox backlog recovery.
 
-Metrics:
+Thresholds и artifacts описаны в `PERFORMANCE.md`.
+
+Текущий verification status: на `ff33a95` HTTP k6 и expiration probe прошли, но RabbitMQ probe topology setup вернул HTTP 400 до создания Outbox backlog. Следовательно, D6 пока не green и Outbox drain этим run не доказан.
+
+Для staging/soak дополнительно измерять:
 
 - p50/p95/p99 latency;
 - requests/sec;

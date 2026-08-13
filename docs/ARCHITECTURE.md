@@ -209,6 +209,10 @@ Minimal API endpoint
 
 OpenAPI доступен через `/openapi/v1.json`.
 
+### Текущий audit-ordering gap
+
+`CorrelationAuditMiddleware` находится внутри `ExceptionHandler`. Если downstream exception затем преобразуется exception handler в `400/409`, audit middleware уже видел exception и записывает промежуточный `500`. Клиентский response корректен, но audit/SLO evidence расходится с ним. До 1.0 audit должен наблюдать итоговый handled response status (либо correlation и audit следует разделить на отдельные middleware).
+
 ### Почему rewrite выполняется до routing
 
 Legacy compatibility меняет `Request.Path`, поэтому canonical route должен быть выбран после rewrite. Если rewrite выполнить после endpoint routing, выбранный endpoint не пересчитывается и старые URLs получают 404.
@@ -226,6 +230,8 @@ Legacy compatibility меняет `Request.Path`, поэтому canonical route
 - application handler повторно проверяет state/deadline;
 - optimistic concurrency безопасно разрешает гонку с submit.
 
+Per-attempt exceptions обрабатываются, но initial/batch DB scan выполняется без cycle-level recovery boundary. Transient query failure способен завершить `BackgroundService`; это stabilization gap.
+
 ### 7.2 OutboxProcessor
 
 Регистрируется только когда подключён реальный publisher (`RabbitMq:Enabled=true` для RabbitMQ path).
@@ -236,6 +242,8 @@ Legacy compatibility меняет `Request.Path`, поэтому canonical route
 - max attempts 10;
 - MariaDB advisory lock по OutboxMessage ID;
 - at-least-once delivery.
+
+Per-message publish failures получают retry/dead-letter state. Ошибки batch query, advisory lock acquisition либо сохранения failure state могут выйти из worker loop; до 1.0 нужен общий resilient cycle с bounded backoff/health signal.
 
 ## 8. Concurrency model
 
@@ -262,6 +270,8 @@ DbUpdateConcurrencyException
 - `StartRequestId` хранится в `test_attempts`;
 - unique `(AssignmentId, UserId, StartRequestId)`;
 - attempt limit проверяется внутри serializable transaction.
+
+Текущий replay lookup выполняется после повторной проверки assignment target/availability. Если первый start был закоммичен, а retry пришёл после cancellation/expiry или изменения group claim, прежний ID может не воспроизвестись. Целевой порядок: actor-scoped replay lookup до mutable eligibility checks, а все checks сохраняются для нового key.
 
 ### Publish/assign/bulk-assign/submit
 
@@ -306,12 +316,16 @@ Aggregate может поднимать `IDomainEvent`. `AppDbContext.SaveChange
 
 ## 13. Текущие архитектурные gaps
 
-- нет `Test.OwnerId/CreatedBy`;
-- нет tenant/team boundary;
-- handlers регистрируются напрямую в API, нет общего command/query dispatcher pipeline для validation/logging/idempotency;
-- idempotency пока body-based, а не HTTP header standard;
-- rate limit hard-coded;
-- нет формального API deprecation/version lifecycle;
+- `Test.OwnerId` и owner-scoped writes/reads реализованы; tenant/workspace boundary сознательно отсутствует до business requirement;
+- handlers регистрируются напрямую в API, общего command/query dispatcher pipeline нет; это допустимо, пока cross-cutting duplication остаётся управляемым;
+- standard `Idempotency-Key` resolver/fingerprint реализован, но no-payload publish/start/submit всё ещё требуют JSON body (`{}`), а не настоящий zero-length body;
+- replay `StartAttempt` зависит от текущей assignment availability/group membership;
+- audit middleware может записать handled `400/409` как `500`;
+- Outbox/expiration workers не имеют cycle-level recovery для DB/query/lock failures;
+- migration-only composition всё ещё загружает unrelated RabbitMQ/CORS/rate-limit/proxy options;
+- paged read models не везде имеют deterministic timestamp + ID tie-breaker;
+- reviewer/admin queries materialize большие revision-ID/score sets вместо SQL joins/aggregates;
+- student-safe attempt presentation DTO с question/option text ещё отсутствует;
 - migrations поддерживаются explicit files, но полноценный EF model snapshot отсутствует;
 - Outbox transport готов, но production integration event catalog ещё не определён;
 - нет separate read database/cache — и сейчас это сознательно не требуется.

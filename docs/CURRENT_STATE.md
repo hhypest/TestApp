@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot**. Этот документ описывает фактическое состояние `beta-ddd` после завершения Phase A, Phase B и первых двух задач Phase C.
+> Статус: **Implemented snapshot** на code baseline `ff33a954b381e0632ade738c88fe3ac386003529` (2026-08-13). Phase A, B, C и D1–D5 завершены; D6 реализована, но её exit gate ещё не пройден.
 
 ## 1. Назначение системы
 
@@ -146,6 +146,10 @@ Persistent idempotency rows содержат SHA-256 fingerprint логичес�
 
 Fingerprint используется publish/single assignment/bulk assignment/submit. Start attempt дополнительно защищён DB unique key `(AssignmentId, UserId, StartRequestId)` и serializable attempt-limit transaction.
 
+Текущий transport resolver принимает key из header и legacy body. Для publish/start/submit Minimal API всё ещё требует JSON body (`{}` достаточно), даже когда key находится только в header; zero-length body является stabilization gap.
+
+Также replay уже созданного start attempt выполняется внутри repository после повторной проверки текущей availability/group membership. Поэтому retry с тем же key после cancellation/expiry либо изменения group claim сейчас может вернуть `409/403` вместо прежнего attempt ID. Это correctness gap до 1.0.
+
 ## 6. Authentication/authorization
 
 - Keycloak JWT Bearer;
@@ -172,7 +176,7 @@ Outside Development:
 - attempt expiration/outbox/rate limits валидируются;
 - HTTPS redirect/HSTS deployment decision должен быть явным.
 
-Migration-only `--migrate` не требует Keycloak/RabbitMQ.
+Migration-only `--migrate` не требует Keycloak и transport-security configuration, но composition root пока всё равно загружает и валидирует RabbitMQ/worker/CORS/rate-limit/OpenAPI/proxy options. Для независимого production migration job это известный stabilization gap: целевой режим должен требовать только database configuration.
 
 ### Reverse proxy
 
@@ -210,13 +214,17 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 ## 8. Audit/correlation/observability
 
 - canonical `/api/v1/*` + legacy rewrite;
+- configurable legacy lifecycle с `Deprecation`, optional `Sunset` и `410 api.version.retired`;
 - ProblemDetails;
 - `X-Correlation-ID`;
 - durable audit для state-changing HTTP methods без body/query/secrets;
 - OpenTelemetry ASP.NET Core/HttpClient/runtime;
+- custom `TestApp.Operations` metrics для Outbox, expiration, retention и bounded API exception categories;
 - optional OTLP exporter;
 - `/health/live`;
 - `/health/ready` MariaDB + RabbitMQ при enabled transport.
+
+**Известное ограничение:** из-за текущего порядка `UseExceptionHandler`/`CorrelationAuditMiddleware` некоторые exceptions, позже корректно преобразованные в HTTP `400/409`, могут сохраниться в audit как `500`. Response для клиента остаётся корректным, но operational audit status требует исправления.
 
 ## 9. Events / Outbox / RabbitMQ
 
@@ -229,11 +237,14 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - at-least-once delivery;
 - exponential retry/backoff;
 - dead-letter state;
+- admin-only safe dead-letter detail/requeue/discard с mandatory reason и action audit;
 - MariaDB advisory lock per message;
 - operations Outbox monitoring endpoint;
 - RabbitMQ readiness.
 
 **Ограничение:** production business integration-event catalog ещё не определён. Готовность transport не означает автоматическую публикацию всех domain events.
+
+**Известное ограничение:** per-message publish failures обрабатываются, но failure batch query/advisory lock/failure-state persistence может выйти из `BackgroundService` cycle. Аналогичный риск есть у initial/batch scan expiration worker; до 1.0 нужен recovery loop с backoff и health/metric signal.
 
 ## 10. Deployment / CI
 
@@ -246,28 +257,39 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - high/critical NuGet vulnerability gate;
 - Compose validation;
 - production image build;
-- `--migrate` из production image.
+- `--migrate` из production image;
+- logical backup + isolated restore verification;
+- repository secret scan;
+- production-image HIGH/CRITICAL vulnerability scan;
+- CycloneDX SBOM artifact;
+- authenticated k6 + expiration/Outbox capacity workflow.
 
 ## 11. Главные оставшиеся ограничения
 
-### API contract maturity
+### Stabilization/correctness
 
-Следующий блок:
+До 1.0 необходимо закрыть:
 
-- normalization malformed UUID/enum/body/required/max-length errors;
-- richer OpenAPI metadata/examples/errors/headers;
-- formal v1 deprecation/lifecycle policy.
+- stable replay `StartAttempt` до mutable assignment checks;
+- audit final-status correctness для handled `400/409/412`;
+- cycle-level resilience Outbox/expiration workers;
+- настоящий zero-body header-only contract для no-payload commands;
+- database-only composition для `--migrate`;
+- deterministic tie-breaker для offset pagination;
+- SQL joins/aggregates вместо high-cardinality ID/score materialization;
+- унификацию ожидаемых domain errors/value-object invariants.
 
 ### Operational reliability
 
+Реализованы repository-level D1–D5: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract и security/SBOM workflow.
+
 Не завершены:
 
-- backup/restore automation и DR drill;
-- retention cleanup audit/idempotency/outbox;
-- dead-letter requeue/drop management;
-- SLO/alerts;
-- container/security scanning beyond NuGet audit;
-- load/capacity tests.
+- D6: последний exact-head `performance` run упал на RabbitMQ Management API topology setup до создания synthetic Outbox backlog; полного green evidence ещё нет;
+- staging/platform restore drill с измеренным RTO;
+- реальные dashboards/alert routes и alert drill;
+- deployment-owned secret store, backup scheduling/PITR/offsite policy;
+- rollback/forward-fix release rehearsal.
 
 ### Identity/product breadth
 
@@ -286,4 +308,4 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 Проект уже является production-oriented modular monolith core, а не CRUD prototype: domain invariants, immutable revisions, owner isolation, HTTP/DB concurrency, distributed idempotency, real infrastructure tests, durable Outbox и deployment path реализованы.
 
-До 1.0 остаются прежде всего **API contract maturity и operational reliability**, после чего можно безопасно расширять authoring/assessment capabilities без возврата к фундаментальным security/data-isolation переделкам.
+До 1.0 остаются прежде всего **точечные correctness/stability fixes, доказанный D6 gate и deployment rehearsal**. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.

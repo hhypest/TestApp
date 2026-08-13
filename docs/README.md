@@ -1,24 +1,26 @@
 # Документация TestApp
 
-> Состояние документации: `beta-ddd`, baseline 2026-08-12, исходный код проверен на commit `024b932303152438fb1e611381b449735ac46fad` перед созданием этого комплекта документов.
+> Состояние документации: `beta-ddd`, baseline 2026-08-13. Фактический код и CI сверены на commit `ff33a954b381e0632ade738c88fe3ac386003529`; последующие изменения этого набора являются documentation-only.
 
 Этот каталог является навигационной точкой по архитектуре, бизнес-модели, API, persistence, безопасности, эксплуатации, тестированию и плану развития TestApp.
 
 ## Как читать документацию
 
-Документы разделяют три типа информации:
+Документы разделяют четыре типа информации:
 
 - **Implemented** — поведение существует в текущем коде и должно подтверждаться тестами/CI.
+- **Verifying** — код или automation существуют, но обязательный exit gate ещё не завершился green.
 - **Planned** — согласованный технический следующий шаг, но код ещё не считается реализованным.
 - **Decision required** — продуктовая или архитектурная гипотеза; до отдельного решения она не должна восприниматься как обязательство.
 
 Если документация расходится с кодом, приоритет источников истины следующий:
 
-1. Domain/Application code и database migrations.
-2. API routing/contracts в `src/TestApp.Api/Program.cs` и OpenAPI document.
-3. Integration/domain/application tests.
-4. Документы в `docs/`.
-5. Roadmap/feature backlog — это план, а не описание текущего поведения.
+1. Domain/Application/Infrastructure/API code и database migrations.
+2. Automated tests, generated OpenAPI и exact-head CI evidence.
+3. `CURRENT_STATE.md` — фактический снимок текущего baseline.
+4. `ROADMAP.md` — milestones и exit gates.
+5. `FEATURE_PLAN.md` — атомарные feature statuses/dependencies.
+6. Тематические документы — долговечные contracts, design и runbooks.
 
 ## Карта документов
 
@@ -30,8 +32,11 @@
 | [API.md](API.md) | Canonical `/api/v1`, legacy compatibility, endpoints, authorization, DTO, ошибки, pagination и idempotency |
 | [PERSISTENCE.md](PERSISTENCE.md) | MariaDB 12.3, EF mappings, schema, migrations, optimistic concurrency и advisory locks |
 | [EVENTS_AND_OUTBOX.md](EVENTS_AND_OUTBOX.md) | Domain/integration events, transactional Outbox, RabbitMQ, retry/dead-letter и delivery semantics |
-| [SECURITY.md](SECURITY.md) | Keycloak/JWT claims, роли/policies, ownership gaps, rate limiting, audit и production security backlog |
+| [SECURITY.md](SECURITY.md) | Keycloak/JWT claims, роли/policies, owner isolation, rate limiting, audit и remaining security backlog |
 | [OPERATIONS.md](OPERATIONS.md) | Docker Compose, migrations, health, OpenTelemetry, RabbitMQ, runbooks и конфигурация |
+| [BACKUP_RESTORE.md](BACKUP_RESTORE.md) | Logical backup/restore baseline, RPO/RTO и recovery drill |
+| [SLO_ALERTS.md](SLO_ALERTS.md) | Operational metrics, SLO thresholds, alert policy и triage |
+| [PERFORMANCE.md](PERFORMANCE.md) | D6 load/capacity scenarios, thresholds и verification status |
 | [TESTING.md](TESTING.md) | Стратегия тестирования, текущие suites, CI gates и требования к новым фичам |
 | [DECISIONS.md](DECISIONS.md) | Зафиксированные архитектурные решения и сознательно неиспользуемые технологии |
 | [ROADMAP.md](ROADMAP.md) | Последовательная дорожная карта релизов и технических этапов |

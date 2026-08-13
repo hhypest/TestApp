@@ -68,6 +68,7 @@ IIntegrationEvent : IDomainEvent
 - `LastAttemptAt`;
 - `NextAttemptAt`;
 - `DeadLetteredAt`;
+- `DiscardedAt`;
 - `Error`.
 
 States концептуально:
@@ -80,6 +81,8 @@ stateDiagram-v2
     RetryScheduled --> Processed: later success
     RetryScheduled --> RetryScheduled: failure below MaxAttempts
     RetryScheduled --> DeadLetter: AttemptCount >= MaxAttempts
+    DeadLetter --> Pending: explicit audited requeue
+    DeadLetter --> Discarded: explicit audited discard
 ```
 
 ## 5. Почему Outbox processor opt-in
@@ -116,6 +119,7 @@ Default options:
 ```text
 ProcessedAt == null
 DeadLetteredAt == null
+DiscardedAt == null
 NextAttemptAt == null || NextAttemptAt <= now
 ```
 
@@ -155,6 +159,10 @@ BaseRetryDelay * 2^(attempt-1)
 ```
 
 с cap `MaxRetryDelay`.
+
+### 6.4 Current worker resilience gap
+
+Per-message publish exceptions переходят в retry/dead-letter state. Но exception во время batch query, advisory-lock acquisition или сохранения failure state может выйти из `BackgroundService` loop. До 1.0 нужен cycle-level recovery boundary с bounded backoff, cancellation passthrough и health/metric signal.
 
 ## 7. Delivery guarantee
 
@@ -264,6 +272,21 @@ Operational view предназначен для:
 - error/attempt diagnostics.
 
 Payload наружу через operational endpoint не должен раскрываться.
+
+Dead-letter management:
+
+```text
+GET  /api/v1/operations/outbox/dead-letters/{eventId}
+POST /api/v1/operations/outbox/dead-letters/{eventId}/requeue
+POST /api/v1/operations/outbox/dead-letters/{eventId}/discard
+```
+
+- policy `operations:read` (`test-admin`);
+- detail не содержит payload;
+- requeue/discard требуют mandatory reason;
+- action выполняется под тем же message advisory lock, что publisher;
+- actor/action/reason/correlation сохраняются в `outbox_dead_letter_actions`;
+- discard является terminal state, не physical delete.
 
 ## 12. Текущее существенное ограничение
 

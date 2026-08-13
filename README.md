@@ -30,12 +30,15 @@ Backend-система создания, публикации, назначен�
 - [Events / Outbox / RabbitMQ](docs/EVENTS_AND_OUTBOX.md)
 - [Безопасность](docs/SECURITY.md)
 - [Эксплуатация и deployment](docs/OPERATIONS.md)
+- [Backup / restore](docs/BACKUP_RESTORE.md)
+- [SLO и alerts](docs/SLO_ALERTS.md)
+- [Performance / capacity](docs/PERFORMANCE.md)
 - [Тестирование](docs/TESTING.md)
 - [Архитектурные решения](docs/DECISIONS.md)
 - [Дорожная карта](docs/ROADMAP.md)
 - [Детальный план фич](docs/FEATURE_PLAN.md)
 
-Документация различает **Implemented**, **Planned** и **Decision required**, чтобы план развития не воспринимался как уже существующий функционал.
+Документация различает **Implemented**, **Verifying**, **Planned** и **Decision required**, чтобы наличие automation не путалось с пройденным exit gate, а план развития — с уже существующим функционалом.
 
 ## Архитектура
 
@@ -112,7 +115,7 @@ test-author
 test-admin
 ```
 
-Важное текущее ограничение: `Test` пока не имеет owner/workspace boundary, поэтому `test-author` — coarse role для общей доверенной author-группы. Это зафиксировано как P0/P1 задача в roadmap.
+`Test.OwnerId` содержит Keycloak `sub` создавшего автора. `test-author` видит и изменяет только собственные tests и результаты; `test-admin` имеет явно глобальный scope. Workspace/tenant boundary и multi-realm identity `(issuer, subject)` пока не реализованы и нужны только при соответствующем deployment/business requirement.
 
 ## API
 
@@ -168,7 +171,7 @@ API replicas в Production не должны конкурировать за sch
 - start attempt защищён unique DB request key + serializable attempt-limit transaction;
 - publish/assign/bulk-assign/submit используют persistent idempotency records + MariaDB `GET_LOCK/RELEASE_LOCK` distributed lease.
 
-Текущий HTTP idempotency key передаётся в JSON body; переход на standard `Idempotency-Key` header находится в roadmap.
+Основной HTTP contract использует standard `Idempotency-Key` header; legacy body field временно поддерживается с mismatch validation и request fingerprint. Для publish/start/submit JSON body (`{}`) пока всё ещё обязателен даже при key только в header — настоящий zero-length-body вариант входит в stabilization backlog.
 
 ## Events / Outbox
 
@@ -193,7 +196,10 @@ RabbitMQ transport реализован:
 - durable audit для POST/PUT/PATCH/DELETE;
 - OpenTelemetry ASP.NET Core/HttpClient/runtime metrics;
 - optional OTLP exporter;
-- admin operational endpoints для audit и Outbox.
+- admin operational endpoints для audit и Outbox;
+- retention cleanup для audit/idempotency/processed Outbox;
+- audited dead-letter detail/requeue/discard;
+- operational metrics и SLO/alert contract.
 
 ## Local Docker Compose
 
@@ -232,19 +238,19 @@ docker compose -f compose.yaml config --quiet
 docker build -t testapp-api:local .
 ```
 
-GitHub Actions поднимает настоящие MariaDB 12.3 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image и запускает этот же image в `--migrate` режиме.
+GitHub Actions поднимает настоящие MariaDB 12.3 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image, запускает этот же image в `--migrate` режиме, проверяет logical backup/restore, выполняет image/secret scan и формирует SBOM. Отдельный performance workflow использует production-shaped stack и real Keycloak; его D6 exit gate пока не пройден полностью.
 
 ## Приоритет дальнейшего развития
 
 Ближайший порядок работ:
 
 ```text
-1. production configuration / proxy / TLS / configurable rate limiting
-2. Test ownership / resource-level authorization
-3. standard Idempotency-Key + HTTP concurrency/OpenAPI contracts
-4. backup/restore/retention/alerts/load tests
-5. 1.0 stabilization
-6. authoring productivity / reporting / selected advanced assessment features
+1. correctness stabilization: StartAttempt replay, audit final status, resilient workers
+2. true empty-body Idempotency-Key commands + database-only migrate mode
+3. green performance/Outbox D6 evidence on exact implementation head
+4. deterministic pagination, SQL reporting queries, domain error/value-object cleanup
+5. 1.0 release rehearsal: restore, alerts, rollback/API freeze
+6. student presentation/resume, затем authoring/reporting и выбранные advanced features
 ```
 
 Подробно: [docs/ROADMAP.md](docs/ROADMAP.md) и [docs/FEATURE_PLAN.md](docs/FEATURE_PLAN.md).

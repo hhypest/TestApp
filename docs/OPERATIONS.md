@@ -1,6 +1,6 @@
 # Эксплуатация и deployment TestApp
 
-> Статус: local/container runtime **Implemented**; production platform runbook частично **Planned**.
+> Статус: local/container runtime и repository operational automation D1–D5 **Implemented**; D6 **Verifying**; platform-specific secret store, PITR, alert routing и release rehearsal остаются deployment work.
 
 ## 1. Runtime topology
 
@@ -162,7 +162,7 @@ ConnectionStrings:Database
 Database:ApplyMigrationsOnStartup
 ```
 
-Current note: `Program.cs` пока имеет development-style fallback connection string. Production hardening должен сделать connection string обязательным вне Development.
+Outside Development connection string обязателен; development fallback применяется только в Development. Startup migrations вне Development запрещены.
 
 ### Keycloak
 
@@ -206,7 +206,7 @@ BatchSize = 100
 PollInterval = 30 seconds
 ```
 
-Binding этих options из production config следует формализовать, если потребуется tuning.
+Options уже загружаются/валидируются из `AttemptExpiration:BatchSize` и `AttemptExpiration:PollIntervalSeconds`.
 
 ### Outbox delivery
 
@@ -221,7 +221,11 @@ MaxRetryDelay = 15 min
 AdvisoryLockTimeoutSeconds = 5
 ```
 
-Production configuration binding для этих параметров — planned hardening.
+Options загружаются/валидируются из секции `Outbox`. При invalid range startup завершается fail-fast.
+
+### Migration-only caveat
+
+`--migrate` не требует Keycloak, но composition root пока загружает unrelated RabbitMQ/worker/CORS/rate-limit/OpenAPI/proxy options. До 1.0 migration container должен перейти на database-only composition, чтобы deployment не выдавал ему ненужные runtime secrets/config.
 
 ## 7. Health endpoints
 
@@ -333,15 +337,21 @@ Audit записывается для:
 
 Audit не содержит body/query payload.
 
-### Planned retention
+### Retention
 
-Перед production 1.0 определить:
+Repository-level bounded cleanup реализован для audit, idempotency и processed Outbox rows:
 
-- retention period;
-- archival/export;
-- who may query audit;
-- whether compliance requires immutable/WORM external sink;
-- cleanup job/index impact.
+- typed retention periods/batch size/poll interval;
+- MariaDB advisory lock между replicas;
+- index-friendly bounded deletes;
+- pending/retrying/active dead-letter Outbox rows не удаляются;
+- deleted-row counters экспортируются через `TestApp.Operations`.
+
+Deployment owner всё ещё определяет фактические retention periods, archival/export и необходимость immutable/WORM external audit sink.
+
+### Known audit status gap
+
+Из-за текущего middleware order handled `400/409` exception может сохраниться в audit как `500`. До исправления при incident triage сопоставляйте audit с HTTP log/trace по correlation ID; клиентский response остаётся source of truth для итогового status.
 
 ## 12. Outbox operations
 
@@ -375,8 +385,10 @@ role: test-admin
 1. Зафиксировать message ID/type/error/attempt count.
 2. Проверить, временная это ошибка или permanent schema/routing issue.
 3. Исправить consumer/broker/config/application.
-4. Сейчас отдельный safe admin requeue API **не реализован**; ручное изменение DB должно выполняться только как controlled operation.
-5. Planned feature: explicit requeue/acknowledge dead-letter command с audit.
+4. Получить safe detail без payload: `GET /api/v1/operations/outbox/dead-letters/{eventId}`.
+5. После устранения причины выполнить audited `POST .../{eventId}/requeue` с mandatory reason.
+6. Если message доказанно устарел, выполнить audited `POST .../{eventId}/discard`; это terminal state, не physical delete.
+7. Не редактировать payload и delivery columns вручную.
 
 ## 13. Attempt expiration operations
 
@@ -394,6 +406,10 @@ role: test-admin
 - error logs по AttemptId.
 
 Worker batch-based и eventual: изменение не обязано произойти ровно в момент deadline; default scan cadence около 30 секунд.
+
+### Current worker recovery gap
+
+Per-attempt processing exceptions логируются, но initial/batch DB scan не имеет cycle-level recovery boundary. Аналогичный gap есть у Outbox batch query/lock/failure-state persistence. Transient dependency failure может завершить hosted worker/process; до 1.0 нужны bounded backoff, cancellation-safe retry и worker last-success/consecutive-failure signal.
 
 ## 14. MariaDB 12.3 operational policy
 
@@ -415,21 +431,29 @@ CI гарантирует minimum runtime version 12.3.
 
 Нельзя считать смену Docker tag достаточным production upgrade process.
 
-## 15. Backup/restore/DR — P0/P1 до production
+## 15. Backup/restore/DR
 
-Должны быть формально определены:
+Repository baseline реализован:
 
-- **RPO** — допустимая потеря данных;
-- **RTO** — время восстановления;
-- backup frequency;
-- full/incremental/binlog strategy;
-- encrypted storage;
-- retention;
-- offsite copy;
-- restore drill;
-- credential restore/rotation;
-- Keycloak realm/config backup;
-- RabbitMQ topology recreation (messages не должны быть единственным source of truth; Outbox позволяет повторную доставку).
+- `scripts/mariadb-backup.sh` создаёт transaction-consistent gzip dump + SHA-256;
+- `scripts/mariadb-restore-verify.sh` восстанавливает только в disposable target database;
+- проверяются table counts, EF migration history и optional business marker;
+- основной CI выполняет recovery drill после migration production image;
+- engineering targets: RPO <= 24h, RTO <= 4h.
+
+До production deployment необходимо:
+
+- настроить schedule, encrypted offsite storage и retention;
+- выполнить staging/platform restore drill и записать actual RTO;
+- для более строгого RPO включить provider-native snapshot/binlog/PITR;
+- определить credential/Keycloak realm restore и rotation;
+- уметь пересоздать RabbitMQ topology; broker не является единственным source of truth благодаря Outbox.
+
+Полный runbook: `BACKUP_RESTORE.md`.
+
+### D6 performance verification
+
+На code baseline `ff33a95` authenticated k6 и expiration-storm probe прошли. Outbox probe не начался: RabbitMQ Management API вернул HTTP 400 во время queue/binding setup до вставки synthetic rows. D6 остаётся `VERIFYING`; topology step должен сохранять response body, проверять exchange/queue/binding и завершиться полным green run с artifacts.
 
 ## 16. Deployment smoke checklist
 
@@ -476,15 +500,15 @@ Background attempt expiration может выполняться на неско�
 
 До production 1.0 закрыть:
 
-- fail-fast configuration;
-- secret manager/injection;
-- trusted proxies/forwarded headers;
-- TLS/HSTS/CORS policy;
-- configurable rate limiting;
-- backup/restore drill;
-- audit/outbox retention;
-- alerting/SLO;
-- dependency/security scan;
-- capacity/load test;
-- dead-letter requeue procedure/API;
-- documented rollback/forward-fix release process.
+- stable StartAttempt replay после mutable assignment/group changes;
+- audit final-status correctness;
+- cycle-level worker resilience;
+- database-only migration composition;
+- full green D6 performance/Outbox evidence;
+- staging backup/restore drill с measured RTO;
+- deployed secret manager/injection и encrypted backup schedule/PITR policy;
+- реальные dashboard/alert routes и alert drill;
+- immutable dependency/action/image pinning и более узкий secret-scan allowlist;
+- documented rollback/forward-fix release rehearsal.
+
+Trusted proxies, CORS/TLS/HSTS configuration contract, configurable rate limiting, repository retention, dead-letter API, security/image scan и SBOM уже реализованы и не должны оставаться в списке отсутствующих возможностей.
