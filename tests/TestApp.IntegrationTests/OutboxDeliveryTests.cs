@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using TestApp.Domain.Events;
+using TestApp.Infrastructure.Observability;
 using TestApp.Infrastructure.Outbox;
 using TestApp.Infrastructure.Persistence;
 using Xunit;
@@ -88,6 +89,7 @@ public sealed class OutboxDeliveryTests
     {
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(o => o.UseMySql(connectionString, new MariaDbServerVersion(new Version(11, 4, 0))));
+        services.AddSingleton<OperationalMetrics>();
         services.AddScoped<IOutboxPublisher>(_ => publisher);
         return services.BuildServiceProvider();
     }
@@ -97,6 +99,7 @@ public sealed class OutboxDeliveryTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             TimeProvider.System,
             Options.Create(options),
+            provider.GetRequiredService<OperationalMetrics>(),
             NullLogger<OutboxProcessor>.Instance);
 
     private sealed record TestIntegrationEvent(Guid EventId, DateTimeOffset OccurredAt, string Value) : IIntegrationEvent;
