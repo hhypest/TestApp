@@ -13,6 +13,7 @@ public sealed class OperationalMetrics : IDisposable
     public const string MeterName = "TestApp.Operations";
 
     private readonly Meter _meter = new(MeterName, "1.0.0");
+    private readonly Counter<long> _apiExceptions;
     private readonly Counter<long> _outboxPublish;
     private readonly Histogram<double> _outboxDeliveryLag;
     private readonly Counter<long> _deadLetterActions;
@@ -27,6 +28,10 @@ public sealed class OperationalMetrics : IDisposable
 
     public OperationalMetrics()
     {
+        _apiExceptions = _meter.CreateCounter<long>(
+            "testapp.api.exception",
+            unit: "{exception}",
+            description: "Operationally relevant API exception outcomes.");
         _outboxPublish = _meter.CreateCounter<long>(
             "testapp.outbox.publish",
             unit: "{message}",
@@ -54,6 +59,9 @@ public sealed class OperationalMetrics : IDisposable
         _meter.CreateObservableGauge("testapp.attempt.overdue", () => Interlocked.Read(ref _overdueAttempts), "{attempt}");
         _meter.CreateObservableGauge("testapp.attempt.oldest_overdue_lag", () => ReadDouble(ref _oldestOverdueLagBits), "s");
     }
+
+    public void RecordApiException(string kind) =>
+        _apiExceptions.Add(1, new KeyValuePair<string, object?>("kind", kind));
 
     public void RecordOutboxPublish(bool success, bool deadLettered, TimeSpan? deliveryLag = null)
     {
