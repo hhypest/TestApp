@@ -1,6 +1,6 @@
 # Дорожная карта развития TestApp
 
-> Baseline: `beta-ddd`, 2026-08-12. Roadmap описывает **последовательность**, а не обещанные календарные даты. Каждый этап начинается только после зелёных gates предыдущего.
+> Baseline: `beta-ddd`, 2026-08-13. Roadmap задаёт последовательность и acceptance gates, а не календарные обещания.
 
 ## 0. Принцип развития
 
@@ -15,495 +15,411 @@ correctness & data isolation
     > scale complexity
 ```
 
-Не следует добавлять новые question types/analytics/microservices, пока остаются P0 security/ownership/configuration gaps.
+Новый этап считается завершённым только после зелёных automated gates и синхронизации документации.
 
-## 1. Baseline — уже реализовано
+---
 
-### Release band: `0.8.x` — Core architecture baseline
+# 1. `0.8.x` — Core architecture baseline
 
-**Status: DONE.**
+**Status: DONE**
 
 Реализовано:
 
-- modular monolith / Clean Architecture / DDD/CQRS;
-- Test authoring lifecycle;
+- modular monolith / Clean Architecture / DDD / CQRS;
+- Test aggregate и controlled authoring;
 - immutable PublishedTestRevision;
-- SingleChoice/MultipleChoice publication validation;
+- SingleChoice / MultipleChoice publication validation;
 - exact-set scoring;
-- user/group assignments;
-- availability + attempt limit;
-- bulk assignment;
+- user/group assignments, windows, attempt limits, bulk assignment;
 - attempt start/answer/clear/submit/timeout;
-- background deadline expiration;
-- reviewer/admin read sides;
-- MariaDB 12.3;
-- optimistic concurrency;
-- distributed idempotency;
-- Minimal API `/api/v1` + legacy rewrite;
-- Keycloak roles/groups;
-- audit/correlation;
-- transactional Outbox;
-- RabbitMQ transport + confirms/retry/dead-letter/readiness;
-- OpenTelemetry;
-- Docker/Compose;
-- production migration-only image path;
-- real MariaDB/RabbitMQ CI integration tests.
-
-**Exit gate:** full CI green on MariaDB 12.3.
+- reviewer/admin/student read models;
+- MariaDB 12.3 runtime/CI baseline;
+- Keycloak authentication/roles/groups;
+- transactional Outbox + RabbitMQ transport;
+- Docker/Compose + migration-only startup;
+- real MariaDB/RabbitMQ integration tests.
 
 ---
 
-# 2. Phase A — Production configuration & edge security
+# 2. `0.9.0` — Phase A: Production configuration & edge security
 
-### Target band: `0.9.0`
-### Priority: P0
-### Status: **DONE**
-### Goal: безопасный запуск API вне developer machine.
+**Priority: P0**  
+**Status: DONE**
 
 Реализовано:
 
-- typed/validated runtime configuration для Database, Keycloak, RabbitMQ, Outbox, attempt expiration, rate limiting, OpenAPI, CORS, transport security и reverse proxy;
-- production DB fallback удалён; Development fallback остаётся только в Development;
-- Production запрещает `Database:ApplyMigrationsOnStartup=true`, migrations выполняются через `--migrate`;
-- trusted `ForwardedHeaders` только через configured `KnownProxies/KnownNetworks`;
-- deterministic tests: untrusted forwarded headers игнорируются;
-- explicit Production HTTPS redirect/HSTS decision;
-- CORS allow-list, wildcard origin запрещён;
-- secure response headers (`nosniff`, frame deny, referrer/permissions/CSP baseline);
-- Kestrel server header отключён;
-- rate limit classes: general, student-write, privileged-read, operations;
-- production OpenAPI disabled by default, при включении может быть admin-only;
-- high/critical NuGet vulnerability audit является CI gate (`NU1903/NU1904`).
+- fail-fast production configuration;
+- отсутствие production fallback DB credentials;
+- `--migrate` вместо startup migrations outside Development;
+- trusted reverse-proxy configuration;
+- explicit CORS allow-list;
+- configurable HTTPS/HSTS policy;
+- security headers + disabled Kestrel server banner;
+- class-based rate limiting;
+- production OpenAPI disabled by default / optionally admin protected;
+- high/critical NuGet audit gate.
 
-**Exit gate: PASSED** — configuration/security tests, boundary E2E, production image и migration smoke зелёные.
+**Exit gate: PASSED.**
 
 ---
 
-# 3. Phase B — Resource ownership и authorization boundary
+# 3. `0.9.1` — Phase B: Resource ownership
 
-### Target band: `0.9.1`
-### Priority: P0
-### Status: **DONE**
-### Goal: исключить cross-author data access.
+**Priority: P0**  
+**Status: DONE**
 
-Принято решение для текущего single-organization этапа:
+Текущая single-organization модель:
 
 ```text
 Test.OwnerId = Keycloak sub создавшего автора
 ```
 
-Workspace остаётся эволюционным следующим шагом, а не обязательной сложностью текущей версии.
+Реализовано:
+
+- immutable mandatory `OwnerId`;
+- owner checks в Application write boundary;
+- owner SQL filtering для catalog/editor/revisions/reviewer list/detail;
+- `test-admin` global scope;
+- safe legacy backfill `__legacy_admin_only__`;
+- cross-author E2E, включая reviewer correctness isolation.
+
+**Exit gate: PASSED.**
+
+---
+
+# 4. `0.9.2` — Phase C: API contract maturity
+
+**Priority: P0/P1**  
+**Status: DONE**
+
+## C1. Standard Idempotency-Key — DONE
+
+- primary retry contract: `Idempotency-Key` header;
+- transitional body compatibility;
+- header/body mismatch -> `400 idempotency.key_mismatch`;
+- canonical SHA-256 request fingerprint;
+- same key + different logical request -> `409 idempotency.key_reused`;
+- distributed MariaDB advisory lock;
+- publish/single assignment/bulk assignment/submit covered.
+
+## C2. HTTP optimistic concurrency — DONE
+
+- editor returns `ConcurrencyVersion` + strong `ETag`;
+- Test mutations require `If-Match`;
+- missing -> `428`;
+- malformed/weak/wildcard -> `400`;
+- stale -> `412`;
+- DB race remains protected by EF concurrency token -> `409`.
+
+## C3. Validation normalization — DONE
+
+- malformed route/query/body -> stable `400 request.invalid`;
+- DataAnnotations-based DTO boundary validation;
+- undefined enum protection;
+- stable `400 request.validation` + structured errors;
+- domain max-length/type invariants aligned with persistence.
+
+## C4. OpenAPI quality — DONE
+
+- Bearer security scheme;
+- stable operation IDs, summaries/descriptions;
+- authorization requirements;
+- documented Idempotency-Key / If-Match / ETag;
+- ProblemDetails responses;
+- enum/examples metadata;
+- serialized OpenAPI contract test.
+
+## C5. API version lifecycle — DONE
+
+Canonical path:
+
+```text
+/api/v1/*
+```
+
+Legacy `/api/*` compatibility является управляемым lifecycle layer:
+
+- configurable enable/disable;
+- RFC-style `Deprecation` header;
+- optional `Sunset`;
+- retirement -> `410 api.version.retired`;
+- lifecycle boundary E2E.
+
+**Exit gate Phase C: PASSED.**
+
+---
+
+# 5. `0.9.3` — Phase D: Operational reliability
+
+**Priority: P0/P1**  
+**Status: IN PROGRESS — D1..D5 DONE, D6 IMPLEMENTED / VERIFYING**
+
+## D1. Backup / restore — DONE
 
 Реализовано:
 
-- `Test.OwnerId` — обязательный immutable owner;
-- новый test получает `OwnerId` из `ICurrentActor.UserId`;
-- authoring commands, publish/archive проверяют ownership в Application;
-- catalog/editor/revision/reviewer list/reviewer detail фильтруются по owner на SQL-side;
-- `test-admin` сохраняет global scope;
-- reviewer DTO с `IsCorrect` не доступен чужому author;
-- migration `TestOwnership` backfill-ит существующие записи owner `__legacy_admin_only__`, затем удаляет DB default;
-- индекс `(OwnerId, Status)`;
-- cross-author E2E: author A не видит и не изменяет test/result author B; admin видит оба.
+- logical MariaDB backup script;
+- gzip + SHA-256;
+- restore verification в отдельной database;
+- schema/table count + EF migration history verification;
+- application data marker verification;
+- CI restore drill;
+- documented baseline RPO/RTO expectations.
 
-Assignment administration остаётся global `test-admin` policy до появления Workspace scope.
+Logical backup является portability/recovery baseline; более жёсткий production RPO требует provider-native snapshot/PITR.
 
-**Exit gate: PASSED** — two-author negative E2E, SQL filters и production migration зелёные.
-
----
-
-# 4. Phase C — API contract maturity
-
-### Target band: `0.9.2`
-### Priority: P0/P1
-### Status: **IN PROGRESS**
-
-## C1. Standard `Idempotency-Key`
-
-**Status: DONE.**
+## D2. Retention / cleanup — DONE
 
 Реализовано:
 
-- `Idempotency-Key` header — основной HTTP retry contract;
-- legacy body `idempotencyKey` временно поддерживается;
-- если header и body заданы и не совпадают -> `400 idempotency.key_mismatch`;
-- canonical SHA-256 request fingerprint вычисляется в Application из логических полей команды;
-- fingerprint хранится в `idempotency_records.RequestFingerprint`;
-- один key + другой payload -> `409 idempotency.key_reused`;
-- старые records с `RequestFingerprint = NULL` сохраняют replay compatibility;
-- header-only replay и fingerprint mismatch покрыты MariaDB/API E2E;
-- publish operation дополнительно resource-scoped по TestId.
+- typed retention configuration;
+- bounded batch deletion;
+- DB-scoped advisory lock;
+- audit retention;
+- idempotency retention;
+- processed Outbox retention;
+- required cleanup indexes;
+- MariaDB safety regression tests.
 
-## C2. HTTP optimistic concurrency contract
+**Не удаляются автоматически:** pending, retrying и active dead-letter Outbox rows.
 
-**Status: DONE.**
-
-Реализовано для mutable `Test` authoring:
-
-- editor DTO содержит `ConcurrencyVersion`;
-- `GET /api/v1/tests/{id}/editor` возвращает strong `ETag: "N"`;
-- изменения существующего `Test` требуют `If-Match`;
-- отсутствующий `If-Match` -> `428 concurrency.precondition_required`;
-- weak/wildcard/invalid validator -> `400 concurrency.if_match`;
-- stale strong ETag -> `412 concurrency.precondition_failed`;
-- application handlers проверяют expected aggregate version до mutation;
-- EF Core concurrency token остаётся последней защитой от race между precondition check и commit;
-- ETag/If-Match regression E2E покрывает fresh/stale/missing/invalid validators.
-
-## C3. Validation normalization
-
-**Status: DONE.**
+## D3. Dead-letter management — DONE
 
 Реализовано:
 
-- malformed route/query/body binding переводится в стабильный `400 request.invalid` без framework-specific detail;
-- typed Minimal API binding использует единый exception path через `ThrowOnBadRequest`;
-- endpoint filter валидирует public request DTO через DataAnnotations и undefined numeric enums через `Enum.IsDefined`;
-- semantic transport validation возвращает `400 request.validation` + структурированный `errors` + `traceId`;
-- max lengths для title/question/answer option/external identity/cancel reason совпадают с persistence limits и защищены до MariaDB;
-- unsupported `QuestionType` дополнительно защищён Domain-инвариантом;
-- malformed UUID/enum/JSON, required/max-length и no-mutation scenarios покрыты HTTP/domain regression tests.
+- admin-only safe detail без payload;
+- explicit requeue;
+- explicit discard как terminal state, не physical delete;
+- mandatory reason;
+- atomic manager audit: actor/action/reason/correlation;
+- shared lock boundary с publisher;
+- API/MariaDB/OpenAPI E2E.
 
-**Gate: PASSED** — full CI `#316`, production image и migration smoke зелёные.
+## D4. SLO / operational metrics — DONE
 
-## C4. OpenAPI quality
+Реализовано:
 
-**Status: NEXT.**
+- `TestApp.Operations` Meter;
+- Outbox publish outcomes / delivery lag;
+- active dead-letter actions;
+- Outbox pending/dead-letter/oldest-age gauges;
+- attempt overdue/lag gauges;
+- expiration outcomes;
+- retention deleted counter;
+- bounded API exception categories;
+- OpenTelemetry registration;
+- `docs/SLO_ALERTS.md` с начальным alerting contract.
 
-Добавить:
+## D5. Security / supply-chain CI — DONE
 
-- operation summaries/descriptions;
-- examples;
-- auth requirements;
-- ProblemDetails schemas;
-- pagination schemas;
-- `Idempotency-Key`/`If-Match`/`ETag` metadata;
-- enum documentation;
-- deprecation metadata.
+Отдельный `security` workflow:
 
-## C5. API version lifecycle
+- repository secret scan;
+- production-image HIGH/CRITICAL vulnerability gate;
+- CycloneDX image SBOM;
+- SBOM artifact retention;
+- существующий NuGet high/critical gate остаётся в основном pipeline.
 
-Определить:
+## D6. Load / capacity regression — IMPLEMENTED / VERIFYING
 
-- срок поддержки v1;
-- deprecation policy;
-- retirement legacy `/api/*` rewrite;
-- breaking-change rules.
+Добавлено:
 
-**Exit gate Phase C:** generated OpenAPI contract snapshot + full boundary E2E.
+- `.github/workflows/performance.yml`;
+- authenticated k6 через реальный local Keycloak;
+- production-shaped stack: API + MariaDB 12.3 + RabbitMQ + Keycloak;
+- performance-only rate-limit ceilings;
+- scenario-specific p95 gates;
+- artifact `testapp-capacity-results`.
 
----
+HTTP critical scenarios:
 
-# 5. Phase D — Operational reliability
+1. simultaneous attempt starts;
+2. answer write burst;
+3. bulk assignment creation;
+4. reviewer pagination.
 
-### Target band: `0.9.3`
-### Priority: P0/P1
+Worker critical scenarios:
 
-## D1. Backup/restore
+5. expiration storm — overdue backlog должен drain до zero <= 30 s;
+6. Outbox backlog recovery — 100 synthetic messages должны пройти real RabbitMQ transport и стать processed <= 30 s.
 
-- MariaDB backup strategy;
-- RPO/RTO;
-- automated restore verification;
-- staging restore drill.
+Подробности и thresholds: `docs/PERFORMANCE.md`.
 
-## D2. Retention/cleanup
+**D6 exit gate:** первый полный `performance` workflow green на exact head + сохранённые artifacts.
 
-Policies/jobs для:
-
-- audit entries;
-- idempotency records;
-- processed Outbox messages;
-- dead letters;
-- old operational records.
-
-Cleanup должен быть batch/index-friendly.
-
-## D3. Dead-letter management
-
-Admin command/API:
-
-- inspect safe metadata;
-- requeue after fix;
-- acknowledge/drop only with explicit audit;
-- prohibit accidental duplicate uncontrolled replay.
-
-## D4. SLO/alerts
-
-Минимальные signals:
-
-- API error rate;
-- p95 latency;
-- readiness failures;
-- DB connection/concurrency errors;
-- Outbox lag/dead-letter;
-- expiration lag;
-- RabbitMQ failures.
-
-## D5. Dependency/security CI
-
-Уже реализовано:
-
-- high/critical NuGet vulnerability gate.
-
-Остаётся:
-
-- container image scanning;
-- secret scanning;
-- SBOM/artifact metadata.
-
-## D6. Load/capacity tests
-
-Critical scenarios:
-
-- simultaneous start attempts;
-- answer write burst;
-- bulk assignments;
-- reviewer pagination;
-- expiration storm;
-- Outbox backlog recovery.
-
-**Exit gate:** staging soak + restore drill + alert verification.
+**Phase D exit gate:** D6 green + основной `dotnet` и `security` workflows green на совместимом head.
 
 ---
 
-# 6. Phase E — 1.0 stabilization
+# 6. `1.0.0` — Phase E: Stabilization / production release candidate
 
-### Target: `1.0.0`
-### Priority: P0
+**Priority: P0**  
+**Status: NEXT AFTER PHASE D**
 
-1. Freeze v1 public contracts.
-2. Close P0 security findings.
-3. Verify ownership isolation.
-4. Verify migration from supported previous schema.
-5. Production config contains no dev secrets/fallback.
-6. Backup restore demonstrated.
-7. Full CI green repeatedly.
-8. Load target defined and met.
-9. Integration event exposure explicitly documented (even if none enabled).
-10. Release notes + operational rollback/forward-fix plan.
+До freeze 1.0 требуется:
 
-**1.0 definition:** production-safe core assessment workflow, не максимальное количество feature types.
+1. public API v1 contract freeze;
+2. zero open P0 security/data-isolation defects;
+3. repeat owner-isolation verification;
+4. migration verification from supported previous schema;
+5. no production dev credentials/fallbacks;
+6. demonstrated backup/restore;
+7. repeated green `dotnet`, `security`, `performance` pipelines;
+8. staging capacity target defined and met;
+9. integration-event catalog explicitly documented;
+10. release notes + rollback/forward-fix runbook;
+11. dependency/container/SBOM evidence attached to release process;
+12. SLO dashboards/alerts exercised against staging.
+
+**1.0 definition:** production-safe core assessment workflow, а не максимальное число типов вопросов.
 
 ---
 
-# 7. Phase F — Authoring productivity
+# 7. `1.1.x` — Phase F: Authoring productivity
 
-### Target band: `1.1.x`
-### Priority: P1
+**Priority: P1**
 
-После 1.0 расширять author experience.
+## F1. Clone test / draft from revision
 
-## F1. Clone test / create draft from revision
+Создание нового working test из immutable revision без ручного копирования.
 
-Позволяет быстро создавать новый test/version definition без ручного копирования.
-
-## F2. Tags/categories/search
+## F2. Tags / categories / enhanced search
 
 - tags;
 - category/subject;
-- enhanced catalog filters;
-- indexes.
+- indexed catalog filters.
 
-## F3. Question bank — Decision required
+## F3. Question bank — product decision required
 
-Если подтверждён use case повторного использования questions:
+Если подтверждён reuse use case:
 
 - отдельный QuestionBankItem aggregate/read model;
-- copy/reference semantics должны быть явными;
-- published revision всё равно snapshot-ит content.
+- explicit copy/reference semantics;
+- PublishedTestRevision всё равно snapshot-ит content.
 
-## F4. Import/export
+## F4. Import / export
 
-Начать с versioned JSON contract. CSV подходит только для ограниченных simple-choice cases.
+Начать с versioned JSON contract; CSV только для ограниченных choice scenarios.
 
 ## F5. Draft validation endpoint
 
-Показать publication errors до publish command без изменения state.
+Получение publication errors без state mutation.
 
 ---
 
-# 8. Phase G — Advanced assessment behavior
+# 8. `1.2.x` — Phase G: Advanced assessment behavior
 
-### Target band: `1.2.x`
-### Priority: P1/P2, product decisions required
+**Priority: P1/P2**
 
 ## G1. Randomization
 
-Варианты:
-
-- shuffle question order;
-- shuffle option order;
-- deterministic seed per attempt.
-
-Historical attempt должен хранить/воспроизводить фактический presentation order.
+- question order;
+- option order;
+- deterministic attempt seed;
+- historical presentation order reproducibility.
 
 ## G2. Question pools
 
-Выбор N из pool на attempt требует attempt snapshot выбранных question IDs и stable scoring maximum.
+Attempt snapshot выбранных question IDs + stable scoring maximum.
 
-## G3. Partial scoring
+## G3. Scoring strategies
 
-Новая explicit scoring strategy:
+Explicit versioned strategy, например:
 
 - ExactSet;
 - PartialPositive;
-- custom policy.
-
-Revision должна snapshot-ить strategy/version, чтобы старые результаты не менялись.
+- будущие custom strategies.
 
 ## G4. New question types
 
-Порядок рекомендуемый:
+Рекомендуемая последовательность:
 
-1. Numeric/short deterministic answer;
+1. Numeric / short deterministic answer;
 2. FreeText + manual grading;
 3. Ordering;
 4. Matching;
-5. attachments/rich content.
+5. rich content / attachments.
 
-Каждый тип должен иметь собственную validation/scoring model; нельзя перегружать `OptionIds` универсальным JSON blob.
+Каждый тип получает собственную model/validation/scoring semantics; универсальный opaque JSON answer blob не вводится.
 
 ## G5. Manual grading
 
-Потребует нового lifecycle:
+Потребуется lifecycle:
 
 ```text
 Submitted -> AwaitingReview -> Graded
 ```
 
-и отделения auto score от final score.
+и разделение auto score / final score.
 
 ---
 
-# 9. Phase H — Assignment orchestration & notifications
+# 9. `1.3.x` — Phase H: Assignment orchestration & notifications
 
-### Target band: `1.3.x`
-### Priority: P1/P2
+**Priority: P1/P2**
 
-## H1. Assignment templates/batches
-
-Reusable campaign-like assignment configuration.
-
-## H2. Scheduled assignment activation
-
-Window уже есть; добавить admin scheduling/readability без внешнего cron при отсутствии необходимости.
-
-## H3. Notifications
-
-Только после определения production integration events:
-
-- assignment created;
-- deadline approaching;
-- result completed.
-
-Notification consumer должен быть отдельным adapter/service только если это реально нужно; core API не должен отправлять email внутри business transaction.
-
-## H4. Group expansion policy
-
-Сейчас group membership проверяется в момент доступа через claims. Решить product semantics:
-
-- dynamic membership;
-- snapshot membership at assignment time.
-
-Это важное бизнес-решение для compliance/training cases.
+- reusable assignment campaigns/templates;
+- scheduling/activation UX;
+- business integration events: assignment created, deadline approaching, result completed;
+- optional notification consumer outside core transaction;
+- explicit decision: dynamic group membership vs snapshot membership at assignment time.
 
 ---
 
-# 10. Phase I — Reporting & analytics
+# 10. `1.4.x` — Phase I: Reporting & analytics
 
-### Target band: `1.4.x`
-### Priority: P1/P2
+**Priority: P1/P2**
 
-## I1. Aggregated test dashboards
-
-- completion rate;
-- pass rate;
-- average/median;
-- time-to-complete;
-- question difficulty.
-
-## I2. Export
-
-Admin/reviewer CSV/JSON export с authorization и audit.
-
-## I3. Question analytics
-
-Для immutable revision анализировать по `(RevisionId, QuestionId)`.
-
-## I4. Separate analytics store — только при необходимости
-
-Если transactional queries становятся тяжёлыми:
-
-- projection tables;
-- materialized analytics;
-- warehouse/columnar store.
-
-Не вводить заранее.
+- completion/pass rate;
+- average/median/time-to-complete;
+- question difficulty by `(RevisionId, QuestionId)`;
+- authorized CSV/JSON export with audit;
+- projection/materialized analytics only after OLTP impact is measured.
 
 ---
 
-# 11. Phase J — Workspace/multi-tenant evolution
+# 11. `2.x` / business-triggered — Phase J: Workspace / multi-tenant evolution
 
-### Target: `2.x` или раньше при business requirement
-### Priority: depends on product
+Не форсируется без требования нескольких организаций/isolated workspaces.
 
-Если система обслуживает несколько организаций/подразделений:
+При необходимости:
 
 - Workspace/Tenant aggregate;
-- memberships;
-- workspace-scoped roles;
-- test/assignment/result isolation;
+- memberships + workspace roles;
+- workspace-scoped tests/assignments/results;
 - `(Issuer, Subject)` identity;
-- tenant-aware idempotency/audit/events;
-- tenant-aware rate limits;
-- data export/delete policies.
-
-Если product остаётся single-organization, этот этап не нужно форсировать.
+- tenant-aware idempotency/audit/events/rate limits;
+- export/delete policies.
 
 ---
 
-# 12. Phase K — Scale extraction triggers
+# 12. Phase K: Scale extraction triggers
 
-Не является feature milestone. Это checklist, когда modular monolith может перестать быть достаточным.
+Microservices не являются roadmap milestone сами по себе.
 
-Рассматривать выделение отдельных deployables, если измерено:
+Рассматривать extraction только после измеренного pressure:
 
-- Outbox/notification worker требует независимого scale;
+- worker требует независимого scaling;
 - analytics мешает OLTP;
-- отдельная команда владеет bounded context;
-- release cadence конфликтует;
-- security boundary требует isolation;
-- DB workload невозможно разумно разделить внутри монолита.
+- отдельный security boundary;
+- независимая команда/релизный цикл;
+- DB workload невозможно разумно разделить внутри modular monolith.
 
-Первый вероятный extraction candidate — worker/analytics, а не Test aggregate CRUD.
+Вероятные первые candidates: worker/analytics, а не Test CRUD.
 
 ---
 
-# 13. Общие gates каждого этапа
+# 13. Общие gates
 
-Каждая roadmap item считается Done только если:
+Каждый пункт считается DONE только если применимо выполнены:
 
-- domain/application semantics документированы;
-- schema migration tested на MariaDB 12.3;
-- authorization negative tests есть;
-- concurrency/idempotency рассмотрены;
-- student correctness boundary сохранён;
-- OpenAPI обновлён при public API change;
-- `docs/` обновлены;
-- full GitHub Actions pipeline green;
-- production image `--migrate` green.
-
-# 14. Что намеренно не входит в ближайший roadmap
-
-Без конкретной потребности не планируются:
-
-- Event Sourcing;
-- Kafka параллельно RabbitMQ;
-- Redis как обязательная инфраструктура;
-- отдельная read DB;
-- Kubernetes-specific code inside application;
-- microservice decomposition;
-- generic plugin engine;
-- arbitrary scripting inside tests.
-
-Эти технологии могут появиться только после измеренного требования, а не как архитектурная цель сами по себе.
+- Domain/Application semantics завершены;
+- authorization/data-isolation проверены;
+- MariaDB migration path проверен;
+- automated tests добавлены;
+- public HTTP/OpenAPI contract синхронизирован;
+- production image собирается;
+- migration smoke зелёный;
+- operational side effects наблюдаемы;
+- документация обновлена;
+- relevant GitHub Actions workflows зелёные на exact implementation head.
