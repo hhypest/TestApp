@@ -71,7 +71,11 @@
     {
       "username": "admin",
       "enabled": true,
+      "firstName": "Local",
+      "lastName": "Admin",
+      "email": "admin@testapp.local",
       "emailVerified": true,
+      "requiredActions": [],
       "realmRoles": ["test-admin"],
       "credentials": [
         { "type": "password", "value": "admin", "temporary": false }
@@ -80,7 +84,11 @@
     {
       "username": "author",
       "enabled": true,
+      "firstName": "Local",
+      "lastName": "Author",
+      "email": "author@testapp.local",
       "emailVerified": true,
+      "requiredActions": [],
       "realmRoles": ["test-author"],
       "credentials": [
         { "type": "password", "value": "author", "temporary": false }
@@ -89,7 +97,11 @@
     {
       "username": "student",
       "enabled": true,
+      "firstName": "Local",
+      "lastName": "Student",
+      "email": "student@testapp.local",
       "emailVerified": true,
+      "requiredActions": [],
       "groups": ["/students"],
       "credentials": [
         { "type": "password", "value": "student", "temporary": false }
