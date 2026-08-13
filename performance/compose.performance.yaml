@@ -1,0 +1,14 @@
+services:
+  api:
+    environment:
+      RateLimiting__General__PermitLimit: "100000"
+      RateLimiting__General__WindowSeconds: "60"
+      RateLimiting__StudentWrite__PermitLimit: "100000"
+      RateLimiting__StudentWrite__WindowSeconds: "60"
+      RateLimiting__PrivilegedRead__PermitLimit: "100000"
+      RateLimiting__PrivilegedRead__WindowSeconds: "60"
+      RateLimiting__Operations__PermitLimit: "100000"
+      RateLimiting__Operations__WindowSeconds: "60"
+      AttemptExpiration__PollIntervalSeconds: "1"
+      Outbox__PollIntervalSeconds: "1"
+      Outbox__BatchSize: "100"
