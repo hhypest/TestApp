@@ -79,12 +79,14 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | ID | Priority | Status | Scope |
 |---|---:|---|---|
 | STAB-001 | P0 | DONE | actor-scoped StartAttempt replay before mutable assignment checks + cancellation/expiry/group regression tests |
-| STAB-002 | P0 | PLANNED | audit stores final handled HTTP status |
+| STAB-002 | P0 | DONE | audit wraps exception mapping + response/audit equality tests for 400/409/412/500 |
 | STAB-003 | P0 | PLANNED | cycle-level Outbox/expiration worker recovery |
 | STAB-004 | P0 | DONE | RabbitMQ 4.3-compatible diagnostic probe + green D6 on `9916b98` |
 | STAB-005 | P0 | PLANNED | database-only `--migrate` configuration path |
 | STAB-006 | P1 | PLANNED | deterministic timestamp + ID pagination order |
 | STAB-007 | P1 | PLANNED | SQL joins/aggregates for reviewer/admin hot queries |
+
+`STAB-002` закрыт перестановкой middleware boundary: correlation/audit выполняется снаружи exception handler и наблюдает уже обработанный response. Regression suite проверяет равенство response/audit status для binding `400`, concurrency `409`, precondition `412` и unhandled `500`.
 
 `STAB-004` закрыт: полный HTTP/expiration/Outbox gate прошёл на PostgreSQL implementation commit `9916b98`; exact-head `dotnet` и `security` также green.
 
@@ -1057,7 +1059,7 @@ Automate Domain-no-EF/API and layer reference constraints.
 Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
 
 ```text
-1  STAB-002/003/005 + API-009 (STAB-001/004 and PERF-001/D6 are DONE)
+1  STAB-003/005 + API-009 (STAB-001/002/004 and PERF-001/D6 are DONE)
 2  STAB-006/007 + error/value-object invariant normalization
 3  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze
 4  ATT-010/011 + UX-001 student presentation/resume

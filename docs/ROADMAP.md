@@ -265,7 +265,7 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 Перед 1.0 RC необходимо закрыть findings текущего exact-head review:
 
 1. **DONE:** actor-scoped `StartAttempt` replay до повторной проверки mutable assignment availability/group membership, с regression tests для cancellation/expiry/group change и нового key;
-2. audit должен сохранять итоговый HTTP status после exception mapping, а не промежуточный `500`;
+2. **DONE:** audit сохраняет итоговый HTTP status после exception mapping, включая handled `400/409`, а не промежуточный `500`;
 3. Outbox/expiration hosted workers должны переживать transient cycle-level DB/query/lock failures;
 4. publish/start/submit должны принимать настоящий zero-length body при валидном `Idempotency-Key` header;
 5. `--migrate` должен загружать только database-required configuration;

@@ -108,6 +108,10 @@ Integration tests являются критической частью прое�
 - correlation header;
 - audit boundary/contracts.
 
+### `AuditStatusContractTests.cs`
+
+Проверяет равенство финального HTTP response и persisted audit status для handled binding `400`, concurrency `409`, precondition `412` и unhandled `500`.
+
 ### `ApiHostTests.cs`
 
 Полный HTTP vertical flow через `WebApplicationFactory`:
@@ -381,7 +385,6 @@ GitHub Actions `dotnet` workflow:
 
 ### P0
 
-- audit response/audit status equality для handled `400/409/412` и real `500`;
 - Outbox/expiration cycle recovery после DB/query/lock failure;
 - настоящий zero-length-body `Idempotency-Key` contract;
 - migration-only startup с database-only configuration;

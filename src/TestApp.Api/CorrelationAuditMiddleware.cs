@@ -15,6 +15,12 @@ public sealed class CorrelationAuditMiddleware(
         var correlationId = ResolveCorrelationId(context);
         context.TraceIdentifier = correlationId;
         context.Response.Headers[CorrelationHeader] = correlationId;
+        context.Response.OnStarting(() =>
+        {
+            // Exception handling may clear response headers before writing ProblemDetails.
+            context.Response.Headers[CorrelationHeader] = correlationId;
+            return Task.CompletedTask;
+        });
         Activity.Current?.SetTag("testapp.correlation_id", correlationId);
 
         var started = Stopwatch.GetTimestamp();

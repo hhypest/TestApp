@@ -339,9 +339,9 @@ Repository-level bounded cleanup реализован для audit, idempotency 
 
 Deployment owner всё ещё определяет фактические retention periods, archival/export и необходимость immutable/WORM external audit sink.
 
-### Known audit status gap
+### Audit status contract
 
-Из-за текущего middleware order handled `400/409` exception может сохраниться в audit как `500`. До исправления при incident triage сопоставляйте audit с HTTP log/trace по correlation ID; клиентский response остаётся source of truth для итогового status.
+Audit/correlation middleware оборачивает exception mapping и сохраняет финальный HTTP status. Regression coverage подтверждает равенство response/audit для handled `400/409`, precondition `412` и real `500`. При incident triage correlation ID остаётся ключом сопоставления audit, HTTP log и trace.
 
 ## 12. Outbox operations
 
@@ -490,7 +490,6 @@ Background attempt expiration может выполняться на неско�
 
 До production 1.0 закрыть:
 
-- audit final-status correctness;
 - cycle-level worker resilience;
 - database-only migration composition;
 - staging backup/restore drill с measured RTO;

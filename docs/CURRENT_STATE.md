@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-14. Phase A–D, STAB-001, STAB-004 и PostgreSQL migration реализованы. Implementation commit `9916b98` прошёл `dotnet`, `security` и полный PostgreSQL/RabbitMQ D6 `performance` gate.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-14. Phase A–D, STAB-001, STAB-002, STAB-004, PostgreSQL migration и EF Core 10 upgrade реализованы. Exact-head evidence определяется последними GitHub Actions runs ветки.
 
 ## 1. Назначение системы
 
@@ -224,7 +224,7 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - `/health/live`;
 - `/health/ready` PostgreSQL + RabbitMQ при enabled transport.
 
-**Известное ограничение:** из-за текущего порядка `UseExceptionHandler`/`CorrelationAuditMiddleware` некоторые exceptions, позже корректно преобразованные в HTTP `400/409`, могут сохраниться в audit как `500`. Response для клиента остаётся корректным, но operational audit status требует исправления.
+`CorrelationAuditMiddleware` оборачивает exception handler и сохраняет финальный status state-changing response. Контракт покрыт real HTTP/PostgreSQL regression tests для `400`, `409`, `412` и `500`.
 
 ## 9. Events / Outbox / RabbitMQ
 
@@ -272,7 +272,6 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 До 1.0 необходимо закрыть:
 
-- audit final-status correctness для handled `400/409/412`;
 - cycle-level resilience Outbox/expiration workers;
 - настоящий zero-body header-only contract для no-payload commands;
 - database-only composition для `--migrate`;

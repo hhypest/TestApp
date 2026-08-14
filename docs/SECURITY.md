@@ -203,11 +203,11 @@ Audit содержит metadata, но **не request/response body**.
 - PII из будущих форм;
 - secrets.
 
-### Current audit limitations
+### Audit guarantees and limitations
 
 Audit entry создаётся best-effort после request execution. Ошибка audit persistence логируется, но не меняет business response. Это правильная availability trade-off для текущего уровня, но compliance-сценарий может потребовать другую гарантию.
 
-Из-за текущего middleware order handled binding/concurrency/idempotency exceptions могут записываться как audit `500`, хотя финальный response уже преобразован в `400/409`. Это operational truthfulness defect до 1.0, а не information-disclosure issue.
+Audit middleware наблюдает финальный status после exception mapping; handled binding/concurrency exceptions и обычные precondition failures сохраняются как фактические `400/409/412`, а unhandled failures — как `500`. Audit по-прежнему не является compliance-grade immutable external sink.
 
 ## 12. ProblemDetails и information disclosure
 
@@ -295,19 +295,18 @@ Actor-scoped `StartAttempt` replay также реализован: lookup вк�
 
 P0/P1 до 1.0:
 
-1. исправить audit final-status mismatch;
-2. добавить настоящий zero-length-body `Idempotency-Key` contract и regression tests;
-3. изолировать migration-only mode от unrelated secrets/config;
-4. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
-5. pin GitHub Actions/container dependencies immutable SHA/digest;
-6. выполнить staging alert/restore/rollback security rehearsal.
+1. добавить настоящий zero-length-body `Idempotency-Key` contract и regression tests;
+2. изолировать migration-only mode от unrelated secrets/config;
+3. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
+4. pin GitHub Actions/container dependencies immutable SHA/digest;
+5. выполнить staging alert/restore/rollback security rehearsal.
 
 Business-triggered/после 1.0:
 
-7. `(Issuer, Subject)` identity при multi-realm;
-8. sensitive-data classification до первого integration event consumer;
-9. Workspace/Tenant/ACL только при multi-organization requirement;
-10. compliance-grade immutable external audit sink, если он требуется нормативно.
+6. `(Issuer, Subject)` identity при multi-realm;
+7. sensitive-data classification до первого integration event consumer;
+8. Workspace/Tenant/ACL только при multi-organization requirement;
+9. compliance-grade immutable external audit sink, если он требуется нормативно.
 
 ## 19. Security review checklist для новой фичи
 

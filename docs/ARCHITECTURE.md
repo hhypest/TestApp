@@ -194,11 +194,11 @@ UseRouting
         ↓
 RequestTelemetryMiddleware
         ↓
+CorrelationAuditMiddleware
+        ↓
 ExceptionHandler
         ↓
 Authentication
-        ↓
-CorrelationAuditMiddleware
         ↓
 RateLimiter
         ↓
@@ -209,9 +209,9 @@ Minimal API endpoint
 
 OpenAPI доступен через `/openapi/v1.json`.
 
-### Текущий audit-ordering gap
+### Audit и exception ordering
 
-`CorrelationAuditMiddleware` находится внутри `ExceptionHandler`. Если downstream exception затем преобразуется exception handler в `400/409`, audit middleware уже видел exception и записывает промежуточный `500`. Клиентский response корректен, но audit/SLO evidence расходится с ним. До 1.0 audit должен наблюдать итоговый handled response status (либо correlation и audit следует разделить на отдельные middleware).
+`CorrelationAuditMiddleware` оборачивает `ExceptionHandler`. Correlation ID поэтому доступен exception mapping, а после возврата downstream pipeline audit видит финальный handled status. Binding/concurrency exceptions сохраняются как фактические `400/409`, обычный precondition result — как `412`, unhandled exception — как `500`. Actor определяется после выполнения downstream authentication.
 
 ### Почему rewrite выполняется до routing
 
@@ -319,13 +319,12 @@ Aggregate может поднимать `IDomainEvent`. `AppDbContext.SaveChange
 - `Test.OwnerId` и owner-scoped writes/reads реализованы; tenant/workspace boundary сознательно отсутствует до business requirement;
 - handlers регистрируются напрямую в API, общего command/query dispatcher pipeline нет; это допустимо, пока cross-cutting duplication остаётся управляемым;
 - standard `Idempotency-Key` resolver/fingerprint реализован, но no-payload publish/start/submit всё ещё требуют JSON body (`{}`), а не настоящий zero-length body;
-- audit middleware может записать handled `400/409` как `500`;
 - Outbox/expiration workers не имеют cycle-level recovery для DB/query/lock failures;
 - migration-only composition всё ещё загружает unrelated RabbitMQ/CORS/rate-limit/proxy options;
 - paged read models не везде имеют deterministic timestamp + ID tie-breaker;
 - reviewer/admin queries materialize большие revision-ID/score sets вместо SQL joins/aggregates;
 - student-safe attempt presentation DTO с question/option text ещё отсутствует;
-- migrations поддерживаются explicit files, но полноценный EF model snapshot отсутствует;
+- migrations поддерживаются explicit files и актуальным EF model snapshot;
 - Outbox transport готов, но production integration event catalog ещё не определён;
 - нет separate read database/cache — и сейчас это сознательно не требуется.
 

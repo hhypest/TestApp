@@ -113,7 +113,7 @@ X-Correlation-ID
 
 Клиентский ID принимается при длине <=128, иначе генерируется current TraceId/Guid v7. Correlation ID используется в audit/logging/telemetry.
 
-Известный operational gap: при exception, который позже преобразуется exception handler в `400/409`, текущий audit middleware может сохранить промежуточный `500`. Это не меняет клиентский ProblemDetails, но требует исправления до 1.0.
+Audit middleware наблюдает итоговый response после exception mapping. Для state-changing запросов audit status совпадает с клиентским status, включая handled `400/409`, precondition `412` и unhandled `500`.
 
 ## 7. HTTP optimistic concurrency: ETag / If-Match
 
@@ -600,7 +600,6 @@ GET /health/ready
 Ближайший stabilization scope:
 
 - настоящий zero-length-body header-only publish/start/submit;
-- audit final-status correctness;
 - deterministic paging tie-breakers;
 - SQL-scalable reviewer/admin read queries;
 - student-safe attempt presentation/resume DTO без correctness leakage.

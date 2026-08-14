@@ -212,9 +212,10 @@ app.UseRouting();
 if (corsOptions.Enabled)
     app.UseCors(CorsPolicies.Api);
 app.UseMiddleware<RequestTelemetryMiddleware>();
+// Audit must wrap exception mapping so it observes the final handled response status.
+app.UseMiddleware<CorrelationAuditMiddleware>();
 app.UseExceptionHandler();
 app.UseAuthentication();
-app.UseMiddleware<CorrelationAuditMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 
