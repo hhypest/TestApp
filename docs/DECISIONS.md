@@ -96,15 +96,17 @@ Aggregates:
 - CI проверяет `server_version_num >= 180000`;
 - старые MariaDB volumes не удаляются и требуют отдельного ETL, если содержат значимые данные.
 
-## ADR-008 — EF Core 9/Npgsql 9 при net10.0 application
+## ADR-008 — EF Core 10/Npgsql 10 при net10.0 application
 
-**Status:** Accepted current compatibility choice.
+**Status:** Accepted.
 
-**Decision:** Infrastructure использует EF Core 9.0.18 + `Npgsql.EntityFrameworkCore.PostgreSQL` 9.0.4, приложение таргетирует .NET 10.
+**Decision:** Infrastructure использует EF Core 10.0.11 + `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3; integration tests используют Npgsql 10.0.3; приложение таргетирует .NET 10.
 
-**Why:** стабильная совместимая provider line для PostgreSQL.
+**Why:** это актуальная stable major line, соответствующая .NET 10. Microsoft EF Core packages и `dotnet-ef` выровнены на одной patch-версии; provider и driver используют последнюю стабильную версию своей 10.x line. Preview EF/Npgsql 11 исключены из production baseline.
 
-**Upgrade rule:** provider/EF major обновляется отдельным compatibility step с full migration/integration suite.
+**Compatibility gate:** repository проверяет отсутствие pending model changes, применение существующего baseline к пустой PostgreSQL 18 database, full integration suite и production-image migration path.
+
+**Upgrade rule:** следующий provider/EF major обновляется отдельным compatibility step с review breaking changes и full migration/integration suite.
 
 ## ADR-009 — CQRS без отдельной read database
 

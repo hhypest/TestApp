@@ -5,13 +5,13 @@
 ## Stack
 
 - PostgreSQL 18;
-- EF Core 9.0.18;
-- `Npgsql.EntityFrameworkCore.PostgreSQL` 9.0.4;
-- Npgsql 9.0.4;
+- EF Core 10.0.11;
+- `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3;
+- Npgsql 10.0.3;
 - `UseNpgsql(connectionString)`;
 - application target — `net10.0`.
 
-EF/Npgsql остаются на compatible stable major line 9. Upgrade до EF/Npgsql 10 должен быть отдельным compatibility change.
+EF/Npgsql находятся на stable major line 10, соответствующей application target `net10.0`. Все Microsoft EF Core packages и local `dotnet-ef` используют одинаковую patch-версию; prerelease line 11 не входит в runtime baseline. Следующий major upgrade должен выполняться отдельным compatibility change.
 
 Development connection:
 
@@ -102,7 +102,7 @@ Baseline сгенерирован из EF-модели. В repository тепер
 Следующая migration:
 
 ```bash
-dotnet tool install --global dotnet-ef --version 9.0.18
+dotnet tool restore
 dotnet ef migrations add <Name> \
   --project src/TestApp.Infrastructure \
   --startup-project src/TestApp.Infrastructure \
@@ -110,7 +110,9 @@ dotnet ef migrations add <Name> \
   --output-dir Persistence/Migrations
 ```
 
-`TESTAPP_DESIGN_CONNECTION` переопределяет design connection; generation не требует доступной database.
+Версия `dotnet-ef` 10.0.11 зафиксирована в repository tool manifest. `TESTAPP_DESIGN_CONNECTION` переопределяет design connection; generation не требует доступной database.
+
+Переход EF/Npgsql 9 -> 10 не меняет текущую relational model, поэтому отдельная schema migration не создаётся. Baseline migration и её designer metadata сохраняют версию инструмента, которой они были сгенерированы; CI на EF Core 10 отдельно выполняет `migrations has-pending-model-changes`, а затем применяет baseline к пустой PostgreSQL 18 database из production image.
 
 Production migration-only mode:
 

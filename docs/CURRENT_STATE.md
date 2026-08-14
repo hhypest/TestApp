@@ -83,7 +83,7 @@ Migration существующих tests использует специальн
 ## 3. Persistence и consistency
 
 - PostgreSQL **18** runtime/CI baseline;
-- EF Core 9.0.18 + Npgsql EF provider 9.0.4;
+- EF Core 10.0.11 + Npgsql EF provider 10.0.3;
 - generated PostgreSQL baseline migration + model snapshot;
 - production `--migrate` mode;
 - startup migration разрешена только Development;

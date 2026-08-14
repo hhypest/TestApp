@@ -290,14 +290,15 @@ GitHub Actions `dotnet` workflow:
 2. RabbitMQ 4.3.1 management service;
 3. checkout;
 4. setup .NET 10;
-5. `dotnet restore TestApp.slnx`;
+5. `dotnet restore TestApp.slnx` + HIGH/CRITICAL NuGet audit;
 6. Release build;
-7. Release tests;
-8. `docker compose config --quiet`;
-9. build production API image;
-10. run production image `--migrate` against PostgreSQL;
-11. create logical backup and verify isolated restore/business marker;
-12. cleanup containers.
+7. restore pinned `dotnet-ef` and verify `migrations has-pending-model-changes`;
+8. Release tests;
+9. `docker compose config --quiet`;
+10. build production API image;
+11. run production image `--migrate` against PostgreSQL;
+12. create logical backup and verify isolated restore/business marker;
+13. cleanup containers.
 
 Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
 

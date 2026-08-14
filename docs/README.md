@@ -48,7 +48,7 @@
 
 - .NET 10;
 - DDD + Clean Architecture + CQRS в modular monolith;
-- EF Core 9.0.18 + Npgsql EF provider 9.0.4;
+- EF Core 10.0.11 + Npgsql EF provider 10.0.3;
 - PostgreSQL 18;
 - Keycloak как внешний Identity Provider;
 - Minimal API + JWT Bearer;

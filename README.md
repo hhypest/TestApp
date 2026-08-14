@@ -8,7 +8,7 @@ Backend-система создания, публикации, назначен�
 |---|---|
 | Runtime | .NET 10 |
 | Persistence | PostgreSQL 18 |
-| ORM | EF Core 9.0.18 + Npgsql EF provider 9.0.4 |
+| ORM | EF Core 10.0.11 + Npgsql EF provider 10.0.3 |
 | Identity | Keycloak / JWT Bearer |
 | Messaging | Transactional Outbox + RabbitMQ 4.3.x |
 | Observability | OpenTelemetry 1.17.0 |

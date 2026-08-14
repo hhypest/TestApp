@@ -53,6 +53,15 @@ jobs:
           -p:NuGetAuditLevel=high
           -warnaserror:NU1903,NU1904
       - run: dotnet build TestApp.slnx --no-restore --configuration Release
+      - run: dotnet tool restore
+      - name: Verify EF Core model matches migrations
+        run: >-
+          dotnet ef migrations has-pending-model-changes
+          --project src/TestApp.Infrastructure/TestApp.Infrastructure.csproj
+          --startup-project src/TestApp.Infrastructure/TestApp.Infrastructure.csproj
+          --context AppDbContext
+          --configuration Release
+          --no-build
       - run: dotnet test TestApp.slnx --no-build --configuration Release
       - name: Validate compose configuration
         run: docker compose -f compose.yaml config --quiet
