@@ -81,12 +81,12 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | STAB-001 | P0 | DONE | actor-scoped StartAttempt replay before mutable assignment checks + cancellation/expiry/group regression tests |
 | STAB-002 | P0 | PLANNED | audit stores final handled HTTP status |
 | STAB-003 | P0 | PLANNED | cycle-level Outbox/expiration worker recovery |
-| STAB-004 | P0 | VERIFYING | diagnostic RabbitMQ capacity probe + full green D6 run |
+| STAB-004 | P0 | DONE | RabbitMQ 4.3-compatible diagnostic probe + green D6 on `9916b98` |
 | STAB-005 | P0 | PLANNED | database-only `--migrate` configuration path |
 | STAB-006 | P1 | PLANNED | deterministic timestamp + ID pagination order |
 | STAB-007 | P1 | PLANNED | SQL joins/aggregates for reviewer/admin hot queries |
 
-`STAB-004` остаётся `VERIFYING`: после миграции persistence полный HTTP/expiration/Outbox gate должен заново пройти на exact PostgreSQL implementation HEAD.
+`STAB-004` закрыт: полный HTTP/expiration/Outbox gate прошёл на PostgreSQL implementation commit `9916b98`; exact-head `dotnet` и `security` также green.
 
 ---
 
@@ -509,7 +509,7 @@ Alert on:
 
 - **Priority:** P0 before sized production launch
 - **Effort:** L
-- **Status:** VERIFYING
+- **Status:** DONE — full PostgreSQL/RabbitMQ D6 gate green on `9916b98`
 
 Scenarios documented in `TESTING.md`.
 
@@ -1057,7 +1057,7 @@ Automate Domain-no-EF/API and layer reference constraints.
 Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
 
 ```text
-1  STAB-001..005 + API-009 + full green PERF-001/D6
+1  STAB-002/003/005 + API-009 (STAB-001/004 and PERF-001/D6 are DONE)
 2  STAB-006/007 + error/value-object invariant normalization
 3  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze
 4  ATT-010/011 + UX-001 student presentation/resume

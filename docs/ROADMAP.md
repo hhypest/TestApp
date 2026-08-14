@@ -154,7 +154,7 @@ Legacy `/api/*` compatibility является управляемым lifecycle 
 # 5. `0.9.3` — Phase D: Operational reliability
 
 **Priority: P0/P1**  
-**Status: IN PROGRESS — D1..D5 DONE, D6 IMPLEMENTED / VERIFYING**
+**Status: DONE — D1..D6 PASSED**
 
 ## D1. Backup / restore — DONE
 
@@ -222,7 +222,7 @@ Logical backup является portability/recovery baseline; более жёс
 - SBOM artifact retention;
 - существующий NuGet high/critical gate остаётся в основном pipeline.
 
-## D6. Load / capacity regression — IMPLEMENTED / VERIFYING
+## D6. Load / capacity regression — DONE
 
 Добавлено:
 
@@ -251,9 +251,9 @@ Worker critical scenarios:
 
 **Phase D exit gate:** D6 green + основной `dotnet` и `security` workflows green на совместимом head.
 
-### Текущий verification status
+### Verification evidence
 
-Смена database engine инвалидировала прежний MariaDB performance baseline. D6 и Phase D остаются незавершёнными до полного green PostgreSQL run (HTTP, expiration и Outbox) с artifacts на exact implementation head.
+PostgreSQL implementation commit `9916b98` прошёл полный `performance` run #9: 8771/8771 checks, HTTP failure rate 0, все scenario p95 ниже thresholds, expiration 1247 -> 0 за 14 s и Outbox 100 -> 0 за 1 s. `dotnet` и `security` на том же commit также green; D6 и Phase D exit gates выполнены.
 
 ---
 
@@ -269,7 +269,7 @@ Worker critical scenarios:
 3. Outbox/expiration hosted workers должны переживать transient cycle-level DB/query/lock failures;
 4. publish/start/submit должны принимать настоящий zero-length body при валидном `Idempotency-Key` header;
 5. `--migrate` должен загружать только database-required configuration;
-6. RabbitMQ performance probe topology должен быть диагностируемым и дать полный green D6 run;
+6. **DONE:** RabbitMQ 4.3-compatible diagnostic capacity probe и полный green D6 run;
 7. documentation source of truth должна оставаться синхронизированной с code/tests/CI.
 
 **Exit gate:** regression tests для пунктов 1–5, полный `dotnet`/`security`/`performance` green на одном implementation HEAD, сохранённый D6 artifact и отсутствие открытых P0 correctness findings.

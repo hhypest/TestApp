@@ -2,7 +2,7 @@
 
 > Scope: `beta-ddd`. Эти значения являются CI regression gates, а не production SLA и не аппаратно-независимым обещанием throughput.
 
-> Verification status: **VERIFYING**. Смена database engine инвалидировала прежний MariaDB capacity baseline. Полный D6 gate должен быть заново пройден на exact PostgreSQL implementation HEAD.
+> Verification status: **PASSED**. Полный PostgreSQL/RabbitMQ D6 gate green на implementation commit [`9916b98`](https://github.com/hhypest/TestApp/commit/9916b980bc9a8ab0dd007b568207c78ef50382e4): [performance #9](https://github.com/hhypest/TestApp/actions/runs/31779887626), [dotnet #388](https://github.com/hhypest/TestApp/actions/runs/31779887611) и [security #20](https://github.com/hhypest/TestApp/actions/runs/31779887588) завершились успешно.
 
 ## Цель D6
 
@@ -29,6 +29,19 @@ Workflow `.github/workflows/performance.yml` использует production Doc
 Общие требования: checks > 99.5%, failed HTTP requests < 1%.
 
 В performance compose override rate-limit ceilings увеличены, чтобы измерять application/database path, а не configured abuse-control ceiling.
+
+Последний verified baseline (`9916b98`):
+
+| Scenario | Result |
+|---|---:|
+| checks | 8771 / 8771 |
+| failed HTTP requests | 0 / 8774 |
+| simultaneous starts p95 | 340.91 ms |
+| answer writes p95 | 30.59 ms |
+| bulk assignments p95 | 68.76 ms |
+| reviewer pagination p95 | 33.67 ms |
+| expiration drain | 1247 -> 0, 14 s |
+| Outbox drain | 100 -> 0, 1 s |
 
 ## Worker probes
 

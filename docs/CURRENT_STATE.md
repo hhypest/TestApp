@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-13. Phase A, B, C, D1–D5, STAB-001 и PostgreSQL migration реализованы; exact-head CI/D6 evidence определяется последними GitHub Actions runs.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-14. Phase A–D, STAB-001, STAB-004 и PostgreSQL migration реализованы. Implementation commit `9916b98` прошёл `dotnet`, `security` и полный PostgreSQL/RabbitMQ D6 `performance` gate.
 
 ## 1. Назначение системы
 
@@ -280,11 +280,10 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 ### Operational reliability
 
-Реализованы repository-level D1–D5: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract и security/SBOM workflow.
+Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s.
 
 Не завершены:
 
-- D6: прежнее MariaDB evidence не подтверждает новый PostgreSQL baseline; требуется полный green exact-head run;
 - staging/platform restore drill с измеренным RTO;
 - реальные dashboards/alert routes и alert drill;
 - deployment-owned secret store, backup scheduling/PITR/offsite policy;
@@ -307,4 +306,4 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 Проект уже является production-oriented modular monolith core, а не CRUD prototype: domain invariants, immutable revisions, owner isolation, HTTP/DB concurrency, distributed idempotency, real infrastructure tests, durable Outbox и deployment path реализованы.
 
-До 1.0 остаются прежде всего **точечные correctness/stability fixes, доказанный D6 gate и deployment rehearsal**. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.
+До 1.0 остаются прежде всего **точечные correctness/stability fixes и deployment rehearsal**. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.

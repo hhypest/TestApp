@@ -361,7 +361,6 @@ GitHub Actions `dotnet` workflow:
 - Outbox/expiration cycle recovery после DB/query/lock failure;
 - настоящий zero-length-body `Idempotency-Key` contract;
 - migration-only startup с database-only configuration;
-- полный green performance D6 run с RabbitMQ topology diagnostics.
 
 ### P1
 
@@ -394,7 +393,7 @@ GitHub Actions `dotnet` workflow:
 
 Thresholds и artifacts описаны в `PERFORMANCE.md`.
 
-Текущий verification status: database migration инвалидировала предыдущее MariaDB performance evidence. D6 остаётся `VERIFYING`, пока полный k6/expiration/Outbox workflow не пройдёт на exact PostgreSQL implementation HEAD.
+Verification status: **PASSED** на PostgreSQL implementation commit `9916b98`. Full run подтвердил 8771/8771 checks, HTTP failure rate 0, expiration drain 1247 -> 0 за 14 s и Outbox drain 100 -> 0 за 1 s через RabbitMQ.
 
 Для staging/soak дополнительно измерять:
 

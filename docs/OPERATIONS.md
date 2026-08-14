@@ -1,6 +1,6 @@
 # Эксплуатация и deployment TestApp
 
-> Статус: local/container runtime и repository operational automation D1–D5 **Implemented**; D6 **Verifying**; platform-specific secret store, PITR, alert routing и release rehearsal остаются deployment work.
+> Статус: local/container runtime и repository operational automation D1–D6 **Implemented**; platform-specific secret store, PITR, alert routing и release rehearsal остаются deployment work.
 
 ## 1. Runtime topology
 
@@ -443,7 +443,7 @@ Repository baseline реализован:
 
 ### D6 performance verification
 
-Предыдущее performance evidence было получено до смены database engine и не подтверждает PostgreSQL baseline. D6 остаётся `VERIFYING`: workflow должен полностью пройти на exact PostgreSQL implementation HEAD и сохранить k6, expiration и Outbox artifacts.
+PostgreSQL baseline подтверждён полным green run на implementation commit `9916b98`. Artifact содержит 8771/8771 successful checks, HTTP failure rate 0, expiration drain 1247 -> 0 за 14 s и Outbox drain 100 -> 0 за 1 s. RabbitMQ probe использует поддерживаемую 4.3 durable queue topology в одноразовом CI volume.
 
 ## 16. Deployment smoke checklist
 
@@ -493,7 +493,6 @@ Background attempt expiration может выполняться на неско�
 - audit final-status correctness;
 - cycle-level worker resilience;
 - database-only migration composition;
-- full green D6 performance/Outbox evidence;
 - staging backup/restore drill с measured RTO;
 - deployed secret manager/injection и encrypted backup schedule/PITR policy;
 - реальные dashboard/alert routes и alert drill;
