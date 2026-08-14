@@ -139,7 +139,7 @@ jobs:
           curl --fail-with-body --silent --show-error -u testapp:testapp \
             http://localhost:15672/api/exchanges/%2F/testapp.events >/dev/null
           QUEUE_DEFINITION=$(jq -nc --arg node "$RABBIT_NODE" \
-            '{durable:false,auto_delete:false,arguments:{},node:$node}')
+            '{durable:true,auto_delete:false,arguments:{},node:$node}')
           curl --fail-with-body --silent --show-error -u testapp:testapp \
             -H 'content-type: application/json' \
             -X PUT http://localhost:15672/api/queues/%2F/capacity-probe \
