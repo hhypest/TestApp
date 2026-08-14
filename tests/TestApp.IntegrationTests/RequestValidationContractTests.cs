@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using TestApp.Api;
 using TestApp.Application.Queries;
 using TestApp.Domain.Tests;
 using Xunit;

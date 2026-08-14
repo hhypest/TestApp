@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using TestApp.Api;
 using Xunit;
 
 namespace TestApp.IntegrationTests;

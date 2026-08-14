@@ -38,6 +38,7 @@
 | [SLO_ALERTS.md](SLO_ALERTS.md) | Operational metrics, SLO thresholds, alert policy и triage |
 | [PERFORMANCE.md](PERFORMANCE.md) | D6 load/capacity scenarios, thresholds и verification status |
 | [TESTING.md](TESTING.md) | Стратегия тестирования, текущие suites, CI gates и требования к новым фичам |
+| [CODE_REVIEW.md](CODE_REVIEW.md) | Правила структуры файлов, размера изменений и reviewability checklist |
 | [DECISIONS.md](DECISIONS.md) | Зафиксированные архитектурные решения и сознательно неиспользуемые технологии |
 | [ROADMAP.md](ROADMAP.md) | Последовательная дорожная карта релизов и технических этапов |
 | [FEATURE_PLAN.md](FEATURE_PLAN.md) | Детальный каталог фич с ID, приоритетами, зависимостями и критериями готовности |

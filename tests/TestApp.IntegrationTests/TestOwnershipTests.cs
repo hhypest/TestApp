@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using TestApp.Api;
 using TestApp.Application.Queries;
 using TestApp.Domain.Assignments;
 using TestApp.Domain.Attempts;

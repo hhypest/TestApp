@@ -101,6 +101,8 @@ Domain **не должен** ссылаться на:
 - transport-neutral `Error`;
 - CQRS read contracts.
 
+Command/query records располагаются рядом со своими handlers и группируются по одному use-case family. Общий файл не используется как каталог всех application types: это сохраняет локальность изменений и делает review границ сценария явным.
+
 Application не знает о PostgreSQL SQL, RabbitMQ client и ASP.NET endpoint routing.
 
 ### TestApp.Infrastructure
@@ -134,6 +136,8 @@ Application не знает о PostgreSQL SQL, RabbitMQ client и ASP.NET endpoi
 - rate limiting;
 - correlation/audit middleware;
 - DI composition root.
+
+`Program.cs` содержит только runtime composition и порядок middleware. HTTP request contracts вынесены в `ApiRequests.cs`, application-handler registrations — в `DependencyInjection.cs`, а route mapping разделён на feature-модули в `Endpoints/`. Правила поддержания этой структуры описаны в [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ## 4. Write-side flow
 
