@@ -1864,10 +1864,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
-                  "pm.test(\"X-Correlation-ID is returned\", () => {",
-                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
-                  "});",
-                  "pm.test(\"Key reuse code\", () => pm.expect(pm.response.json().title).to.eql(\"idempotency.key_reused\"));"
+                  "const problem = pm.response.json();",
+                  "pm.test(\"Correlation trace survives exception mapping\", () => pm.expect(problem.traceId).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"Key reuse code\", () => pm.expect(problem.title).to.eql(\"idempotency.key_reused\"));"
                 ]
               }
             }

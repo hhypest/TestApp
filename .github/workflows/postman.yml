@@ -82,8 +82,7 @@ jobs:
             --environment TestApp.Local.postman_environment.json \
             --reporters cli,junit \
             --reporter-junit-export /results/newman.xml \
-            --timeout-request 30000 \
-            --bail
+            --timeout-request 30000
 
       - name: Upload Newman report
         if: always()
