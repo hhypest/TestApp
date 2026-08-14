@@ -7,6 +7,7 @@
 - `Program.cs` является composition root: загружает конфигурацию, регистрирует зависимости, собирает middleware pipeline и подключает endpoint-модули. Бизнес-логика и подробное описание маршрутов в нём не размещаются.
 - HTTP request contracts находятся в `TestApp.Api/ApiRequests.cs`; операционные endpoint-specific contracts могут оставаться рядом со своим endpoint-модулем.
 - Маршруты группируются по пользовательскому сценарию в `TestApp.Api/Endpoints/`. Endpoint преобразует HTTP input в command/query и отображает результат в HTTP response, но не реализует domain invariant.
+- Runtime options/loaders группируются по concern в `TestApp.Api/Configuration/`; OpenAPI transformation и статический operation catalog находятся в `TestApp.Api/OpenApi/`.
 - Application command/query и соответствующий handler располагаются рядом и группируются по одному use-case family. Файл не должен превращаться в каталог несвязанных типов.
 - Domain aggregate может быть крупнее обычного service-файла, если размер обусловлен единым consistency boundary. HTTP, EF Core и broker concerns в Domain запрещены независимо от размера файла.
 - Infrastructure группируется по адаптеру или persistence-сценарию. SQL/EF projection не переносится в Application ради уменьшения числа строк.
@@ -30,7 +31,19 @@
 - Новая абстракция добавляется только при наличии реальной границы или как минимум двух потребителей. Уменьшение числа строк само по себе не является основанием для interface/helper.
 - Generated migrations и snapshots не форматируются вручную и не используются как ориентир размера production-файлов.
 
-## 4. Минимальный checklist автора
+## 4. Удаление устаревшего кода
+
+Код удаляется как obsolete/dead только после проверки всех применимых путей использования:
+
+- отсутствуют compile-time consumers;
+- тип не обнаруживается через DI scanning, EF configuration, serialization, reflection или tooling;
+- код не обслуживает действующий HTTP/configuration/persistence/event contract;
+- compatibility window, migration/cutover и rollback retention явно завершены, если они применимы;
+- удаление подтверждается релевантными regression tests и exact-head CI.
+
+Неиспользуемые abstractions и package references «на будущее» удаляются. Повторно они добавляются вместе с первым реальным потребителем. Legacy `/api/*`, body idempotency compatibility и MariaDB cutover/rollback документация не считаются dead code, пока их lifecycle contracts остаются действующими.
+
+## 5. Минимальный checklist автора
 
 Перед публикацией изменения автор проверяет:
 

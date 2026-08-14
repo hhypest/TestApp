@@ -62,7 +62,7 @@ graph TD
 
 ### TestApp.Core
 
-Минимальные общие primitives, не зависящие от ASP.NET Core/EF/Keycloak.
+Минимальные общие primitives, не зависящие от ASP.NET Core/EF/Keycloak. Текущий реально используемый functional primitive — `Result<TValue, TError>`; speculative `Option`/`Validation` удалены до появления подтверждённого use case.
 
 ### TestApp.Domain
 
@@ -89,7 +89,7 @@ Domain **не должен** ссылаться на:
 
 ### TestApp.Messaging
 
-Содержит generic `ICommand`, `IQuery`, handlers abstractions. Это не broker integration layer.
+Содержит только используемые generic `ICommand<TResponse>`, `IQuery<TResponse>` и соответствующие handler abstractions. Dispatcher, notification bus и broker integration сюда не добавляются до появления реального потребителя.
 
 ### TestApp.Application
 
@@ -137,7 +137,7 @@ Application не знает о PostgreSQL SQL, RabbitMQ client и ASP.NET endpoi
 - correlation/audit middleware;
 - DI composition root.
 
-`Program.cs` содержит только runtime composition и порядок middleware. HTTP request contracts вынесены в `ApiRequests.cs`, application-handler registrations — в `DependencyInjection.cs`, а route mapping разделён на feature-модули в `Endpoints/`. Правила поддержания этой структуры описаны в [CODE_REVIEW.md](CODE_REVIEW.md).
+`Program.cs` содержит только runtime composition и порядок middleware. HTTP request contracts вынесены в `ApiRequests.cs`, application-handler registrations — в `DependencyInjection.cs`, route mapping разделён на feature-модули в `Endpoints/`, runtime configuration — по concerns в `Configuration/`, OpenAPI transformers и operation catalog — в `OpenApi/`. Правила поддержания этой структуры описаны в [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ## 4. Write-side flow
 
