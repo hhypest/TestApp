@@ -127,12 +127,24 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/performance
           DB_CONTAINER=$(docker compose -f compose.yaml -f performance/compose.performance.yaml ps -q postgres)
+          printf '{"status":"topology-setup"}\n' > artifacts/performance/outbox.json
 
-          curl --fail --silent --show-error -u testapp:testapp \
+          RABBIT_NODE=$(curl --fail-with-body --silent --show-error -u testapp:testapp \
+            http://localhost:15672/api/overview | jq -r '.node')
+          if [ -z "$RABBIT_NODE" ] || [ "$RABBIT_NODE" = "null" ]; then
+            echo "RabbitMQ management API did not return a node name" >&2
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error -u testapp:testapp \
+            http://localhost:15672/api/exchanges/%2F/testapp.events >/dev/null
+          QUEUE_DEFINITION=$(jq -nc --arg node "$RABBIT_NODE" \
+            '{durable:false,auto_delete:false,arguments:{},node:$node}')
+          curl --fail-with-body --silent --show-error -u testapp:testapp \
             -H 'content-type: application/json' \
             -X PUT http://localhost:15672/api/queues/%2F/capacity-probe \
-            -d '{"durable":false,"auto_delete":true,"arguments":{}}' >/dev/null
-          curl --fail --silent --show-error -u testapp:testapp \
+            -d "$QUEUE_DEFINITION" >/dev/null
+          curl --fail-with-body --silent --show-error -u testapp:testapp \
             -H 'content-type: application/json' \
             -X POST http://localhost:15672/api/bindings/%2F/e/testapp.events/q/capacity-probe \
             -d '{"routing_key":"testapp.#","arguments":{}}' >/dev/null
