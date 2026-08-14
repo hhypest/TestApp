@@ -64,14 +64,14 @@ public sealed class ApiLifecycleContractTests
         string connectionString,
         bool legacyCompatibilityEnabled,
         DateTimeOffset? sunsetAt) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Keycloak:Authority", "https://identity.invalid/realms/testapp");
-            builder.UseSetting("Keycloak:Audience", "testapp-api");
-            builder.UseSetting("ConnectionStrings:Database", connectionString);
-            builder.UseSetting("ApiLifecycle:LegacyCompatibilityEnabled", legacyCompatibilityEnabled.ToString());
-            builder.UseSetting("ApiLifecycle:LegacyDeprecationAt", DeprecationAt.ToString("O", CultureInfo.InvariantCulture));
-            if (sunsetAt is not null)
-                builder.UseSetting("ApiLifecycle:LegacySunsetAt", sunsetAt.Value.ToString("O", CultureInfo.InvariantCulture));
-        });
+        ApiTestHost.Create(
+            connectionString,
+            builder =>
+            {
+                builder.UseSetting("ApiLifecycle:LegacyCompatibilityEnabled", legacyCompatibilityEnabled.ToString());
+                builder.UseSetting("ApiLifecycle:LegacyDeprecationAt", DeprecationAt.ToString("O", CultureInfo.InvariantCulture));
+                if (sunsetAt is not null)
+                    builder.UseSetting("ApiLifecycle:LegacySunsetAt", sunsetAt.Value.ToString("O", CultureInfo.InvariantCulture));
+            },
+            useTestAuthentication: false);
 }

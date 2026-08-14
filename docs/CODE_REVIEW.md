@@ -11,6 +11,7 @@
 - Application command/query и соответствующий handler располагаются рядом и группируются по одному use-case family. Файл не должен превращаться в каталог несвязанных типов.
 - Domain aggregate может быть крупнее обычного service-файла, если размер обусловлен единым consistency boundary. HTTP, EF Core и broker concerns в Domain запрещены независимо от размера файла.
 - Infrastructure группируется по адаптеру или persistence-сценарию. SQL/EF projection не переносится в Application ради уменьшения числа строк.
+- Повторяемая настройка integration-test host, database connection и test authentication находится в общей test infrastructure. В test-классе остаются только настройки, влияющие на проверяемый сценарий.
 
 ## 2. Размер и связность
 
@@ -37,6 +38,7 @@
 
 - отсутствуют compile-time consumers;
 - тип не обнаруживается через DI scanning, EF configuration, serialization, reflection или tooling;
+- DI registration имеет фактического runtime consumer, а не существует только «на будущее»;
 - код не обслуживает действующий HTTP/configuration/persistence/event contract;
 - compatibility window, migration/cutover и rollback retention явно завершены, если они применимы;
 - удаление подтверждается релевантными regression tests и exact-head CI.

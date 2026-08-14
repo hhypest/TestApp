@@ -1,13 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using TestApp.Api;
 using TestApp.Application.Queries;
 using TestApp.Domain.Tests;
@@ -77,55 +70,8 @@ public sealed class ApiBoundaryContractTests
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string connectionString) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Keycloak:Authority", "https://identity.invalid/realms/testapp");
-            builder.UseSetting("Keycloak:Audience", "testapp-api");
-            builder.UseSetting("ConnectionStrings:Database", connectionString);
-            builder.ConfigureTestServices(services =>
-            {
-                services.AddAuthentication(options =>
-                    {
-                        options.DefaultAuthenticateScheme = BoundaryAuthenticationHandler.TestScheme;
-                        options.DefaultChallengeScheme = BoundaryAuthenticationHandler.TestScheme;
-                        options.DefaultScheme = BoundaryAuthenticationHandler.TestScheme;
-                    })
-                    .AddScheme<AuthenticationSchemeOptions, BoundaryAuthenticationHandler>(BoundaryAuthenticationHandler.TestScheme, _ => { });
-            });
-        });
+        ApiTestHost.Create(connectionString);
 
     private static void Authenticate(HttpClient client, string userId, params string[] roles)
-    {
-        client.DefaultRequestHeaders.Remove("X-Test-User");
-        client.DefaultRequestHeaders.Remove("X-Test-Roles");
-        client.DefaultRequestHeaders.Add("X-Test-User", userId);
-        if (roles.Length > 0)
-            client.DefaultRequestHeaders.Add("X-Test-Roles", string.Join(',', roles));
-    }
-}
-
-internal sealed class BoundaryAuthenticationHandler(
-    IOptionsMonitor<AuthenticationSchemeOptions> options,
-    ILoggerFactory logger,
-    UrlEncoder encoder)
-    : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
-{
-    public const string TestScheme = "BoundaryTest";
-
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-    {
-        if (!Request.Headers.TryGetValue("X-Test-User", out var userValues) || string.IsNullOrWhiteSpace(userValues.FirstOrDefault()))
-            return Task.FromResult(AuthenticateResult.NoResult());
-
-        var claims = new List<Claim> { new("sub", userValues.First()!) };
-        if (Request.Headers.TryGetValue("X-Test-Roles", out var roleValues))
-        {
-            foreach (var role in roleValues.SelectMany(x => x?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? []))
-                claims.Add(new Claim(ClaimTypes.Role, role));
-        }
-
-        var identity = new ClaimsIdentity(claims, TestScheme, "sub", ClaimTypes.Role);
-        var principal = new ClaimsPrincipal(identity);
-        return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, TestScheme)));
-    }
+        => ApiTestHost.Authenticate(client, userId, roles);
 }

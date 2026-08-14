@@ -122,6 +122,8 @@ Application не знает о PostgreSQL SQL, RabbitMQ client и ASP.NET endpoi
 - OpenTelemetry;
 - background attempt expiration worker.
 
+`IReadModelQueries` реализован одним Infrastructure adapter, но его EF projections разделены partial-файлами по editor, assignment, attempt и reviewer сценариям в `Persistence/ReadModels/`. Это сохраняет единый DI contract и одновременно не заставляет reviewer разбирать несвязанные запросы в одном файле.
+
 ### TestApp.Api
 
 Содержит:
@@ -137,7 +139,7 @@ Application не знает о PostgreSQL SQL, RabbitMQ client и ASP.NET endpoi
 - correlation/audit middleware;
 - DI composition root.
 
-`Program.cs` содержит только runtime composition и порядок middleware. HTTP request contracts вынесены в `ApiRequests.cs`, application-handler registrations — в `DependencyInjection.cs`, route mapping разделён на feature-модули в `Endpoints/`, runtime configuration — по concerns в `Configuration/`, OpenAPI transformers и operation catalog — в `OpenApi/`. Правила поддержания этой структуры описаны в [CODE_REVIEW.md](CODE_REVIEW.md).
+`Program.cs` содержит только runtime composition и порядок middleware. HTTP request contracts вынесены в `ApiRequests.cs`, application-handler registrations — в `DependencyInjection.cs`, route mapping разделён на feature-модули в `Endpoints/`, runtime configuration — по concerns в `Configuration/`, OpenAPI transformers и operation catalog — в `OpenApi/`. Загруженные runtime option values передаются непосредственно их runtime consumers; неиспользуемые `IOptions<T>` registrations не создаются. Правила поддержания этой структуры описаны в [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ## 4. Write-side flow
 

@@ -275,6 +275,8 @@ RabbitMQ tests используют real broker service container.
 
 HTTP integration tests заменяют production JWT scheme на test authentication scheme на уровне `ConfigureTestServices`.
 
+Общий bootstrap находится в `ApiTestHost.cs`: он задаёт test database/Keycloak settings, регистрирует единый authentication handler и формирует request headers. Конкретный contract suite добавляет только scenario-specific host/service overrides; например lifecycle flags, edge-security settings или failing `IUnitOfWork`.
+
 Test principal формирует:
 
 - `sub` через `X-Test-User`;

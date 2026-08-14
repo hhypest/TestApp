@@ -4,9 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestApp.Api;
@@ -173,24 +171,11 @@ public sealed class EdgeSecurityTests
     private static WebApplicationFactory<Program> CreateFactory(
         string connectionString,
         Action<IWebHostBuilder>? configure = null) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("ConnectionStrings:Database", connectionString);
-            builder.UseSetting("Database:ApplyMigrationsOnStartup", "false");
-            builder.UseSetting("Keycloak:Authority", "https://identity.invalid/realms/testapp");
-            builder.UseSetting("Keycloak:Audience", "testapp-api");
-            configure?.Invoke(builder);
-            builder.ConfigureTestServices(services =>
+        ApiTestHost.Create(
+            connectionString,
+            builder =>
             {
-                services.AddAuthentication(options =>
-                    {
-                        options.DefaultAuthenticateScheme = BoundaryAuthenticationHandler.TestScheme;
-                        options.DefaultChallengeScheme = BoundaryAuthenticationHandler.TestScheme;
-                        options.DefaultScheme = BoundaryAuthenticationHandler.TestScheme;
-                    })
-                    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, BoundaryAuthenticationHandler>(
-                        BoundaryAuthenticationHandler.TestScheme,
-                        _ => { });
+                builder.UseSetting("Database:ApplyMigrationsOnStartup", "false");
+                configure?.Invoke(builder);
             });
-        });
 }

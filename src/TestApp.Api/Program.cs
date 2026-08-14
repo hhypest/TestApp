@@ -26,17 +26,6 @@ var transportSecurityOptions = migrateOnly
 var reverseProxyOptions = RuntimeConfiguration.LoadReverseProxy(builder.Configuration);
 var apiLifecycleOptions = ApiLifecycleConfiguration.Load(builder.Configuration);
 
-RuntimeConfiguration.RegisterTypedOptions(
-    builder.Services,
-    databaseOptions,
-    keycloakOptions,
-    rabbitMqOptions,
-    expirationOptions,
-    rateLimitingOptions,
-    openApiOptions,
-    corsOptions,
-    transportSecurityOptions,
-    reverseProxyOptions);
 RuntimeConfiguration.ConfigureForwardedHeaders(builder.Services, reverseProxyOptions);
 
 builder.Services.AddProblemDetails();

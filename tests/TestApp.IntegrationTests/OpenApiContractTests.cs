@@ -129,10 +129,5 @@ public sealed class OpenApiContractTests
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string connectionString) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Keycloak:Authority", "https://identity.invalid/realms/testapp");
-            builder.UseSetting("Keycloak:Audience", "testapp-api");
-            builder.UseSetting("ConnectionStrings:Database", connectionString);
-        });
+        ApiTestHost.Create(connectionString, useTestAuthentication: false);
 }

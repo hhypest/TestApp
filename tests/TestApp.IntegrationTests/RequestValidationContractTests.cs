@@ -2,12 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
 using TestApp.Api;
 using TestApp.Application.Queries;
 using TestApp.Domain.Tests;
@@ -113,29 +109,8 @@ public sealed class RequestValidationContractTests
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string connectionString) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Keycloak:Authority", "https://identity.invalid/realms/testapp");
-            builder.UseSetting("Keycloak:Audience", "testapp-api");
-            builder.UseSetting("ConnectionStrings:Database", connectionString);
-            builder.ConfigureTestServices(services =>
-            {
-                services.AddAuthentication(options =>
-                    {
-                        options.DefaultAuthenticateScheme = TestAuthenticationHandler.TestScheme;
-                        options.DefaultChallengeScheme = TestAuthenticationHandler.TestScheme;
-                        options.DefaultScheme = TestAuthenticationHandler.TestScheme;
-                    })
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(TestAuthenticationHandler.TestScheme, _ => { });
-            });
-        });
+        ApiTestHost.Create(connectionString);
 
     private static void Authenticate(HttpClient client, string userId, params string[] roles)
-    {
-        client.DefaultRequestHeaders.Remove("X-Test-User");
-        client.DefaultRequestHeaders.Remove("X-Test-Roles");
-        client.DefaultRequestHeaders.Add("X-Test-User", userId);
-        if (roles.Length > 0)
-            client.DefaultRequestHeaders.Add("X-Test-Roles", string.Join(',', roles));
-    }
+        => ApiTestHost.Authenticate(client, userId, roles);
 }

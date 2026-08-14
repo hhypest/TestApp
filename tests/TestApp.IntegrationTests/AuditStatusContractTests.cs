@@ -1,17 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Claims;
 using System.Text;
-using System.Text.Encodings.Web;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using TestApp.Api;
 using TestApp.Application.Abstractions;
 using TestApp.Application.Common;
@@ -153,36 +147,19 @@ public sealed class AuditStatusContractTests
     private static WebApplicationFactory<Program> CreateFactory(
         string connectionString,
         Func<Exception>? saveFailureFactory = null) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Keycloak:Authority", "https://identity.invalid/realms/testapp");
-            builder.UseSetting("Keycloak:Audience", "testapp-api");
-            builder.UseSetting("ConnectionStrings:Database", connectionString);
-            builder.ConfigureTestServices(services =>
+        ApiTestHost.Create(
+            connectionString,
+            configureServices: services =>
             {
-                services.AddAuthentication(options =>
-                    {
-                        options.DefaultAuthenticateScheme = AuditStatusAuthenticationHandler.TestScheme;
-                        options.DefaultChallengeScheme = AuditStatusAuthenticationHandler.TestScheme;
-                        options.DefaultScheme = AuditStatusAuthenticationHandler.TestScheme;
-                    })
-                    .AddScheme<AuthenticationSchemeOptions, AuditStatusAuthenticationHandler>(
-                        AuditStatusAuthenticationHandler.TestScheme,
-                        _ => { });
-
                 if (saveFailureFactory is not null)
                 {
                     services.RemoveAll<IUnitOfWork>();
                     services.AddScoped<IUnitOfWork>(_ => new FailingUnitOfWork(saveFailureFactory));
                 }
             });
-        });
 
     private static void Authenticate(HttpClient client)
-    {
-        client.DefaultRequestHeaders.Add("X-Test-User", "audit-status-author");
-        client.DefaultRequestHeaders.Add("X-Test-Roles", "test-author");
-    }
+        => ApiTestHost.Authenticate(client, "audit-status-author", "test-author");
 
     private static string NewCorrelationId(string outcome) =>
         $"audit-{outcome}-{Guid.CreateVersion7():N}";
@@ -191,37 +168,5 @@ public sealed class AuditStatusContractTests
     {
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
             Task.FromException(failureFactory());
-    }
-}
-
-internal sealed class AuditStatusAuthenticationHandler(
-    IOptionsMonitor<AuthenticationSchemeOptions> options,
-    ILoggerFactory logger,
-    UrlEncoder encoder)
-    : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
-{
-    public const string TestScheme = "AuditStatusTest";
-
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-    {
-        if (!Request.Headers.TryGetValue("X-Test-User", out var userValues) ||
-            string.IsNullOrWhiteSpace(userValues.FirstOrDefault()))
-        {
-            return Task.FromResult(AuthenticateResult.NoResult());
-        }
-
-        var claims = new List<Claim> { new("sub", userValues.First()!) };
-        if (Request.Headers.TryGetValue("X-Test-Roles", out var roleValues))
-        {
-            foreach (var role in roleValues.SelectMany(x =>
-                         x?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? []))
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-        }
-
-        var identity = new ClaimsIdentity(claims, TestScheme, "sub", ClaimTypes.Role);
-        var principal = new ClaimsPrincipal(identity);
-        return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, TestScheme)));
     }
 }
