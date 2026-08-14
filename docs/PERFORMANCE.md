@@ -38,7 +38,7 @@ Workflow `.github/workflows/performance.yml` использует production Doc
 
 ### Outbox recovery
 
-Workflow создаёт временную RabbitMQ queue, связанную с `testapp.events`, и добавляет 100 synthetic `CapacityProbe` Outbox rows в изолированную CI database. Реальный `OutboxProcessor` с publisher confirms должен отметить все 100 сообщений как processed не более чем за 30 секунд.
+Workflow создаёт временную RabbitMQ queue, связанную с `testapp.events`, и после HTTP-нагрузки добавляет 100 synthetic `CapacityProbe` Outbox rows в изолированную CI database. Probe не получает приоритет и остаётся после ранее созданных событий в FIFO backlog: реальный `OutboxProcessor` с publisher confirms должен дренировать предшествующую очередь и отметить все 100 probe-сообщений как processed не более чем за 30 секунд.
 
 Topology setup является частью gate: setup failure нельзя интерпретировать как application backlog failure.
 
@@ -48,7 +48,7 @@ Topology setup является частью gate: setup failure нельзя и
 
 - `k6-summary.json`;
 - `expiration.json`;
-- `outbox.json`.
+- `outbox.json` с размером backlog перед probe и результатом drain.
 
 ## Интерпретация
 

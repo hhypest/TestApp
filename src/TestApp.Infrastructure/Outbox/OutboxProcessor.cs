@@ -45,11 +45,30 @@ public sealed class OutboxProcessor(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _options.Validate();
-        await ProcessBatchAsync(stoppingToken);
+        await DrainAvailableAsync(stoppingToken);
 
         using var timer = new PeriodicTimer(_options.PollInterval, time);
         while (await timer.WaitForNextTickAsync(stoppingToken))
-            await ProcessBatchAsync(stoppingToken);
+            await DrainAvailableAsync(stoppingToken);
+    }
+
+    public async Task<int> DrainAvailableAsync(CancellationToken ct)
+    {
+        var processed = 0;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            var batchProcessed = await ProcessBatchAsync(ct);
+            processed += batchProcessed;
+
+            if (batchProcessed < _options.BatchSize)
+                return processed;
+
+            // Database and broker calls are asynchronous, but explicitly yield between
+            // full batches so a sustained backlog cannot monopolize the worker thread.
+            await Task.Yield();
+        }
     }
 
     public async Task<int> ProcessBatchAsync(CancellationToken ct)

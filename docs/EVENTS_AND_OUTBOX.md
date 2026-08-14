@@ -125,6 +125,8 @@ NextAttemptAt == null || NextAttemptAt <= now
 
 Order: oldest `OccurredAt` first.
 
+После полностью обработанного batch processor сразу выбирает следующий batch, не ожидая `PollInterval`. Это позволяет быстро дренировать накопившийся FIFO backlog. Пауза до следующего poll применяется после пустого/неполного batch либо если lock/publish failure не позволил обработать batch полностью; такое условие не создаёт tight retry loop при недоступном broker или contention.
+
 ### 6.2 Multi-instance safety
 
 Для каждого message используется session-level PostgreSQL advisory lock. Resource material:

@@ -85,6 +85,46 @@ public sealed class OutboxDeliveryTests
         Assert.Equal(1, deadLetter.AttemptCount);
     }
 
+    [Fact]
+    public async Task Available_backlog_is_drained_across_multiple_batches_without_poll_delays()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        var occurredAt = DateTimeOffset.UtcNow;
+        var integrationEvents = Enumerable.Range(0, 5)
+            .Select(index => new TestIntegrationEvent(
+                Guid.NewGuid(),
+                occurredAt.AddMilliseconds(index),
+                $"payload-{index}"))
+            .ToArray();
+
+        await using (var setup = database.CreateContext())
+        {
+            await setup.Database.MigrateAsync(ct);
+            setup.OutboxMessages.AddRange(integrationEvents.Select(OutboxMessage.From));
+            await setup.SaveChangesAsync(ct);
+        }
+
+        var publisher = new RecordingPublisher();
+        await using var provider = BuildServices(database.ConnectionString, publisher);
+        var processor = CreateProcessor(provider, new OutboxDeliveryOptions
+        {
+            BatchSize = 2,
+            PollInterval = TimeSpan.FromMinutes(1)
+        });
+
+        var count = await processor.DrainAvailableAsync(ct);
+
+        Assert.Equal(integrationEvents.Length, count);
+        Assert.Equal(integrationEvents.Select(x => x.EventId), publisher.EventIds);
+
+        await using var verification = database.CreateContext();
+        var remaining = await verification.OutboxMessages
+            .AsNoTracking()
+            .CountAsync(x => x.ProcessedAt == null, ct);
+        Assert.Equal(0, remaining);
+    }
+
     private static ServiceProvider BuildServices(string connectionString, IOutboxPublisher publisher)
     {
         var services = new ServiceCollection();
@@ -106,11 +146,14 @@ public sealed class OutboxDeliveryTests
 
     private sealed class RecordingPublisher : IOutboxPublisher
     {
-        public Guid? LastEventId { get; private set; }
+        private readonly List<Guid> _eventIds = [];
+
+        public Guid? LastEventId => _eventIds.Count == 0 ? null : _eventIds[^1];
+        public IReadOnlyList<Guid> EventIds => _eventIds;
 
         public Task Publish(Guid eventId, string eventType, string payload, CancellationToken ct)
         {
-            LastEventId = eventId;
+            _eventIds.Add(eventId);
             return Task.CompletedTask;
         }
     }

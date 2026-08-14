@@ -137,6 +137,9 @@ jobs:
             -X POST http://localhost:15672/api/bindings/%2F/e/testapp.events/q/capacity-probe \
             -d '{"routing_key":"testapp.#","arguments":{}}' >/dev/null
 
+          PREEXISTING_PENDING=$(docker exec "$DB_CONTAINER" psql -U testapp -d testapp -Atqc \
+            'SELECT COUNT(*) FROM outbox_messages WHERE "ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL AND "DiscardedAt" IS NULL;')
+
           docker exec -i "$DB_CONTAINER" psql -U testapp -d testapp -v ON_ERROR_STOP=1 <<'SQL'
           INSERT INTO outbox_messages
               ("Id", "OccurredAt", "Type", "Payload", "ProcessedAt", "Error", "AttemptCount", "LastAttemptAt", "NextAttemptAt", "DeadLetteredAt", "DiscardedAt")
@@ -151,6 +154,10 @@ jobs:
             exit 1
           fi
 
+          printf '{"preexistingPending":%s,"initialOutbox":%s,"remainingOutbox":%s,"totalPending":%s,"drainSeconds":0}\n' \
+            "$PREEXISTING_PENDING" "$INITIAL" "$INITIAL" "$((PREEXISTING_PENDING + INITIAL))" \
+            > artifacts/performance/outbox.json
+
           START=$(date +%s)
           REMAINING="$INITIAL"
           for attempt in $(seq 1 30); do
@@ -162,15 +169,20 @@ jobs:
             sleep 1
           done
           ELAPSED=$(( $(date +%s) - START ))
+          TOTAL_PENDING=$(docker exec "$DB_CONTAINER" psql -U testapp -d testapp -Atqc \
+            'SELECT COUNT(*) FROM outbox_messages WHERE "ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL AND "DiscardedAt" IS NULL;')
+
+          printf '{"preexistingPending":%s,"initialOutbox":%s,"remainingOutbox":%s,"totalPending":%s,"drainSeconds":%s}\n' \
+            "$PREEXISTING_PENDING" "$INITIAL" "$REMAINING" "$TOTAL_PENDING" "$ELAPSED" \
+            > artifacts/performance/outbox.json
 
           if [ "$REMAINING" -ne 0 ]; then
-            echo "Outbox backlog did not drain within 30 seconds: remaining=$REMAINING" >&2
-            docker compose -f compose.yaml -f performance/compose.performance.yaml logs api
+            echo "Outbox backlog did not drain within 30 seconds: probe_remaining=$REMAINING total_pending=$TOTAL_PENDING" >&2
+            docker exec "$DB_CONTAINER" psql -U testapp -d testapp -P pager=off -c \
+              'SELECT "Type", COUNT(*) AS pending, MIN("OccurredAt") AS oldest FROM outbox_messages WHERE "ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL AND "DiscardedAt" IS NULL GROUP BY "Type" ORDER BY oldest;'
+            docker compose -f compose.yaml -f performance/compose.performance.yaml logs --no-color --tail=500 api
             exit 1
           fi
-
-          printf '{"initialOutbox":%s,"remainingOutbox":%s,"drainSeconds":%s}\n' \
-            "$INITIAL" "$REMAINING" "$ELAPSED" > artifacts/performance/outbox.json
 
       - name: Upload performance evidence
         if: always()
@@ -183,7 +195,7 @@ jobs:
 
       - name: Show service logs on failure
         if: failure()
-        run: docker compose -f compose.yaml -f performance/compose.performance.yaml logs --no-color
+        run: docker compose -f compose.yaml -f performance/compose.performance.yaml logs --no-color --tail=1000
 
       - name: Stop performance stack
         if: always()
