@@ -262,6 +262,8 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - repository secret scan;
 - production-image HIGH/CRITICAL vulnerability scan;
 - CycloneDX SBOM artifact;
+- importable Postman Collection v2.1 с real Keycloak author/admin/student flow;
+- Newman API contract workflow с JUnit artifact;
 - authenticated k6 + expiration/Outbox capacity workflow.
 
 ## 11. Главные оставшиеся ограничения

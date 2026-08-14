@@ -1,0 +1,103 @@
+name: postman
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - beta-ddd
+    paths:
+      - "src/**"
+      - "tests/TestApp.Postman/**"
+      - "deploy/keycloak/**"
+      - "Dockerfile"
+      - "compose.yaml"
+      - ".github/workflows/postman.yml"
+  pull_request:
+    branches:
+      - beta-ddd
+    paths:
+      - "src/**"
+      - "tests/TestApp.Postman/**"
+      - "deploy/keycloak/**"
+      - "Dockerfile"
+      - "compose.yaml"
+      - ".github/workflows/postman.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postman-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Postman project
+        run: node tests/TestApp.Postman/scripts/validate.mjs
+
+      - name: Build and start local API stack
+        run: docker compose -f compose.yaml up -d --build api
+
+      - name: Wait for Keycloak and API readiness
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error \
+              http://localhost:8081/realms/testapp/.well-known/openid-configuration >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Keycloak did not become ready" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://localhost:8080/health/ready >/dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "API did not become ready" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Run Postman API contract with Newman
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/postman
+          chmod 0777 artifacts/postman
+          docker run --rm --network host \
+            -v "$PWD/tests/TestApp.Postman:/etc/newman:ro" \
+            -v "$PWD/artifacts/postman:/results" \
+            postman/newman:6-alpine \
+            run TestApp.Api.postman_collection.json \
+            --environment TestApp.Local.postman_environment.json \
+            --reporters cli,junit \
+            --reporter-junit-export /results/newman.xml \
+            --timeout-request 30000 \
+            --bail
+
+      - name: Upload Newman report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testapp-postman-results
+          path: artifacts/postman
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -f compose.yaml logs --no-color --tail=1000
+
+      - name: Stop local API stack
+        if: always()
+        run: docker compose -f compose.yaml down -v --remove-orphans

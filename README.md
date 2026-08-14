@@ -34,6 +34,7 @@ Backend-система создания, публикации, назначен�
 - [SLO и alerts](docs/SLO_ALERTS.md)
 - [Performance / capacity](docs/PERFORMANCE.md)
 - [Тестирование](docs/TESTING.md)
+- [Postman API tests](tests/TestApp.Postman/README.md)
 - [Архитектурные решения](docs/DECISIONS.md)
 - [Дорожная карта](docs/ROADMAP.md)
 - [Детальный план фич](docs/FEATURE_PLAN.md)
@@ -229,11 +230,14 @@ Development credentials находятся в [docs/OPERATIONS.md](docs/OPERATIO
 dotnet restore TestApp.slnx
 dotnet build TestApp.slnx --no-restore --configuration Release
 dotnet test TestApp.slnx --no-build --configuration Release
+node tests/TestApp.Postman/scripts/validate.mjs
 docker compose -f compose.yaml config --quiet
 docker build -t testapp-api:local .
 ```
 
-GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image, запускает этот же image в `--migrate` режиме, проверяет logical backup/restore, выполняет image/secret scan и формирует SBOM. Отдельный performance workflow использует production-shaped stack и real Keycloak; его D6 exit gate пока не пройден полностью.
+Импортируемая Postman collection с real Keycloak flow и Newman CI находится в [`tests/TestApp.Postman`](tests/TestApp.Postman/README.md).
+
+GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image, запускает этот же image в `--migrate` режиме, проверяет logical backup/restore, выполняет image/secret scan и формирует SBOM. Отдельные workflows используют production-shaped stack и real Keycloak для Postman/Newman API contract и performance/capacity gates.
 
 ## Приоритет дальнейшего развития
 

@@ -1,0 +1,3792 @@
+{
+  "info": {
+    "_postman_id": "5dc9825f-8c9f-4e18-9c5d-386c2d252b57",
+    "name": "TestApp API — beta-ddd",
+    "description": "Executable API contract for the beta-ddd branch.\n\nRun folders in collection order. The default run creates and archives disposable tests, creates one active direct assignment with two completed attempts, and cancels the disposable group assignment. Dead-letter mutations are opt-in.\n\nCanonical API: /api/v1. Authentication: local Keycloak fixture users.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const baseUrl = pm.environment.get(\"baseUrl\");",
+          "if (baseUrl && pm.request.url.toString().startsWith(baseUrl)) {",
+          "  const suffix = pm.variables.replaceIn(\"{{$guid}}\");",
+          "  pm.request.headers.upsert({ key: \"X-Correlation-ID\", value: `postman-${suffix}` });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "zeroGuid",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Bootstrap and service contract",
+      "description": "Инициализация одного независимого прогона и проверка публичных runtime endpoints.",
+      "item": [
+        {
+          "name": "Initialize run + liveness",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const guid = () => pm.variables.replaceIn(\"{{$guid}}\");",
+                  "const now = Date.now();",
+                  "const suffix = guid().slice(0, 8);",
+                  "pm.environment.set(\"runId\", `${new Date(now).toISOString().replace(/[-:.TZ]/g, \"\").slice(0, 14)}-${suffix}`);",
+                  "pm.environment.set(\"missingId\", guid());",
+                  "pm.environment.set(\"publishKey\", guid());",
+                  "pm.environment.set(\"mismatchHeaderKey\", guid());",
+                  "pm.environment.set(\"mismatchBodyKey\", guid());",
+                  "pm.environment.set(\"assignmentKey\", guid());",
+                  "pm.environment.set(\"bulkAssignmentKey\", guid());",
+                  "pm.environment.set(\"startAttemptKey\", guid());",
+                  "pm.environment.set(\"timeoutAttemptKey\", guid());",
+                  "pm.environment.set(\"submitAttemptKey\", guid());",
+                  "pm.environment.set(\"availableFrom\", new Date(now - 60_000).toISOString());",
+                  "pm.environment.set(\"availableUntil\", new Date(now + 3_600_000).toISOString());",
+                  "pm.environment.set(\"updatedAvailableFrom\", new Date(now - 30_000).toISOString());",
+                  "pm.environment.set(\"updatedAvailableUntil\", new Date(now + 7_200_000).toISOString());",
+                  "[\"authorToken\", \"adminToken\", \"studentToken\", \"authorSub\", \"adminSub\", \"studentSub\", \"testId\", \"testEtag\", \"staleTestEtag\", \"questionId\", \"correctOptionId\", \"wrongOptionId\", \"revisionId\", \"assignmentId\", \"bulkAssignmentId\", \"attemptId\", \"timeoutAttemptId\", \"sandboxTestId\", \"sandboxEtag\", \"sandboxQuestionId\", \"sandboxOptionId\"].forEach((key) => pm.environment.unset(key));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health/live"
+          }
+        },
+        {
+          "name": "Readiness — PostgreSQL and RabbitMQ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health/ready"
+          }
+        },
+        {
+          "name": "OpenAPI document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const document = pm.response.json();",
+                  "pm.test(\"OpenAPI exposes canonical API\", () => {",
+                  "  pm.expect(document.openapi).to.match(/^3\\./);",
+                  "  pm.expect(document.paths).to.have.property(\"/api/v1/tests\");",
+                  "  pm.expect(document.components.securitySchemes).to.have.property(\"Bearer\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/openapi/v1.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 — Keycloak authentication",
+      "description": "Resource Owner Password flow используется только fixture-пользователями локального realm.",
+      "item": [
+        {
+          "name": "Token — Author",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const tokenResponse = pm.response.json();",
+                  "pm.test(\"Access token is returned\", () => pm.expect(tokenResponse.access_token).to.be.a(\"string\").and.not.empty);",
+                  "pm.environment.set(\"authorToken\", tokenResponse.access_token);",
+                  "const segment = tokenResponse.access_token.split(\".\")[1].replace(/-/g, \"+\").replace(/_/g, \"/\");",
+                  "const padded = segment.padEnd(Math.ceil(segment.length / 4) * 4, \"=\");",
+                  "const claims = JSON.parse(atob(padded));",
+                  "pm.environment.set(\"authorSub\", claims.sub);",
+                  "pm.test(\"Author role is present\", () => pm.expect(claims.roles || []).to.include(\"test-author\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "{{authorUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{authorPassword}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "description": "Получает локальный development JWT для author."
+          }
+        },
+        {
+          "name": "Token — Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const tokenResponse = pm.response.json();",
+                  "pm.test(\"Access token is returned\", () => pm.expect(tokenResponse.access_token).to.be.a(\"string\").and.not.empty);",
+                  "pm.environment.set(\"adminToken\", tokenResponse.access_token);",
+                  "const segment = tokenResponse.access_token.split(\".\")[1].replace(/-/g, \"+\").replace(/_/g, \"/\");",
+                  "const padded = segment.padEnd(Math.ceil(segment.length / 4) * 4, \"=\");",
+                  "const claims = JSON.parse(atob(padded));",
+                  "pm.environment.set(\"adminSub\", claims.sub);",
+                  "pm.test(\"Admin role is present\", () => pm.expect(claims.roles || []).to.include(\"test-admin\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "{{adminUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "description": "Получает локальный development JWT для admin."
+          }
+        },
+        {
+          "name": "Token — Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const tokenResponse = pm.response.json();",
+                  "pm.test(\"Access token is returned\", () => pm.expect(tokenResponse.access_token).to.be.a(\"string\").and.not.empty);",
+                  "pm.environment.set(\"studentToken\", tokenResponse.access_token);",
+                  "const segment = tokenResponse.access_token.split(\".\")[1].replace(/-/g, \"+\").replace(/_/g, \"/\");",
+                  "const padded = segment.padEnd(Math.ceil(segment.length / 4) * 4, \"=\");",
+                  "const claims = JSON.parse(atob(padded));",
+                  "pm.environment.set(\"studentSub\", claims.sub);",
+                  "pm.test(\"Student belongs to students group\", () => pm.expect(claims.groups || []).to.include(\"students\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "{{studentUsername}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{studentPassword}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "description": "Получает локальный development JWT для student."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Authoring and publication",
+      "description": "Полный author flow с обязательным обновлением ETag после каждой мутации.",
+      "item": [
+        {
+          "name": "Create test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"TestId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"testId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman E2E {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — initial ETag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.environment.set(\"staleTestEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 0 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Rename test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/title",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman API contract {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after rename",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 0 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Change settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/settings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passingPercentage\": 70,\n  \"timeLimitMinutes\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 0 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Add question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"QuestionId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"questionId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"What is an aggregate?\",\n  \"type\": 1,\n  \"points\": 1,\n  \"order\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Update question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/questions/{{questionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"What defines an aggregate boundary?\",\n  \"type\": 1,\n  \"points\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after question update",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Reorder question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/questions/{{questionId}}/order",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after question reorder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Add correct option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"Correct AnswerOptionId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"correctOptionId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/questions/{{questionId}}/options",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A consistency boundary\",\n  \"isCorrect\": true,\n  \"order\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after correct option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Update correct option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/questions/{{questionId}}/options/{{correctOptionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"The consistency boundary around entities\",\n  \"isCorrect\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after option update",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Reorder correct option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/questions/{{questionId}}/options/{{correctOptionId}}/order",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — after option reorder",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Add wrong option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"Wrong AnswerOptionId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"wrongOptionId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/questions/{{questionId}}/options",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"A database table\",\n  \"isCorrect\": false,\n  \"order\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — publishable draft",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));",
+                  "pm.test(\"Correctness is available to author\", () => {",
+                  "  const options = pm.response.json().questions[0].options;",
+                  "  pm.expect(options.filter((option) => option.isCorrect)).to.have.lengthOf(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "List owned draft tests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Created draft is listed\", () => pm.expect(pm.response.json().totalCount).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests?status=Draft&search={{runId}}&page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Publish test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"PublishedTestRevisionId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"revisionId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{publishKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Replay publish idempotently",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const replayed = typeof payload === \"string\" ? payload : (payload.value || payload.Value);",
+                  "pm.test(\"Publish replay returns the same revision\", () => pm.expect(replayed).to.eql(pm.environment.get(\"revisionId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{publishKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read editor — published",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 1\", () => pm.expect(editor.status).to.eql(1));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "List immutable revisions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Published revision is listed\", () => {",
+                  "  const revisions = pm.response.json();",
+                  "  pm.expect(revisions).to.have.lengthOf(1);",
+                  "  pm.expect(revisions[0].id.value).to.eql(pm.environment.get(\"revisionId\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/revisions"
+          }
+        },
+        {
+          "name": "List owned published tests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Published test is listed\", () => pm.expect(pm.response.json().totalCount).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests?status=Published&search={{runId}}&page=1&pageSize=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — HTTP contract guards",
+      "description": "Негативные проверки authentication, authorization, validation, ETag и idempotency.",
+      "item": [
+        {
+          "name": "Anonymous protected read is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/me/assignments"
+          }
+        },
+        {
+          "name": "Student cannot read author catalog",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests"
+          }
+        },
+        {
+          "name": "Blank title is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"ProblemDetails is returned\", () => pm.expect(pm.response.json().title).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Missing If-Match is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 428\", () => pm.response.to.have.status(428));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Precondition code\", () => pm.expect(pm.response.json().title).to.eql(\"concurrency.precondition_required\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/title",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Must not be applied\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Stale If-Match is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 412\", () => pm.response.to.have.status(412));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Stale precondition code\", () => pm.expect(pm.response.json().title).to.eql(\"concurrency.precondition_failed\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{staleTestEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/title",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Must not be applied\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mismatched idempotency keys are rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Mismatch code\", () => pm.expect(pm.response.json().title).to.eql(\"idempotency.key_mismatch\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{mismatchHeaderKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"{{mismatchBodyKey}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unknown editor returns not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{missingId}}/editor"
+          }
+        },
+        {
+          "name": "Legacy /api path is marked deprecated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Deprecation header is returned\", () => pm.expect(pm.response.headers.get(\"Deprecation\")).to.match(/^@\\d+$/));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/tests?search={{runId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Assignment administration",
+      "description": "Single/bulk assignment, filters, lifecycle and idempotency fingerprint.",
+      "item": [
+        {
+          "name": "Author cannot administer assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments"
+          }
+        },
+        {
+          "name": "Assign revision to student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"TestAssignmentId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"assignmentId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{assignmentKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\",\n  \"userId\": \"{{studentSub}}\",\n  \"groupId\": null,\n  \"availableFrom\": \"{{availableFrom}}\",\n  \"availableUntil\": \"{{availableUntil}}\",\n  \"attemptLimit\": 2,\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Replay assignment idempotently",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const replayed = typeof payload === \"string\" ? payload : (payload.value || payload.Value);",
+                  "pm.test(\"Assignment replay returns the same id\", () => pm.expect(replayed).to.eql(pm.environment.get(\"assignmentId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{assignmentKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\",\n  \"userId\": \"{{studentSub}}\",\n  \"groupId\": null,\n  \"availableFrom\": \"{{availableFrom}}\",\n  \"availableUntil\": \"{{availableUntil}}\",\n  \"attemptLimit\": 2,\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Changed assignment fingerprint is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Key reuse code\", () => pm.expect(pm.response.json().title).to.eql(\"idempotency.key_reused\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{assignmentKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\",\n  \"userId\": null,\n  \"groupId\": \"students\",\n  \"availableFrom\": \"{{availableFrom}}\",\n  \"availableUntil\": \"{{availableUntil}}\",\n  \"attemptLimit\": 2,\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List assignments with filters",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Direct assignment is listed\", () => pm.expect(pm.response.json().totalCount).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments?revisionId={{revisionId}}&targetType=User&targetId={{studentSub}}&status=Active&page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Read assignment detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}"
+          }
+        },
+        {
+          "name": "Change assignment window",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}/window",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availableFrom\": \"{{updatedAvailableFrom}}\",\n  \"availableUntil\": \"{{updatedAvailableUntil}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Change attempt limit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}/attempt-limit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attemptLimit\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Bulk assign revision to students group",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const result = pm.response.json();",
+                  "pm.test(\"Bulk assignment created one target\", () => { pm.expect(result.createdCount).to.eql(1); pm.expect(result.assignmentIds).to.have.lengthOf(1); });",
+                  "pm.environment.set(\"bulkAssignmentId\", result.assignmentIds[0].value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{bulkAssignmentKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/bulk",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\",\n  \"targets\": [\n    {\n      \"userId\": null,\n      \"groupId\": \"students\"\n    }\n  ],\n  \"availableFrom\": \"{{availableFrom}}\",\n  \"availableUntil\": \"{{availableUntil}}\",\n  \"attemptLimit\": 1,\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Replay bulk assignment idempotently",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Bulk replay returns the same assignment\", () => pm.expect(pm.response.json().assignmentIds[0].value).to.eql(pm.environment.get(\"bulkAssignmentId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{bulkAssignmentKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/bulk",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revisionId\": \"{{revisionId}}\",\n  \"targets\": [\n    {\n      \"userId\": null,\n      \"groupId\": \"students\"\n    }\n  ],\n  \"availableFrom\": \"{{availableFrom}}\",\n  \"availableUntil\": \"{{availableUntil}}\",\n  \"attemptLimit\": 1,\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel bulk-created assignment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{bulkAssignmentId}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Postman E2E cleanup\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read cancelled assignment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Assignment is cancelled\", () => pm.expect(pm.response.json().status).to.eql(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{bulkAssignmentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — Student attempt",
+      "description": "Self-service reads, start replay, answer/clear, submit replay and student-safe result.",
+      "item": [
+        {
+          "name": "List my assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Student sees direct assignment\", () => pm.expect(pm.response.json().totalCount).to.be.at.least(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/assignments?status=Active&page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Start attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"TestAttemptId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"attemptId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{startAttemptKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}/attempts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Replay start attempt idempotently",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const replayed = typeof payload === \"string\" ? payload : (payload.value || payload.Value);",
+                  "pm.test(\"Start replay returns the same attempt\", () => pm.expect(replayed).to.eql(pm.environment.get(\"attemptId\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{startAttemptKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}/attempts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List my in-progress attempts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/attempts?status=InProgress&page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Read attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Attempt DTO does not leak correctness\", () => pm.expect(JSON.stringify(pm.response.json())).not.to.include(\"isCorrect\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}"
+          }
+        },
+        {
+          "name": "Answer question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}/answers/{{questionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"optionIds\": [\n    \"{{correctOptionId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read answered attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"One response is present\", () => pm.expect(pm.response.json().responses).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}"
+          }
+        },
+        {
+          "name": "Clear answer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}/answers/{{questionId}}"
+          }
+        },
+        {
+          "name": "Read cleared attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Response has no selected options\", () => pm.expect(pm.response.json().responses[0].selectedOptionIds).to.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}"
+          }
+        },
+        {
+          "name": "Answer correctly again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}/answers/{{questionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"optionIds\": [\n    \"{{correctOptionId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Submit attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Full score is returned\", () => { const score = pm.response.json(); pm.expect(score.earned).to.eql(2); pm.expect(score.maximum).to.eql(2); pm.expect(score.percentage).to.eql(100); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{submitAttemptKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Replay submit idempotently",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Submit replay keeps full score\", () => pm.expect(pm.response.json().percentage).to.eql(100));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{submitAttemptKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read own result",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const result = pm.response.json();",
+                  "pm.test(\"Attempt passed\", () => { pm.expect(result.status).to.eql(2); pm.expect(result.outcome).to.eql(1); pm.expect(result.percentage).to.eql(100); });",
+                  "pm.test(\"Result does not leak correctness\", () => pm.expect(JSON.stringify(result)).not.to.include(\"isCorrect\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}/result"
+          }
+        },
+        {
+          "name": "List my submitted attempts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/attempts?status=Submitted&page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Student cannot use reviewer API",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/results/{{attemptId}}"
+          }
+        },
+        {
+          "name": "Start second attempt for timeout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"Timeout TestAttemptId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"timeoutAttemptId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{timeoutAttemptKey}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}/attempts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 — Review, timeout and operations",
+      "description": "Privileged result projection, manual timeout, assignment attempts, audit and Outbox status.",
+      "item": [
+        {
+          "name": "Manually timeout second attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{timeoutAttemptId}}/timeout",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Student reads timed-out result",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Second attempt timed out\", () => { const result = pm.response.json(); pm.expect(result.status).to.eql(3); pm.expect(result.outcome).to.eql(2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{timeoutAttemptId}}/result"
+          }
+        },
+        {
+          "name": "List assignment attempts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Two attempts are visible\", () => pm.expect(pm.response.json().totalCount).to.eql(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}/attempts?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "List reviewer results as owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Passed result is listed\", () => pm.expect(pm.response.json().totalCount).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/results?testId={{testId}}&revisionId={{revisionId}}&outcome=Passed&page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Read reviewer result as owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const result = pm.response.json();",
+                  "pm.test(\"Reviewer sees correctness breakdown\", () => {",
+                  "  pm.expect(result.questions).to.have.lengthOf(1);",
+                  "  pm.expect(result.questions[0].options.some((option) => option.isCorrect && option.isSelected)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/results/{{attemptId}}"
+          }
+        },
+        {
+          "name": "Read reviewer result as admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/results/{{attemptId}}"
+          }
+        },
+        {
+          "name": "Read Outbox operational status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const outbox = pm.response.json();",
+                  "pm.test(\"Outbox counters are non-negative\", () => { pm.expect(outbox.pendingCount).to.be.at.least(0); pm.expect(outbox.deadLetterCount).to.be.at.least(0); });",
+                  "if (outbox.recentDeadLetters && outbox.recentDeadLetters.length > 0) pm.environment.set(\"deadLetterEventId\", outbox.recentDeadLetters[0].eventId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/operations/outbox?deadLetterLimit=20"
+          }
+        },
+        {
+          "name": "Read audit trail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Audit captured write requests\", () => pm.expect(pm.response.json().totalCount).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/operations/audit?page=1&pageSize=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 — Draft remove operations and cleanup",
+      "description": "Отдельный disposable draft покрывает DELETE endpoints; созданные tests архивируются.",
+      "item": [
+        {
+          "name": "Create disposable draft",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"Sandbox TestId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"sandboxTestId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman cleanup {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read disposable editor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"sandboxEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 0 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/editor"
+          }
+        },
+        {
+          "name": "Add disposable question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"Sandbox QuestionId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"sandboxQuestionId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{sandboxEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Disposable question\",\n  \"type\": 1,\n  \"points\": 1,\n  \"order\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Refresh disposable ETag after question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"sandboxEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/editor"
+          }
+        },
+        {
+          "name": "Add disposable option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const payload = pm.response.json();",
+                  "const value = typeof payload === \"string\" ? payload : (payload && (payload.value || payload.Value));",
+                  "pm.test(\"Sandbox AnswerOptionId is returned\", () => {",
+                  "  pm.expect(value).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);",
+                  "});",
+                  "pm.environment.set(\"sandboxOptionId\", value);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{sandboxEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/questions/{{sandboxQuestionId}}/options",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Disposable option\",\n  \"isCorrect\": true,\n  \"order\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Refresh disposable ETag after option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"sandboxEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/editor"
+          }
+        },
+        {
+          "name": "Remove disposable option",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{sandboxEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/questions/{{sandboxQuestionId}}/options/{{sandboxOptionId}}"
+          }
+        },
+        {
+          "name": "Refresh disposable ETag after option removal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"sandboxEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/editor"
+          }
+        },
+        {
+          "name": "Remove disposable question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{sandboxEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/questions/{{sandboxQuestionId}}"
+          }
+        },
+        {
+          "name": "Refresh disposable ETag after question removal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"sandboxEtag\", etag);",
+                  "pm.test(\"Editor status is 0\", () => pm.expect(editor.status).to.eql(0));",
+                  "pm.test(\"Editor contains 0 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/editor"
+          }
+        },
+        {
+          "name": "Archive disposable draft",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{sandboxEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{sandboxTestId}}/archive",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Refresh main test ETag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "const editor = pm.response.json();",
+                  "const etag = pm.response.headers.get(\"ETag\");",
+                  "pm.test(\"Strong numeric ETag is returned\", () => {",
+                  "  pm.expect(etag).to.match(/^\"\\d+\"$/);",
+                  "  pm.expect(editor.concurrencyVersion).to.eql(Number(etag.slice(1, -1)));",
+                  "});",
+                  "pm.environment.set(\"testEtag\", etag);",
+                  "pm.test(\"Editor status is 1\", () => pm.expect(editor.status).to.eql(1));",
+                  "pm.test(\"Editor contains 1 question(s)\", () => pm.expect(editor.questions).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/editor"
+          }
+        },
+        {
+          "name": "Archive main test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{testEtag}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests/{{testId}}/archive",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List archived tests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Both Postman tests are archived\", () => pm.expect(pm.response.json().totalCount).to.eql(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authorToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/tests?status=Archived&search={{runId}}&page=1&pageSize=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 — Dead-letter actions (manual opt-in)",
+      "description": "Запрос detail выполняется при найденном dead letter. Requeue/discard требуют явных отдельных ID в environment и поэтому безопасно пропускаются в обычном прогоне.",
+      "item": [
+        {
+          "name": "Read dead-letter detail when available",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"deadLetterEventId\")) { console.warn(\"No deadLetterEventId; request skipped.\"); pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/operations/outbox/dead-letters/{{deadLetterEventId}}"
+          }
+        },
+        {
+          "name": "Requeue dead letter — explicit opt-in",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"deadLetterRequeueEventId\")) { console.warn(\"Set deadLetterRequeueEventId to opt in; request skipped.\"); pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/operations/outbox/dead-letters/{{deadLetterRequeueEventId}}/requeue",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Manual Postman recovery test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Discard dead letter — explicit opt-in",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"deadLetterDiscardEventId\")) { console.warn(\"Set deadLetterDiscardEventId to opt in; request skipped.\"); pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Correlation-ID is returned\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/operations/outbox/dead-letters/{{deadLetterDiscardEventId}}/discard",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Manual Postman discard test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

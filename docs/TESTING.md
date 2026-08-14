@@ -18,13 +18,34 @@
 
 ## 2. Test suites
 
-Solution содержит три test projects:
+Solution содержит три .NET test projects:
 
 ```text
 tests/TestApp.Domain.Tests
 tests/TestApp.Application.Tests
 tests/TestApp.IntegrationTests
 ```
+
+Репозиторий также содержит отдельный импортируемый API test project:
+
+```text
+tests/TestApp.Postman
+```
+
+Он включает Postman Collection v2.1, local environment, dependency-free validator и Newman CI. Collection использует real Keycloak fixture users и выполняет сквозной author -> admin -> student -> reviewer/operations flow по canonical `/api/v1`.
+
+### Postman/Newman coverage
+
+- health и OpenAPI;
+- получение JWT для `author`, `admin`, `student`;
+- все реализованные canonical API routes;
+- ETag/If-Match и idempotency replay/fingerprint;
+- authorization/validation/precondition negative paths;
+- single/bulk assignments, attempt submit/timeout и reviewer projections;
+- audit/Outbox reads;
+- dead-letter detail/requeue/discard как manual opt-in operations.
+
+Запуск и data-cleanup описаны в [`tests/TestApp.Postman/README.md`](../tests/TestApp.Postman/README.md).
 
 ## 3. Domain tests
 
@@ -281,6 +302,8 @@ GitHub Actions `dotnet` workflow:
 Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
 
 Отдельный `performance` workflow поднимает production-shaped API/PostgreSQL/RabbitMQ/Keycloak stack, получает real JWT и проверяет k6 HTTP scenarios, expiration storm и Outbox recovery.
+
+Отдельный `postman` workflow валидирует importable artifacts, поднимает тот же local stack и запускает полный Postman API contract через Newman. JUnit report сохраняется как Actions artifact.
 
 ### Merge/release gate
 
