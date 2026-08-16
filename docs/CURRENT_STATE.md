@@ -22,12 +22,12 @@ Identity source of truth — Keycloak. TestApp не создаёт локаль�
 - question/answer-option CRUD и reorder;
 - `SingleChoice` и `MultipleChoice`;
 - публикация;
-- immutable revision history;
+- неизменяемая история ревизий;
 - архивирование;
 - owner-scoped catalog, editor и revision list;
-- admin global scope.
+- глобальная область видимости администратора.
 
-### 2.2 Publication model
+### 2.2 Модель публикации
 
 - `Draft -> Published`;
 - изменение опубликованного working definition возвращает его в `Draft`;
@@ -36,7 +36,7 @@ Identity source of truth — Keycloak. TestApp не создаёт локаль�
 - Archived test заблокирован для изменения/публикации;
 - revision snapshot содержит title/settings/questions/options/correctness.
 
-### 2.3 Ownership boundary
+### 2.3 Граница владения
 
 `Test.OwnerId` является обязательным non-null external user ID.
 
@@ -44,10 +44,10 @@ Identity source of truth — Keycloak. TestApp не создаёт локаль�
 
 - catalog;
 - editor;
-- revision list;
+- список ревизий;
 - rename/settings/questions/options;
 - publish/archive;
-- reviewer result list/detail.
+- список и детали результатов для рецензента.
 
 `test-admin` имеет global scope.
 
@@ -57,44 +57,44 @@ Migration существующих tests использует специальн
 
 - назначение конкретной immutable revision;
 - target user или group;
-- availability window;
-- optional attempt limit;
-- cancel audit;
+- окно доступности;
+- необязательный лимит попыток;
+- аудит отмены;
 - изменение window/attempt-limit;
 - bulk assignment до 500 targets;
-- deduplication targets;
-- admin list/detail/statistics;
+- дедупликация целей;
+- список, детали и статистика для администратора;
 - student visibility по direct target или group claims.
 
 ### 2.5 Attempts
 
-- target/availability/attempt-limit validation;
-- idempotent start;
+- проверка цели, доступности и лимита попыток;
+- идемпотентный старт;
 - deadline из revision snapshot;
 - answer/clear/submit;
-- ownership attempt;
-- background expiration;
+- владение попыткой;
+- фоновое истечение;
 - `Submitted`/`TimedOut`;
 - `Passed`/`Failed`;
-- exact-set scoring;
-- reviewer correctness detail;
+- оценивание по точному совпадению набора;
+- детализация правильности для рецензента;
 - student-safe result без correct flags;
 - student-safe presentation попытки (вопросы/варианты из immutable revision + собственные ответы + `serverTime`) и resume активной попытки — `ATT-010`/`ATT-011`/`UX-001`, ADR-028.
 
 ## 3. Persistence и consistency
 
-- PostgreSQL **18** runtime/CI baseline;
-- EF Core 10.0.11 + Npgsql EF provider 10.0.3;
-- generated PostgreSQL baseline migration + model snapshot;
+- PostgreSQL **18** как baseline для runtime и CI;
+- EF Core 10.0.11 + провайдер Npgsql EF 10.0.3;
+- сгенерированная базовая миграция PostgreSQL + снимок модели;
 - production `--migrate` mode;
 - startup migration разрешена только Development;
 - optimistic concurrency через `ConcurrencyVersion`;
 - `DbUpdateConcurrencyException -> ConcurrencyConflictException`;
-- normalized attempt responses;
-- immutable revision questions JSON snapshot;
+- нормализованные ответы попытки;
+- неизменяемый JSON-снимок вопросов ревизии;
 - session-level PostgreSQL advisory locks для common idempotency, Outbox и retention.
 
-## 4. HTTP optimistic concurrency
+## 4. Оптимистичный контроль параллельного доступа по HTTP
 
 Для mutable authoring resource `Test` реализован HTTP precondition contract.
 
@@ -106,21 +106,21 @@ Migration существующих tests использует специальн
 Mutating endpoints существующего `Test` требуют `If-Match`:
 
 - rename/settings;
-- question/option CRUD/reorder;
+- CRUD и переупорядочивание вопросов и вариантов;
 - publish;
 - archive.
 
 Semantics:
 
 - отсутствует `If-Match` -> `428 concurrency.precondition_required`;
-- malformed/weak/wildcard validator -> `400 concurrency.if_match`;
-- stale ETag -> `412 concurrency.precondition_failed`;
+- некорректный, слабый или wildcard-валидатор -> `400 concurrency.if_match`;
+- устаревший ETag -> `412 concurrency.precondition_failed`;
 - valid current ETag -> use case выполняется;
 - EF concurrency token остаётся финальным race guard между precondition check и commit.
 
 ## 5. Idempotency
 
-### 5.1 HTTP contract
+### 5.1 HTTP-контракт
 
 Основной public contract — header:
 
@@ -136,7 +136,7 @@ Legacy body `idempotencyKey` временно поддерживается.
 400 idempotency.key_mismatch
 ```
 
-### 5.2 Request fingerprint
+### 5.2 Отпечаток запроса
 
 Persistent idempotency rows содержат SHA-256 fingerprint логического request payload.
 
@@ -153,21 +153,21 @@ Actor-scoped lookup уже созданного start attempt выполняет
 
 ## 6. Authentication/authorization
 
-- Keycloak JWT Bearer;
+- JWT Bearer через Keycloak;
 - `MapInboundClaims=false`;
-- `sub` — external identity;
-- `roles` — role claim;
-- `groups` — group membership;
+- `sub` — внешняя идентичность;
+- `roles` — claim ролей;
+- `groups` — членство в группах;
 - policies `tests:write`, `tests:publish`, `tests:assign`, `results:review`, `operations:read`;
 - coarse role checks дополняются owner/attempt/assignment business authorization в Application/read side.
 
-## 7. Production configuration & edge security
+## 7. Production-конфигурация и защита периметра
 
 Phase A реализована.
 
-### Fail-fast configuration
+### Конфигурация с ранним отказом
 
-Outside Development:
+Вне окружения Development:
 
 - `ConnectionStrings:Database` обязателен;
 - startup migrations запрещены;
@@ -179,25 +179,25 @@ Outside Development:
 
 Migration-only `--migrate` загружает только database configuration (`RuntimeConfiguration.LoadDatabase`); Keycloak/RabbitMQ/worker/CORS/rate-limit/OpenAPI/transport-security/reverse-proxy loaders и связанные DI-регистрации пропускаются, так что независимый production migration job не должен получать эти secrets/config.
 
-### Reverse proxy
+### Обратный прокси
 
-- ForwardedHeaders opt-in;
+- ForwardedHeaders включаются явно;
 - explicit `KnownProxies/KnownNetworks`;
 - ForwardLimit;
 - untrusted X-Forwarded-* игнорируется.
 
-### CORS/transport headers
+### CORS и транспортные заголовки
 
 - CORS только explicit allow-list;
 - wildcard origin запрещён;
-- optional credentials;
-- configurable HTTPS redirect/HSTS;
+- необязательная передача учётных данных;
+- настраиваемые перенаправление на HTTPS и HSTS;
 - Kestrel server header выключен;
-- security headers baseline: `nosniff`, `DENY`, `no-referrer`, Permissions-Policy, restrictive CSP.
+- базовые заголовки безопасности: `nosniff`, `DENY`, `no-referrer`, Permissions-Policy, ограничительный CSP.
 
-### Rate limiting
+### Ограничение частоты запросов
 
-Configuration-driven classes:
+Классы, задаваемые конфигурацией:
 
 - general;
 - student-write;
@@ -206,7 +206,7 @@ Configuration-driven classes:
 
 Partition key = authenticated `sub`, иначе trusted remote IP.
 
-### OpenAPI exposure
+### Публикация OpenAPI
 
 - Development: enabled/public по умолчанию;
 - Production: disabled по умолчанию;
@@ -214,14 +214,14 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 ## 8. Audit/correlation/observability
 
-- canonical `/api/v1/*` + legacy rewrite;
+- канонический `/api/v1/*` + переписывание легаси-путей;
 - configurable legacy lifecycle с `Deprecation`, optional `Sunset` и `410 api.version.retired`;
 - ProblemDetails;
 - `X-Correlation-ID`;
 - durable audit для state-changing HTTP methods без body/query/secrets;
-- OpenTelemetry ASP.NET Core/HttpClient/runtime;
+- OpenTelemetry для ASP.NET Core/HttpClient/runtime;
 - custom `TestApp.Operations` metrics для Outbox, expiration, retention и bounded API exception categories;
-- optional OTLP exporter;
+- необязательный экспортер OTLP;
 - Prometheus + Grafana в `compose.yaml` как local/CI metrics backend позади OTel Collector: dashboard (`TestApp Overview`) и alert rule expressions (`deploy/prometheus/alerts.yml`, все технически выразимые правила `docs/SLO_ALERTS.md` §4) provisioned и CI-validated (ADR-027, `OBS-012`/`OBS-013`);
 - `/health/live`;
 - `/health/ready` PostgreSQL + RabbitMQ при enabled transport.
@@ -230,19 +230,19 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 ## 9. Events / Outbox / RabbitMQ
 
-- `IDomainEvent` — internal notification;
+- `IDomainEvent` — внутреннее уведомление;
 - только explicit `IIntegrationEvent` сохраняется в Outbox;
-- RabbitMQ transport opt-in;
-- publisher confirms;
-- durable topic exchange/persistent messages;
+- транспорт RabbitMQ включается явно;
+- подтверждения публикации;
+- durable topic-обменник и устойчивые сообщения;
 - EventId -> MessageId;
-- at-least-once delivery;
-- exponential retry/backoff;
-- dead-letter state;
+- доставка at-least-once;
+- экспоненциальные повторы с задержкой;
+- состояние dead-letter;
 - admin-only safe dead-letter detail/requeue/discard с mandatory reason и action audit;
-- PostgreSQL advisory lock per message;
-- operations Outbox monitoring endpoint;
-- RabbitMQ readiness.
+- advisory-блокировка PostgreSQL на каждое сообщение;
+- эксплуатационный эндпоинт мониторинга Outbox;
+- готовность RabbitMQ.
 
 **Ограничение:** production business integration-event catalog ещё не определён. Готовность transport не означает автоматическую публикацию всех domain events.
 
@@ -250,23 +250,23 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 ## 10. Deployment / CI
 
-- multi-stage production Docker image;
-- non-root runtime user;
-- Compose: API, PostgreSQL 18, RabbitMQ, Keycloak, migration container, OTEL Collector;
+- многоэтапный production Docker-образ;
+- запуск не от root;
+- Compose: API, PostgreSQL 18, RabbitMQ, Keycloak, контейнер миграций, OTEL Collector, Prometheus, Grafana;
 - CI использует реальные PostgreSQL/RabbitMQ;
-- PostgreSQL 18 runtime assertion;
+- проверка версии PostgreSQL 18 во время выполнения;
 - restore/build/tests;
-- high/critical NuGet vulnerability gate;
-- Compose validation;
-- production image build;
+- гейт уязвимостей NuGet уровня high/critical;
+- валидация Compose;
+- сборка production-образа;
 - `--migrate` из production image;
-- logical backup + isolated restore verification;
-- repository secret scan;
-- production-image HIGH/CRITICAL vulnerability scan;
-- CycloneDX SBOM artifact;
+- логическая резервная копия + проверка восстановления в изолированной базе;
+- сканирование репозитория на секреты;
+- сканирование production-образа на уязвимости HIGH/CRITICAL;
+- артефакт SBOM в формате CycloneDX;
 - importable Postman Collection v2.1 с real Keycloak author/admin/student flow;
 - Newman API contract workflow с JUnit artifact;
-- authenticated k6 + expiration/Outbox capacity workflow.
+- аутентифицированный k6 + workflow ёмкости истечения попыток и Outbox.
 
 ## 11. Главные оставшиеся ограничения
 
@@ -276,7 +276,7 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 90.3% (267 тестов) и закрыл четыре дефекта, найденных при чтении непокрытых участков: порядок проверок в `ReorderQuestion`/`ReorderAnswerOption` (404 вместо 409), смена типа вопроса в обход инварианта single-choice, отсутствие tie-breaker в audit pagination (пропуск STAB-006) и nullable-аннотация `Result.TryGetError`. Роль, определяющая owner-scope, консолидирована в одном месте. Детали — `docs/TESTING.md` §2/§14 и `CHANGELOG.md`.
 
-### Operational reliability
+### Эксплуатационная надёжность
 
 Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s. Дополнительно реализован и CI-validated local/CI observability backend — Prometheus + Grafana в `compose.yaml` (dashboard + alert rule expressions, `OBS-012`/`OBS-013`, ADR-027).
 
@@ -285,21 +285,21 @@ Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 
 - staging/platform restore drill с измеренным RTO;
 - alert routes (Alertmanager + pager/chat receiver) и alert drill против staging — rule expressions сами по себе уже реализованы и оцениваются в Prometheus, но никуда не маршрутизируются;
 - активный readiness prober (`blackbox_exporter` или аналог) для `/health/ready` — сейчас есть только metrics-pipeline health check;
-- deployment-owned secret store, backup scheduling/PITR/offsite policy;
-- rollback/forward-fix release rehearsal.
+- хранилище секретов на стороне развёртывания, расписание резервных копий, PITR и политика внешнего хранения;
+- репетиция релиза с откатом и исправлением вперёд.
 
-### Identity/product breadth
+### Идентичность и продуктовая широта
 
 Не реализованы:
 
 - multi-realm `(Issuer, Subject)`;
-- Workspace/multi-tenant model;
+- модель Workspace/мультиарендности;
 - frontend application (backend presentation/resume contract готов — `ATT-010`/`ATT-011`);
-- non-choice question types;
-- partial/custom scoring;
-- manual grading;
-- notification business events/consumers;
-- advanced analytics.
+- типы вопросов, отличные от выбора варианта;
+- частичное и настраиваемое оценивание;
+- ручная проверка;
+- бизнес-события уведомлений и их потребители;
+- расширенная аналитика.
 
 ## 12. Текущий архитектурный уровень
 
