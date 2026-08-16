@@ -1,6 +1,6 @@
 # Документация TestApp
 
-> Состояние документации: `beta-ddd`, baseline 2026-08-13. Persistence/runtime/CI контур переведён на PostgreSQL 18; exact-head evidence определяется последними GitHub Actions runs ветки.
+> Состояние документации: `beta-ddd`, baseline 2026-08-16. Persistence/runtime/CI контур переведён на PostgreSQL 18; exact-head evidence определяется последними GitHub Actions runs ветки.
 
 Этот каталог является навигационной точкой по архитектуре, бизнес-модели, API, persistence, безопасности, эксплуатации, тестированию и плану развития TestApp.
 
@@ -42,6 +42,7 @@
 | [DECISIONS.md](DECISIONS.md) | Зафиксированные архитектурные решения и сознательно неиспользуемые технологии |
 | [ROADMAP.md](ROADMAP.md) | Последовательная дорожная карта релизов и технических этапов |
 | [FEATURE_PLAN.md](FEATURE_PLAN.md) | Детальный каталог фич с ID, приоритетами, зависимостями и критериями готовности |
+| [CHANGELOG.md](../CHANGELOG.md) | Пользовательский changelog по версиям/фазам roadmap (Keep a Changelog + SemVer) |
 
 ## Технологический baseline
 

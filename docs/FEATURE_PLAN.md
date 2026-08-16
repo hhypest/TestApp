@@ -1061,7 +1061,11 @@ Automate Domain-no-EF/API and layer reference constraints.
 
 - **Priority:** P1 before 1.0
 - **Effort:** S
-- **Status:** PLANNED
+- **Status:** DONE
+
+`CHANGELOG.md` (repo root) реализован по формату Keep a Changelog + SemVer, с явно задокументированным отклонением: до первого git-тега версии совпадают с фазами `docs/ROADMAP.md` (`0.8.x` … `0.9.4`), а не с датами. Записи покрывают Phase A–D7 (включая все `STAB-001..008` и `API-009`), плюс открытый `[Unreleased]` раздел с оставшимися Phase E gaps. Conventional Commits prefixes рекомендованы (не обязательны) начиная с `1.0.0`.
+
+Отдельно от этой задачи остаётся rollback/forward-fix release runbook (ROADMAP.md item 10, вторая половина) — он требует staging rehearsal и не закрывается документацией changelog.
 
 ---
 

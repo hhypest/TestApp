@@ -281,7 +281,7 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 # 7. `1.0.0` — Phase E: Stabilization / production release candidate
 
 **Priority: P0**  
-**Status: IN PROGRESS — Phase D7 closed, items 13–15 done, 1–12 open**
+**Status: IN PROGRESS — Phase D7 closed, items 13–15 done, release-notes half of item 10 done (DEV-005), remainder of 1–12 open**
 
 До freeze 1.0 требуется:
 
@@ -294,7 +294,7 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 7. repeated green `dotnet`, `security`, `performance` pipelines;
 8. staging capacity target defined and met;
 9. integration-event catalog explicitly documented;
-10. release notes + rollback/forward-fix runbook;
+10. release notes (**DONE:** `CHANGELOG.md`, DEV-005) + rollback/forward-fix runbook (open — requires staging release rehearsal);
 11. dependency/container/SBOM evidence attached to release process;
 12. SLO dashboards/alerts exercised against staging;
 13. **DONE:** deterministic pagination order (`timestamp + ID`) на всех paged read models;
