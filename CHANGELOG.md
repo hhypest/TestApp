@@ -13,8 +13,8 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 - staging restore drill с измеренным RTO;
 - маршрутизация алертов в actionable destination (Alertmanager + pager/chat) и alert drill против staging;
 - активный readiness prober для `/health/ready` (например `blackbox_exporter`);
-- rollback/forward-fix release rehearsal;
-- staging capacity target;
+- репетиция релиза с откатом/исправлением вперёд;
+- целевые показатели ёмкости на staging;
 - формальная фиксация API v1 contract freeze.
 
 ### Added
@@ -38,7 +38,7 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 
 Документация: `docs/API.md` §14, `docs/USER_GUIDE.md` §4.3/§4.3.1 (раздел «ограничение реализации» заменён рабочей инструкцией), ADR-028.
 
-## [0.9.5] — Test coverage and review pass before 1.0 RC
+## [0.9.5] — Покрытие тестами и ревью перед 1.0 RC
 
 ### Fixed
 
@@ -54,14 +54,14 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 ### Added
 
 - Новый test project `tests/TestApp.Core.Tests` для `Result<TSuccess, TFailure>` — failure contract, через который выражены все domain/application правила.
-- Domain suites: `TestAuthoringInvariantTests`, `AttemptLifecycleTests`, `AssignmentLifecycleTests`, `PublishedRevisionScoringTests`.
+- Наборы Domain: `TestAuthoringInvariantTests`, `AttemptLifecycleTests`, `AssignmentLifecycleTests`, `PublishedRevisionScoringTests`.
 - Application suites: `AuthoringCommandTests`, `AssignmentAndAttemptCommandTests` (ownership, If-Match precondition, отсутствие commit при отклонённой команде).
 - Integration suites: `StudentReadModelQueryTests` (`/api/v1/me/*` и attempt detail/result — были 0%), `AuditTrailPaginationTests`.
 - `coverlet.collector` во всех test projects, чтобы покрытие было воспроизводимо.
 
 Итог: 98 -> 267 тестов, line coverage 81.1% -> 90.3% (Core 47.5% -> 96.7%, Domain 75.8% -> 93.8%, Application 67.4% -> 90.3%). Подробности и оставшиеся gaps — `docs/TESTING.md` §2 и §14.
 
-## [0.9.4] — Phase D7: Correctness/stabilization fixes
+## [0.9.4] — Фаза D7: исправления корректности и стабилизация
 
 ### Fixed
 
@@ -77,7 +77,7 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 
 - Publish/start-attempt/submit-attempt принимают настоящий zero-length HTTP body при валидном заголовке `Idempotency-Key` — легаси JSON-тело больше не обязательно (`API-009`).
 
-## [0.9.3] — Phase D: Operational reliability
+## [0.9.3] — Фаза D: эксплуатационная надёжность
 
 ### Added
 
@@ -88,7 +88,7 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 - Отдельный `security` CI workflow: secret scan, HIGH/CRITICAL сканирование production-образа, CycloneDX SBOM (D5).
 - `performance` CI workflow: authenticated k6-сценарии против production-shaped stack (API + PostgreSQL + RabbitMQ + Keycloak), пороги p95 по HTTP-сценариям и by worker recovery (expiration storm, Outbox backlog) (D6).
 
-## [0.9.2] — Phase C: API contract maturity
+## [0.9.2] — Фаза C: зрелость контракта API
 
 ### Added
 
@@ -98,7 +98,7 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 - Обогащённый OpenAPI: Bearer security scheme, стабильные operation ID, ProblemDetails-схемы, enum/examples, serialized contract test.
 - Управляемый lifecycle legacy `/api/*`: enable/disable, `Deprecation`/`Sunset` заголовки, `410 api.version.retired` после retirement.
 
-## [0.9.1] — Phase B: Resource ownership
+## [0.9.1] — Фаза B: владение ресурсами
 
 ### Added
 
@@ -106,17 +106,17 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 - Owner-scoped SQL-фильтрация каталога/редактора/revision list/reviewer результатов для `test-author`; global scope для `test-admin`.
 - Safe legacy backfill (`__legacy_admin_only__`) для существующих записей при миграции модели владения.
 
-## [0.9.0] — Phase A: Production configuration & edge security
+## [0.9.0] — Фаза A: production-конфигурация и защита периметра
 
 ### Added
 
 - Fail-fast production-конфигурация: обязательный `ConnectionStrings:Database` вне Development, запрет startup-миграций вне Development, `--migrate` как отдельный режим.
 - Explicit CORS allow-list (без wildcard), настраиваемая HTTPS/HSTS политика, security headers, отключённый Kestrel server banner.
-- Class-based rate limiting (general/student-write/privileged-read/operations).
+- Классовое ограничение частоты запросов (general/student-write/privileged-read/operations).
 - Production OpenAPI отключён по умолчанию / опционально защищён ролью.
 - High/critical NuGet audit gate в CI.
 
-## [0.8.x] — Core architecture baseline
+## [0.8.x] — Базовая архитектура ядра
 
 ### Added
 
@@ -124,10 +124,10 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 - `Test` aggregate: авторинг, `SingleChoice`/`MultipleChoice`, публикация с валидацией, exact-set scoring.
 - Immutable `PublishedTestRevision`.
 - User/group assignments: окно доступности, лимит попыток, bulk assignment.
-- Attempt lifecycle: start/answer/clear/submit/timeout.
-- Reviewer/admin/student read model.
+- Жизненный цикл попытки: старт/ответ/очистка/отправка/таймаут.
+- Модель чтения для рецензента/администратора/студента.
 - Транзакционный Outbox + RabbitMQ transport.
-- Keycloak authentication/roles/groups.
+- Аутентификация, роли и группы Keycloak.
 - Docker/Compose с migration-only режимом запуска.
 - Интеграционные тесты против реальных PostgreSQL/RabbitMQ.
 

@@ -19,54 +19,54 @@ correctness & data isolation
 
 ---
 
-# 1. `0.8.x` — Core architecture baseline
+# 1. `0.8.x` — Базовая архитектура ядра
 
-**Status: DONE**
+**Статус: ГОТОВО**
 
 Реализовано:
 
-- modular monolith / Clean Architecture / DDD / CQRS;
+- модульный монолит / Clean Architecture / DDD / CQRS;
 - Test aggregate и controlled authoring;
-- immutable PublishedTestRevision;
-- SingleChoice / MultipleChoice publication validation;
-- exact-set scoring;
-- user/group assignments, windows, attempt limits, bulk assignment;
-- attempt start/answer/clear/submit/timeout;
-- reviewer/admin/student read models;
-- PostgreSQL 18 runtime/CI baseline;
-- Keycloak authentication/roles/groups;
-- transactional Outbox + RabbitMQ transport;
-- Docker/Compose + migration-only startup;
-- real PostgreSQL/RabbitMQ integration tests.
+- неизменяемая `PublishedTestRevision`;
+- валидация публикации для `SingleChoice` / `MultipleChoice`;
+- оценивание по точному совпадению набора;
+- назначения на пользователя/группу, окна доступности, лимиты попыток, массовое назначение;
+- старт/ответ/очистка/отправка/таймаут попытки;
+- модели чтения для рецензента/администратора/студента;
+- PostgreSQL 18 как baseline для runtime и CI;
+- аутентификация, роли и группы Keycloak;
+- транзакционный Outbox + транспорт RabbitMQ;
+- Docker/Compose + запуск в режиме только миграций;
+- интеграционные тесты против реальных PostgreSQL/RabbitMQ.
 
 ---
 
-# 2. `0.9.0` — Phase A: Production configuration & edge security
+# 2. `0.9.0` — Фаза A: production-конфигурация и защита периметра
 
-**Priority: P0**
-**Status: DONE**
+**Приоритет: P0**
+**Статус: ГОТОВО**
 
 Реализовано:
 
-- fail-fast production configuration;
+- production-конфигурация с ранним отказом;
 - отсутствие production fallback DB credentials;
 - `--migrate` вместо startup migrations outside Development;
-- trusted reverse-proxy configuration;
-- explicit CORS allow-list;
-- configurable HTTPS/HSTS policy;
-- security headers + disabled Kestrel server banner;
-- class-based rate limiting;
-- production OpenAPI disabled by default / optionally admin protected;
-- high/critical NuGet audit gate.
+- конфигурация доверенного обратного прокси;
+- явный список разрешённых источников CORS;
+- настраиваемая политика HTTPS/HSTS;
+- заголовки безопасности + отключённый баннер сервера Kestrel;
+- классовое ограничение частоты запросов;
+- OpenAPI в production выключен по умолчанию / опционально защищён ролью администратора;
+- гейт аудита NuGet по уязвимостям high/critical.
 
-**Exit gate: PASSED.**
+**Выходной гейт: ПРОЙДЕН.**
 
 ---
 
-# 3. `0.9.1` — Phase B: Resource ownership
+# 3. `0.9.1` — Фаза B: владение ресурсами
 
-**Priority: P0**
-**Status: DONE**
+**Приоритет: P0**
+**Статус: ГОТОВО**
 
 Текущая single-organization модель:
 
@@ -76,64 +76,64 @@ Test.OwnerId = Keycloak sub создавшего автора
 
 Реализовано:
 
-- immutable mandatory `OwnerId`;
+- неизменяемый обязательный `OwnerId`;
 - owner checks в Application write boundary;
 - owner SQL filtering для catalog/editor/revisions/reviewer list/detail;
-- `test-admin` global scope;
-- safe legacy backfill `__legacy_admin_only__`;
+- глобальная область видимости для `test-admin`;
+- безопасное заполнение легаси-записей значением `__legacy_admin_only__`;
 - cross-author E2E, включая reviewer correctness isolation.
 
-**Exit gate: PASSED.**
+**Выходной гейт: ПРОЙДЕН.**
 
 ---
 
-# 4. `0.9.2` — Phase C: API contract maturity
+# 4. `0.9.2` — Фаза C: зрелость контракта API
 
-**Priority: P0/P1**  
-**Status: DONE**
+**Приоритет: P0/P1**  
+**Статус: ГОТОВО**
 
-## C1. Standard Idempotency-Key — DONE
+## C1. Стандартный Idempotency-Key — ГОТОВО
 
-- primary retry contract: `Idempotency-Key` header;
-- transitional body compatibility;
-- header/body mismatch -> `400 idempotency.key_mismatch`;
-- canonical SHA-256 request fingerprint;
-- same key + different logical request -> `409 idempotency.key_reused`;
-- distributed PostgreSQL advisory lock;
-- publish/single assignment/bulk assignment/submit covered.
+- основной контракт повтора — заголовок `Idempotency-Key`;
+- переходная совместимость с ключом в теле запроса;
+- расхождение заголовка и тела -> `400 idempotency.key_mismatch`;
+- канонический SHA-256 отпечаток запроса;
+- тот же ключ + другой логический запрос -> `409 idempotency.key_reused`;
+- распределённая advisory-блокировка PostgreSQL;
+- покрыты публикация, одиночное и массовое назначение, отправка попытки.
 
 Phase C завершила header resolution/fingerprint contract. Настоящий zero-length body для no-payload publish/start/submit закрыт в `0.9.4` (API-009): request DTO параметр nullable, key только в header достаточен.
 
-## C2. HTTP optimistic concurrency — DONE
+## C2. HTTP optimistic concurrency — ГОТОВО
 
-- editor returns `ConcurrencyVersion` + strong `ETag`;
-- Test mutations require `If-Match`;
+- редактор возвращает `ConcurrencyVersion` + строгий `ETag`;
+- изменения `Test` требуют `If-Match`;
 - missing -> `428`;
 - malformed/weak/wildcard -> `400`;
 - stale -> `412`;
-- DB race remains protected by EF concurrency token -> `409`.
+- гонка на уровне БД остаётся защищена токеном параллельного доступа EF -> `409`.
 
-## C3. Validation normalization — DONE
+## C3. Нормализация валидации — ГОТОВО
 
-- malformed route/query/body -> stable `400 request.invalid`;
-- DataAnnotations-based DTO boundary validation;
-- undefined enum protection;
-- stable `400 request.validation` + structured errors;
-- domain max-length/type invariants aligned with persistence.
+- некорректные путь/строка запроса/тело -> стабильный `400 request.invalid`;
+- валидация границы DTO на основе DataAnnotations;
+- защита от неопределённых значений перечислений;
+- стабильный `400 request.validation` + структурированные ошибки;
+- доменные инварианты длины и типов согласованы с хранилищем.
 
-## C4. OpenAPI quality — DONE
+## C4. Качество OpenAPI — ГОТОВО
 
-- Bearer security scheme;
-- stable operation IDs, summaries/descriptions;
-- authorization requirements;
-- documented Idempotency-Key / If-Match / ETag;
-- ProblemDetails responses;
-- enum/examples metadata;
-- serialized OpenAPI contract test.
+- схема безопасности Bearer;
+- стабильные идентификаторы операций, краткие и подробные описания;
+- требования авторизации;
+- задокументированные `Idempotency-Key` / `If-Match` / `ETag`;
+- ответы в формате ProblemDetails;
+- метаданные перечислений и примеров;
+- контрактный тест сериализованного документа OpenAPI.
 
-## C5. API version lifecycle — DONE
+## C5. Жизненный цикл версий API — ГОТОВО
 
-Canonical path:
+Канонический путь:
 
 ```text
 /api/v1/*
@@ -141,106 +141,106 @@ Canonical path:
 
 Legacy `/api/*` compatibility является управляемым lifecycle layer:
 
-- configurable enable/disable;
+- настраиваемое включение/отключение;
 - RFC-style `Deprecation` header;
 - optional `Sunset`;
 - retirement -> `410 api.version.retired`;
-- lifecycle boundary E2E.
+- сквозные тесты границы жизненного цикла.
 
-**Exit gate Phase C: PASSED.**
+**Выходной гейт фазы C: ПРОЙДЕН.**
 
 ---
 
-# 5. `0.9.3` — Phase D: Operational reliability
+# 5. `0.9.3` — Фаза D: эксплуатационная надёжность
 
-**Priority: P0/P1**  
-**Status: DONE — D1..D6 PASSED**
+**Приоритет: P0/P1**  
+**Статус: ГОТОВО — D1..D6 ПРОЙДЕНЫ**
 
-## D1. Backup / restore — DONE
+## D1. Резервное копирование и восстановление — ГОТОВО
 
 Реализовано:
 
-- logical PostgreSQL backup script;
-- PostgreSQL custom-format archive + SHA-256;
+- скрипт логического резервного копирования PostgreSQL;
+- архив PostgreSQL в custom-формате + SHA-256;
 - restore verification в отдельной database;
-- schema/table count + EF migration history verification;
-- application data marker verification;
-- CI restore drill;
-- documented baseline RPO/RTO expectations.
+- проверка схемы, количества таблиц и истории миграций EF;
+- проверка маркера прикладных данных;
+- учебное восстановление в CI;
+- задокументированные базовые ожидания RPO/RTO.
 
 Logical backup является portability/recovery baseline; более жёсткий production RPO требует provider-native snapshot/WAL/PITR.
 
-## D2. Retention / cleanup — DONE
+## D2. Сроки хранения и очистка — ГОТОВО
 
 Реализовано:
 
-- typed retention configuration;
-- bounded batch deletion;
-- DB-scoped advisory lock;
-- audit retention;
-- idempotency retention;
-- processed Outbox retention;
-- required cleanup indexes;
-- PostgreSQL safety regression tests.
+- типизированная конфигурация сроков хранения;
+- удаление ограниченными пакетами;
+- advisory-блокировка в области базы данных;
+- срок хранения аудита;
+- срок хранения записей идемпотентности;
+- срок хранения обработанных записей Outbox;
+- необходимые индексы для очистки;
+- регрессионные тесты безопасности на PostgreSQL.
 
 **Не удаляются автоматически:** pending, retrying и active dead-letter Outbox rows.
 
-## D3. Dead-letter management — DONE
+## D3. Управление dead-letter — ГОТОВО
 
 Реализовано:
 
 - admin-only safe detail без payload;
-- explicit requeue;
+- явная повторная постановка в очередь;
 - explicit discard как terminal state, не physical delete;
-- mandatory reason;
-- atomic manager audit: actor/action/reason/correlation;
+- обязательная причина;
+- атомарный аудит менеджера: актор/действие/причина/корреляция;
 - shared lock boundary с publisher;
 - API/PostgreSQL/OpenAPI E2E.
 
-## D4. SLO / operational metrics — DONE
+## D4. SLO и эксплуатационные метрики — ГОТОВО
 
 Реализовано:
 
 - `TestApp.Operations` Meter;
-- Outbox publish outcomes / delivery lag;
-- active dead-letter actions;
-- Outbox pending/dead-letter/oldest-age gauges;
-- attempt overdue/lag gauges;
-- expiration outcomes;
-- retention deleted counter;
-- bounded API exception categories;
-- OpenTelemetry registration;
+- результаты публикации Outbox и задержка доставки;
+- действия над активными dead-letter;
+- gauge-метрики Outbox: необработанные, dead-letter, возраст самого старого;
+- gauge-метрики просроченных попыток и отставания;
+- результаты истечения попыток;
+- счётчик записей, удалённых по сроку хранения;
+- ограниченный набор категорий API-исключений;
+- регистрация в OpenTelemetry;
 - `docs/SLO_ALERTS.md` с начальным alerting contract.
 
-## D5. Security / supply-chain CI — DONE
+## D5. CI безопасности и цепочки поставок — ГОТОВО
 
 Отдельный `security` workflow:
 
-- repository secret scan;
-- production-image HIGH/CRITICAL vulnerability gate;
-- CycloneDX image SBOM;
-- SBOM artifact retention;
+- сканирование репозитория на секреты;
+- гейт уязвимостей HIGH/CRITICAL в production-образе;
+- SBOM образа в формате CycloneDX;
+- хранение артефакта SBOM;
 - существующий NuGet high/critical gate остаётся в основном pipeline.
 
-## D6. Load / capacity regression — DONE
+## D6. Регрессия нагрузки и ёмкости — ГОТОВО
 
 Добавлено:
 
 - `.github/workflows/performance.yml`;
 - authenticated k6 через реальный local Keycloak;
-- production-shaped stack: API + PostgreSQL 18 + RabbitMQ + Keycloak;
-- performance-only rate-limit ceilings;
+- стек, приближенный к production: API + PostgreSQL 18 + RabbitMQ + Keycloak;
+- повышенные потолки rate limit только для нагрузочных прогонов;
 - scenario-specific p95 gates;
 - artifact `testapp-capacity-results`.
 
-HTTP critical scenarios:
+Критичные HTTP-сценарии:
 
-1. simultaneous attempt starts;
-2. answer write burst;
-3. bulk assignment creation;
-4. reviewer pagination.
+1. одновременные старты попыток;
+2. всплеск записи ответов;
+3. массовое создание назначений;
+4. постраничный обход результатов рецензентом.
 
-Worker critical scenarios:
+Критичные сценарии воркеров:
 
 5. expiration storm — overdue backlog должен drain до zero <= 30 s;
 6. Outbox backlog recovery — 100 synthetic messages должны пройти real RabbitMQ transport и стать processed <= 30 s.
@@ -251,16 +251,16 @@ Worker critical scenarios:
 
 **Phase D exit gate:** D6 green + основной `dotnet` и `security` workflows green на совместимом head.
 
-### Verification evidence
+### Свидетельства проверки
 
 PostgreSQL implementation commit `9916b98` прошёл полный `performance` run #9: 8771/8771 checks, HTTP failure rate 0, все scenario p95 ниже thresholds, expiration 1247 -> 0 за 14 s и Outbox 100 -> 0 за 1 s. `dotnet` и `security` на том же commit также green; D6 и Phase D exit gates выполнены.
 
 ---
 
-# 6. `0.9.4` — Phase D7: Correctness/stabilization fixes
+# 6. `0.9.4` — Фаза D7: исправления корректности и стабилизация
 
-**Priority: P0**
-**Status: DONE**
+**Приоритет: P0**
+**Статус: ГОТОВО**
 
 Перед 1.0 RC необходимо было закрыть findings текущего exact-head review:
 
@@ -274,29 +274,29 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 
 Дополнительно за рамками исходного findings review закрыт STAB-006/007/008 (deterministic pagination, SQL-side reviewer/admin queries, unified domain/application failure contract — см. `docs/DECISIONS.md` ADR-026).
 
-**Exit gate: PASSED.** Regression tests для пунктов 1–6 существуют, `dotnet`/`security`/`performance` green на HEAD `aa0752f`, D6 artifact пересобран на этом же head, открытых P0 correctness findings нет.
+**Выходной гейт: ПРОЙДЕН.** Regression tests для пунктов 1–6 существуют, `dotnet`/`security`/`performance` green на HEAD `aa0752f`, D6 artifact пересобран на этом же head, открытых P0 correctness findings нет.
 
 ---
 
-# 7. `1.0.0` — Phase E: Stabilization / production release candidate
+# 7. `1.0.0` — Фаза E: стабилизация / кандидат в production-релиз
 
-**Priority: P0**  
-**Status: IN PROGRESS — Phase D7 closed, items 13–15 done, release-notes half of item 10 done (DEV-005), local/CI half of item 12 done (OBS-012/013, ADR-027), remainder of 1–12 open**
+**Приоритет: P0**  
+**Статус: В РАБОТЕ — фаза D7 закрыта, пункты 13–15 готовы, из пункта 10 готова часть про release notes (DEV-005), из пункта 12 готова local/CI-часть (OBS-012/013, ADR-027), остальное из 1–12 открыто**
 
 До freeze 1.0 требуется:
 
-1. public API v1 contract freeze;
-2. zero open P0 security/data-isolation defects;
-3. repeat owner-isolation verification;
-4. migration verification from supported previous schema;
-5. no production dev credentials/fallbacks;
-6. demonstrated backup/restore;
-7. repeated green `dotnet`, `security`, `performance` pipelines;
-8. staging capacity target defined and met;
-9. integration-event catalog explicitly documented;
-10. release notes (**DONE:** `CHANGELOG.md`, DEV-005) + rollback/forward-fix runbook (open — requires staging release rehearsal);
-11. dependency/container/SBOM evidence attached to release process;
-12. SLO dashboards/alerts exercised against staging (**DONE locally/CI:** Prometheus + Grafana added to `compose.yaml`, dashboard + alert rule expressions implemented and CI-validated — OBS-012/OBS-013, ADR-027; still open — alert routing to an actionable destination, a readiness prober, and the staging drill itself, see `docs/SLO_ALERTS.md` §7);
+1. заморозка публичного контракта API v1;
+2. ноль открытых дефектов P0 по безопасности и изоляции данных;
+3. повторная проверка изоляции по владельцу;
+4. проверка миграции с поддерживаемой предыдущей схемы;
+5. отсутствие в production отладочных учётных данных и запасных значений;
+6. продемонстрированное резервное копирование и восстановление;
+7. повторно зелёные пайплайны `dotnet`, `security`, `performance`;
+8. определённые и достигнутые целевые показатели ёмкости на staging;
+9. явно задокументированный каталог интеграционных событий;
+10. release notes (**ГОТОВО:** `CHANGELOG.md`, DEV-005) + runbook отката/исправления вперёд (открыто — требует репетиции релиза на staging);
+11. свидетельства по зависимостям, контейнеру и SBOM приложены к процессу релиза;
+12. дашборды и алерты SLO отработаны против staging (**ГОТОВО локально/в CI:** Prometheus + Grafana добавлены в `compose.yaml`, дашборд и выражения правил алертов реализованы и проверяются в CI — OBS-012/OBS-013, ADR-027; остаётся открытым — маршрутизация алертов в actionable-назначение, readiness-пробер и сам drill на staging, см. `docs/SLO_ALERTS.md` §7);
 13. **DONE:** deterministic pagination order (`timestamp + ID`) на всех paged read models;
 14. **DONE:** reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;
 15. **DONE:** domain/application error и value-object invariants имеют единый ожидаемый failure contract (STAB-008, ADR-026).
@@ -305,11 +305,11 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 
 ---
 
-# 8. `1.1.x` — Phase F: Student journey & authoring productivity
+# 8. `1.1.x` — Фаза F: путь студента и продуктивность авторинга
 
-**Priority: P1**
+**Приоритет: P1**
 
-## F0. Student-safe attempt presentation/resume — **DONE**
+## F0. Безопасное для студента представление и возобновление попытки — **ГОТОВО**
 
 Первая product vertical после 1.0, реализована досрочно (ATT-010/ATT-011/UX-001, ADR-028):
 
@@ -319,50 +319,50 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 - **DONE:** resume активной попытки (`GET /api/v1/assignments/{id}/attempts/active`);
 - **DONE:** ownership/contract tests. OpenAPI документ генерируется автоматически и покрыт существующим `OpenApiContractTests`.
 
-## F1. Clone test / draft from revision
+## F1. Клонирование теста / черновик из revision
 
 Создание нового working test из immutable revision без ручного копирования.
 
-## F2. Tags / categories / enhanced search
+## F2. Теги / категории / расширенный поиск
 
 - tags;
 - category/subject;
-- indexed catalog filters.
+- индексированные фильтры каталога.
 
-## F3. Question bank — product decision required
+## F3. Банк вопросов — требуется продуктовое решение
 
 Если подтверждён reuse use case:
 
 - отдельный QuestionBankItem aggregate/read model;
-- explicit copy/reference semantics;
+- явная семантика копирования/ссылки;
 - PublishedTestRevision всё равно snapshot-ит content.
 
 ## F4. Import / export
 
 Начать с versioned JSON contract; CSV только для ограниченных choice scenarios.
 
-## F5. Draft validation endpoint
+## F5. Эндпоинт валидации черновика
 
 Получение publication errors без state mutation.
 
 ---
 
-# 9. `1.2.x` — Phase G: Advanced assessment behavior
+# 9. `1.2.x` — Фаза G: расширенное поведение оценивания
 
 **Priority: P1/P2**
 
 ## G1. Randomization
 
-- question order;
-- option order;
-- deterministic attempt seed;
-- historical presentation order reproducibility.
+- порядок вопросов;
+- порядок вариантов;
+- детерминированное зерно генерации для попытки;
+- воспроизводимость исторического порядка предъявления.
 
-## G2. Question pools
+## G2. Пулы вопросов
 
 Attempt snapshot выбранных question IDs + stable scoring maximum.
 
-## G3. Scoring strategies
+## G3. Стратегии оценивания
 
 Explicit versioned strategy, например:
 
@@ -370,19 +370,19 @@ Explicit versioned strategy, например:
 - PartialPositive;
 - будущие custom strategies.
 
-## G4. New question types
+## G4. Новые типы вопросов
 
 Рекомендуемая последовательность:
 
-1. Numeric / short deterministic answer;
-2. FreeText + manual grading;
+1. числовой / короткий детерминированный ответ;
+2. свободный текст + ручная проверка;
 3. Ordering;
 4. Matching;
-5. rich content / attachments.
+5. форматированный контент / вложения.
 
 Каждый тип получает собственную model/validation/scoring semantics; универсальный opaque JSON answer blob не вводится.
 
-## G5. Manual grading
+## G5. Ручная проверка
 
 Потребуется lifecycle:
 
@@ -394,15 +394,15 @@ Submitted -> AwaitingReview -> Graded
 
 ---
 
-# 10. `1.3.x` — Phase H: Assignment orchestration & notifications
+# 10. `1.3.x` — Фаза H: оркестрация назначений и уведомления
 
 **Priority: P1/P2**
 
-- reusable assignment campaigns/templates;
-- scheduling/activation UX;
-- business integration events: assignment created, deadline approaching, result completed;
-- optional notification consumer outside core transaction;
-- explicit decision: dynamic group membership vs snapshot membership at assignment time.
+- переиспользуемые кампании и шаблоны назначений;
+- планирование и активация со стороны интерфейса;
+- бизнес-события интеграции: назначение создано, дедлайн приближается, результат получен;
+- необязательный потребитель уведомлений вне основной транзакции;
+- явное решение: динамическое членство в группе или снимок членства на момент назначения.
 
 ---
 
@@ -410,30 +410,30 @@ Submitted -> AwaitingReview -> Graded
 
 **Priority: P1/P2**
 
-- completion/pass rate;
+- доля завершения и прохождения;
 - average/median/time-to-complete;
-- question difficulty by `(RevisionId, QuestionId)`;
-- authorized CSV/JSON export with audit;
-- projection/materialized analytics only after OLTP impact is measured.
+- сложность вопроса в разрезе `(RevisionId, QuestionId)`;
+- авторизованный экспорт CSV/JSON с аудитом;
+- проекции и материализованная аналитика только после измерения влияния на OLTP.
 
 ---
 
-# 12. `2.x` / business-triggered — Phase J: Workspace / multi-tenant evolution
+# 12. `2.x` / по бизнес-триггеру — Фаза J: развитие в сторону workspace / мультиарендности
 
 Не форсируется без требования нескольких организаций/isolated workspaces.
 
 При необходимости:
 
-- Workspace/Tenant aggregate;
-- memberships + workspace roles;
-- workspace-scoped tests/assignments/results;
+- агрегат Workspace/Tenant;
+- членства + роли внутри workspace;
+- тесты, назначения и результаты в области workspace;
 - `(Issuer, Subject)` identity;
-- tenant-aware idempotency/audit/events/rate limits;
-- export/delete policies.
+- идемпотентность, аудит, события и ограничения частоты с учётом арендатора;
+- политики экспорта и удаления.
 
 ---
 
-# 13. Phase K: Scale extraction triggers
+# 13. Фаза K: триггеры выделения сервисов при росте
 
 Microservices не являются roadmap milestone сами по себе.
 

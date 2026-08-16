@@ -4,26 +4,26 @@
 
 ## ADR-001 — Modular monolith вместо микросервисов
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** единый deployable backend с внутренними проектными/модульными границами.
+**Решение:** единый deployable backend с внутренними проектными/модульными границами.
 
-**Why:** текущий domain тесно связан транзакциями publication/assignment/attempt; нет независимых команд/scale profiles, оправдывающих distributed complexity.
+**Обоснование:** текущий domain тесно связан транзакциями publication/assignment/attempt; нет независимых команд/scale profiles, оправдывающих distributed complexity.
 
-**Consequences:**
+**Последствия:**
 
 - одна PostgreSQL transactional boundary;
 - проще consistency/migrations/testing;
 - modules должны сохранять dependency discipline;
 - service extraction только по реальному organizational/operational pressure.
 
-## ADR-002 — Clean dependency direction
+## ADR-002 — Чистое направление зависимостей
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** Domain не зависит от Infrastructure/API. Application зависит от Domain abstractions, Infrastructure реализует adapters, API является composition/transport boundary.
+**Решение:** Domain не зависит от Infrastructure/API. Application зависит от Domain abstractions, Infrastructure реализует adapters, API является composition/transport boundary.
 
-**Consequences:**
+**Последствия:**
 
 - Keycloak/EF/RabbitMQ не проникают в Domain;
 - domain tests быстрые;
@@ -31,28 +31,28 @@
 
 ## ADR-003 — DDD aggregates как write boundary
 
-**Status:** Accepted.
+**Статус:** принято.
 
-Aggregates:
+Агрегаты:
 
 - Test;
 - PublishedTestRevision;
 - TestAssignment;
 - TestAttempt.
 
-**Decision:** business state transitions выполняются через aggregate methods, а не arbitrary EF property setters/CRUD service.
+**Решение:** business state transitions выполняются через aggregate methods, а не arbitrary EF property setters/CRUD service.
 
-**Consequences:** invariants централизованы; optimistic concurrency привязана к aggregate mutation.
+**Последствия:** invariants централизованы; optimistic concurrency привязана к aggregate mutation.
 
-## ADR-004 — Immutable PublishedTestRevision
+## ADR-004 — Неизменяемая PublishedTestRevision
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** publication создаёт immutable snapshot. Assignment/Attempt ссылаются на revision ID, не на mutable Test.
+**Решение:** publication создаёт immutable snapshot. Assignment/Attempt ссылаются на revision ID, не на mutable Test.
 
-**Why:** historical result должен воспроизводиться после дальнейшего редактирования test definition.
+**Обоснование:** historical result должен воспроизводиться после дальнейшего редактирования test definition.
 
-**Consequences:**
+**Последствия:**
 
 - correctness history сохраняется;
 - editing Published Test возвращает working definition в Draft;
@@ -60,21 +60,21 @@ Aggregates:
 
 ## ADR-005 — Exact-set scoring для choice questions
 
-**Status:** Accepted current behavior; product extension allowed later.
+**Статус:** текущее поведение принято; продуктовое расширение допускается позже.
 
-**Decision:** question points начисляются только при полном совпадении selected set и correct set.
+**Решение:** question points начисляются только при полном совпадении selected set и correct set.
 
-**Consequences:** simple deterministic scoring; partial credit отсутствует.
+**Последствия:** simple deterministic scoring; partial credit отсутствует.
 
 При добавлении partial scoring нужна новая явная scoring strategy, а не silent изменение исторической semantics.
 
 ## ADR-006 — Keycloak является source of truth identity
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** TestApp не создаёт локальных users/passwords. Domain хранит внешние identity IDs.
+**Решение:** TestApp не создаёт локальных users/passwords. Domain хранит внешние identity IDs.
 
-**Consequences:**
+**Последствия:**
 
 - authentication делегирована OIDC/Keycloak;
 - system roles приходят claims;
@@ -83,13 +83,13 @@ Aggregates:
 
 ## ADR-007 — PostgreSQL как production persistence
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** PostgreSQL 18 runtime/CI baseline.
+**Решение:** PostgreSQL 18 как baseline для runtime и CI.
 
-**History:** SQLite development provider был удалён при переходе на MariaDB; затем MariaDB contract заменён PostgreSQL, а migrations rebased на PostgreSQL baseline.
+**История:** SQLite development provider был удалён при переходе на MariaDB; затем MariaDB contract заменён PostgreSQL, а migrations rebased на PostgreSQL baseline.
 
-**Consequences:**
+**Последствия:**
 
 - persistence tests выполняются на real PostgreSQL;
 - используются PostgreSQL advisory locks;
@@ -98,23 +98,23 @@ Aggregates:
 
 ## ADR-008 — EF Core 10/Npgsql 10 при net10.0 application
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** Infrastructure использует EF Core 10.0.11 + `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3; integration tests используют Npgsql 10.0.3; приложение таргетирует .NET 10.
+**Решение:** Infrastructure использует EF Core 10.0.11 + `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3; integration tests используют Npgsql 10.0.3; приложение таргетирует .NET 10.
 
-**Why:** это актуальная stable major line, соответствующая .NET 10. Microsoft EF Core packages и `dotnet-ef` выровнены на одной patch-версии; provider и driver используют последнюю стабильную версию своей 10.x line. Preview EF/Npgsql 11 исключены из production baseline.
+**Обоснование:** это актуальная stable major line, соответствующая .NET 10. Microsoft EF Core packages и `dotnet-ef` выровнены на одной patch-версии; provider и driver используют последнюю стабильную версию своей 10.x line. Preview EF/Npgsql 11 исключены из production baseline.
 
-**Compatibility gate:** repository проверяет отсутствие pending model changes, применение существующего baseline к пустой PostgreSQL 18 database, full integration suite и production-image migration path.
+**Гейт совместимости:** repository проверяет отсутствие pending model changes, применение существующего baseline к пустой PostgreSQL 18 database, full integration suite и production-image migration path.
 
-**Upgrade rule:** следующий provider/EF major обновляется отдельным compatibility step с review breaking changes и full migration/integration suite.
+**Правило обновления:** следующий provider/EF major обновляется отдельным compatibility step с review breaking changes и full migration/integration suite.
 
 ## ADR-009 — CQRS без отдельной read database
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** commands работают через aggregates/repositories; queries используют отдельные read DTO/projections, но читают ту же PostgreSQL.
+**Решение:** commands работают через aggregates/repositories; queries используют отдельные read DTO/projections, но читают ту же PostgreSQL.
 
-**Consequences:**
+**Последствия:**
 
 - CQRS separation без distributed consistency;
 - `AsNoTracking`, SQL filters/paging;
@@ -122,115 +122,115 @@ Aggregates:
 
 ## ADR-010 — Optimistic concurrency через aggregate version
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** `ConcurrencyVersion` — EF concurrency token, `Touch()` на mutation.
+**Решение:** `ConcurrencyVersion` — EF concurrency token, `Touch()` на mutation.
 
-**Consequences:** lost update -> conflict/HTTP 409; клиент перечитывает state.
+**Последствия:** lost update -> conflict/HTTP 409; клиент перечитывает state.
 
-## ADR-011 — Database-backed idempotency
+## ADR-011 — Идемпотентность на основе базы данных
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** retry-safe unsafe operations не полагаются на in-memory locks/cache.
+**Решение:** retry-safe unsafe operations не полагаются на in-memory locks/cache.
 
-General operations:
+Общие операции:
 
-- persistent result record;
+- устойчивая запись результата;
 - session-level PostgreSQL `pg_try_advisory_lock` distributed lease с explicit `pg_advisory_unlock`;
-- cache re-check inside lease.
+- повторная проверка кэша внутри аренды.
 
-Start attempt:
+Старт попытки:
 
-- domain-specific unique request key;
+- доменно-специфичный уникальный ключ запроса;
 - PostgreSQL advisory lease на assignment/user + transaction для replay/count/insert.
 
-**Consequences:** несколько API replicas имеют общую retry semantics.
+**Последствия:** несколько API replicas имеют общую retry semantics.
 
 ## ADR-012 — Transactional Outbox только для explicit integration events
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** `IDomainEvent` не публикуется наружу автоматически. Только `IIntegrationEvent` сохраняется в Outbox.
+**Решение:** `IDomainEvent` не публикуется наружу автоматически. Только `IIntegrationEvent` сохраняется в Outbox.
 
-**Why:** external event schema является API contract и не должна случайно совпадать с internal domain notification.
+**Обоснование:** external event schema является API contract и не должна случайно совпадать с internal domain notification.
 
-**Consequences:** transport может быть готов до определения внешнего event catalog; это допустимо.
+**Последствия:** transport может быть готов до определения внешнего event catalog; это допустимо.
 
 ## ADR-013 — RabbitMQ и at-least-once delivery
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** RabbitMQ transport opt-in; delivery guarantee — at-least-once.
+**Решение:** транспорт RabbitMQ включается явно; гарантия доставки — at-least-once.
 
-Mechanisms:
+Механизмы:
 
-- publisher confirms;
-- persistent messages;
+- подтверждения публикации;
+- устойчивые сообщения;
 - EventId -> MessageId;
 - retry/backoff/dead-letter;
-- Outbox advisory locks.
+- advisory-блокировки Outbox.
 
-**Consequences:** consumer обязан дедуплицировать EventId. Exactly-once не обещается.
+**Последствия:** consumer обязан дедуплицировать EventId. Exactly-once не обещается.
 
 ## ADR-014 — No-op Outbox publisher запрещён как success path
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** отсутствие configured transport означает отсутствие OutboxProcessor, а не `Publish => success`.
+**Решение:** отсутствие configured transport означает отсутствие OutboxProcessor, а не `Publish => success`.
 
-**Why:** no-op success помечал бы событие delivered, хотя оно потеряно.
+**Обоснование:** no-op success помечал бы событие delivered, хотя оно потеряно.
 
-## ADR-015 — Background timeout eventual processing
+## ADR-015 — Отложенная фоновая обработка таймаутов
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** deadline enforced:
+**Решение:** дедлайн обеспечивается:
 
 - синхронно на answer/submit;
 - background scan с default 30 sec cadence.
 
-**Consequences:** Attempt может оставаться `InProgress` небольшой интервал после deadline, но писать/submit после deadline нельзя; worker eventual фиксирует terminal state.
+**Последствия:** Attempt может оставаться `InProgress` небольшой интервал после deadline, но писать/submit после deadline нельзя; worker eventual фиксирует terminal state.
 
 ## ADR-016 — OpenTelemetry через стандартный OTLP
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** instrumentation остаётся vendor-neutral; exporter включается только при OTLP endpoint.
+**Решение:** instrumentation остаётся vendor-neutral; exporter включается только при OTLP endpoint.
 
-**Consequences:** backend можно менять без Domain/Application changes.
+**Последствия:** backend можно менять без Domain/Application changes.
 
 ## ADR-017 — Production migrations отдельным job
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** production API replicas не должны автоматически конкурировать за schema migrations. Используется тот же image с `--migrate`.
+**Решение:** production API replicas не должны автоматически конкурировать за schema migrations. Используется тот же image с `--migrate`.
 
-**Consequences:** deployment pipeline содержит explicit migration gate.
+**Последствия:** deployment pipeline содержит explicit migration gate.
 
 Migrate-only composition загружает только database configuration; Keycloak/RabbitMQ/CORS/rate-limit/proxy options не загружаются, так что job остаётся database-only.
 
-## ADR-018 — Canonical API path `/api/v1`
+## ADR-018 — Канонический путь API `/api/v1`
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** новые clients должны использовать `/api/v1`.
+**Решение:** новые clients должны использовать `/api/v1`.
 
 Legacy `/api/*` rewrite сохранён временно.
 
 ## ADR-019 — Legacy `/api/*` rewrite
 
-**Status:** Transitional.
+**Статус:** переходное.
 
-**Decision:** старые routes переписываются в canonical v1 до routing.
+**Решение:** старые routes переписываются в canonical v1 до routing.
 
 **Current lifecycle:** enable/disable configuration, `Deprecation`, optional `Sunset`, configured retirement -> `410 api.version.retired` реализованы.
 
 **Exit criteria:** telemetry/client migration и объявленная дата удаления rewrite.
 
-## ADR-020 — Body-based idempotency key
+## ADR-020 — Ключ идемпотентности в теле запроса
 
-**Status:** Superseded by standard `Idempotency-Key` header contract.
+**Статус:** заменено стандартным контрактом заголовка `Idempotency-Key`.
 
 **Historical decision:** commands первоначально принимали `idempotencyKey` в JSON request body.
 
@@ -238,49 +238,49 @@ Legacy `/api/*` rewrite сохранён временно.
 
 ## ADR-021 — Role authorization не заменяет resource ownership
 
-**Status:** Accepted; current `OwnerId` implementation complete for single-organization scope.
+**Статус:** принято; текущая реализация `OwnerId` полна для области одной организации.
 
-**Decision:** Keycloak roles — coarse permission. Resource ownership/eligibility должен проверяться отдельно.
+**Решение:** Keycloak roles — coarse permission. Resource ownership/eligibility должен проверяться отдельно.
 
-**Current implementation:** `Test.OwnerId = current Keycloak sub`, owner-scoped author/reviewer reads/writes, global `test-admin`, safe legacy backfill.
+**Текущая реализация:** `Test.OwnerId = текущий Keycloak sub`, чтение/запись автора и рецензента ограничены владельцем, глобальный `test-admin`, безопасное заполнение легаси-записей.
 
 **Remaining decision:** Workspace/Tenant/ACL и `(issuer, subject)` вводятся только при multi-organization/multi-realm requirement.
 
 ## ADR-022 — Не добавлять Event Sourcing без отдельной причины
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** current state persistence + domain events + Outbox достаточны.
+**Решение:** current state persistence + domain events + Outbox достаточны.
 
 Event Sourcing не нужен для:
 
 - revision history (она уже immutable snapshot);
-- audit HTTP operations;
-- integration delivery.
+- аудит HTTP-операций;
+- доставка интеграционных событий.
 
 ## ADR-023 — Не добавлять Redis/cache заранее
 
-**Status:** Accepted current policy.
+**Статус:** текущая политика принята.
 
-**Decision:** кеш/Redis вводится после profiling конкретного read/coordination bottleneck.
+**Решение:** кеш/Redis вводится после profiling конкретного read/coordination bottleneck.
 
 PostgreSQL уже обеспечивает consistency, idempotency locks и indexed read queries.
 
 ## ADR-024 — Не вводить отдельный broker кроме RabbitMQ без consumer requirement
 
-**Status:** Accepted.
+**Статус:** принято.
 
 Kafka/другой transport не добавляется «для универсальности». Event contracts должны зависеть от business boundary, а adapter к другому broker можно добавить позже.
 
-## ADR-025 — Documentation is part of Definition of Done
+## ADR-025 — Документация входит в Definition of Done
 
-**Status:** Accepted с созданием `docs/`.
+**Статус:** принято с созданием `docs/`.
 
-## ADR-026 — Business-rule invariants surface as `Result<T, DomainError>`, never raw exceptions (STAB-008)
+## ADR-026 — Инварианты бизнес-правил возвращаются как `Result<T, DomainError>`, а не как сырые исключения (STAB-008)
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** если invariant реально достижим через application-level use case (создание/изменение aggregate по command, вызванному из HTTP API), нарушение должно возвращаться как `Result<T, DomainError>` — как и остальные business rules того же метода — а не как брошенное `ArgumentException`/`ArgumentOutOfRangeException`.
+**Решение:** если invariant реально достижим через application-level use case (создание/изменение aggregate по command, вызванному из HTTP API), нарушение должно возвращаться как `Result<T, DomainError>` — как и остальные business rules того же метода — а не как брошенное `ArgumentException`/`ArgumentOutOfRangeException`.
 
 **Почему это стало отдельным решением:** до STAB-008 `Test.Normalize`/`NormalizeAnswerOptionText` и приватный конструктор `TestAssignment` кидали исключения для длины текста и порядка availability window/attempt limit — при этом те же самые правила уже были правильно реализованы как `Result`-возвращающие проверки в соседних методах того же агрегата (`TestAssignment.ChangeAvailability`/`ChangeAttemptLimit`). Это привело к трём наблюдаемым проблемам:
 
@@ -290,13 +290,13 @@ Kafka/другой transport не добавляется «для универс
 
 **Что осталось exceptions (сознательно, не рефакторится):** guard-инварианты, недостижимые при корректно сформированном caller — `ArgumentNullException` для `null` Id (`Entity.cs`), unreachable switch-default для exhaustive enum (`TestAssignment.cs`), length-проверки `ExternalUserId`/`ExternalGroupId`/`ValidateTargetId`, уже полностью покрытые `[Required]`/`[StringLength]` на HTTP DTO и не имеющие workaround-кода (try/catch или дублированной проверки) в вызывающем Application-коде. Критерий — не «достижимо ли сегодня через конкретный DTO», а «существует ли уже bridging-код (try/catch/дублированная проверка) вокруг этого throw», что и является надёжным сигналом накопленного technical debt.
 
-**Reference:** источник этого пункта — `docs/ROADMAP.md` Phase E, пункт 15 («domain/application error и value-object invariants имеют единый ожидаемый failure contract»), заведён как `STAB-008` в `docs/FEATURE_PLAN.md`.
+**Источник:** источник этого пункта — `docs/ROADMAP.md` Phase E, пункт 15 («domain/application error и value-object invariants имеют единый ожидаемый failure contract»), заведён как `STAB-008` в `docs/FEATURE_PLAN.md`.
 
-## ADR-027 — Prometheus + Grafana as the local/CI metrics backend, not Jaeger (`OBS-012`/`OBS-013`)
+## ADR-027 — Prometheus + Grafana как local/CI backend метрик вместо Jaeger (`OBS-012`/`OBS-013`)
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** `compose.yaml` gets `prometheus` and `grafana` services behind the existing OTel Collector. The collector's `metrics` pipeline gains a `prometheus` exporter (`0.0.0.0:8889`) in addition to `debug`; `traces` stays `debug`-only. Prometheus scrapes the collector and evaluates alert rules from `deploy/prometheus/alerts.yml`; Grafana is provisioned with a Prometheus datasource and the `TestApp Overview` dashboard (`deploy/grafana/dashboards/testapp-overview.json`).
+**Решение:** в `compose.yaml` добавляются сервисы `prometheus` и `grafana` позади существующего OTel Collector. В pipeline `metrics` коллектора добавляется экспортер `prometheus` (`0.0.0.0:8889`) в дополнение к `debug`; `traces` остаётся только с `debug`. Prometheus собирает метрики с коллектора и вычисляет правила алертов из `deploy/prometheus/alerts.yml`; Grafana разворачивается с источником данных Prometheus и дашбордом `TestApp Overview` (`deploy/grafana/dashboards/testapp-overview.json`).
 
 **Почему Prometheus/Grafana, а не Jaeger:** `docs/SLO_ALERTS.md` уже определял конкретные пороги (§4) и "dashboard minimum" (§6) до этого решения — то, что было не готово, это не список сигналов, а *место, куда их положить и с чем сравнивать*. Jaeger — backend для distributed tracing одного вида телеметрии (spans); он не даёт ни time-series хранилище для метрик, ни alerting engine, ни dashboarding. TestApp — modular monolith в одном процессе, поэтому distributed tracing сейчас имеет низкую практическую ценность (нет сложного multi-service call graph, который trace waterfall обычно объясняет), а alert/dashboard контракт из `SLO_ALERTS.md` уже написан в терминах метрик и порогов, не spans. Prometheus/Grafana закрывает именно этот, реально задокументированный пробел.
 
@@ -306,11 +306,11 @@ Kafka/другой transport не добавляется «для универс
 
 **Верификация:** метрика-по-метрике naming (dots→underscores, unit suffixes, `_total` для counters) проверена эмпирически — реальный `otel/opentelemetry-collector-contrib:0.157.0` прогнан с synthetic OTLP payloads, зеркалирующими точные instrument definitions из `TestApp.Infrastructure.Observability.OperationalMetrics`, а .NET runtime/ASP.NET Core metric names — реальным `net10.0` пробным приложением через актуальные `OpenTelemetry.Instrumentation.Runtime`/`AspNetCore` 1.17.0 пакеты, а не по памяти. `scripts/validate-observability-stack.sh` (CI workflow `observability`) держит это в проверенном состоянии на каждый релевантный push/PR: `promtool check config/rules`, Prometheus target health, наличие ожидаемых metric families, здоровье Grafana datasource и присутствие provisioned dashboard.
 
-## ADR-028 — Student-safe presentation is a projection boundary, not a storage boundary (ATT-010/011, UX-001)
+## ADR-028 — Безопасное для студента представление — граница проекции, а не хранилища (ATT-010/011, UX-001)
 
-**Status:** Accepted.
+**Статус:** принято.
 
-**Decision:** студенческий presentation contract (`GET /api/v1/attempts/{id}/presentation`, `GET /api/v1/assignments/{id}/attempts/active`) строится отдельным DTO-семейством (`AttemptPresentationView`/`AttemptQuestionView`/`AttemptAnswerOptionView`), у которого **нет** члена корректности. Reviewer-контракт (`ReviewerAnswerOptionView` с `IsCorrect`) остаётся отдельным типом; эти два семейства нельзя переиспользовать одно вместо другого.
+**Решение:** студенческий presentation contract (`GET /api/v1/attempts/{id}/presentation`, `GET /api/v1/assignments/{id}/attempts/active`) строится отдельным DTO-семейством (`AttemptPresentationView`/`AttemptQuestionView`/`AttemptAnswerOptionView`), у которого **нет** члена корректности. Reviewer-контракт (`ReviewerAnswerOptionView` с `IsCorrect`) остаётся отдельным типом; эти два семейства нельзя переиспользовать одно вместо другого.
 
 **Почему это ADR, а не деталь реализации:** `PublishedTestRevision.Questions` хранится как один `jsonb`-столбец `questions_json`, включающий `IsCorrect` каждого варианта. Значит EF материализует **весь answer key** в память при любом чтении revision, и никакая SQL-проекция не может его отфильтровать. Отсутствие корректности в ответе студенту — свойство ровно одного метода (`ReadModelQueries.ProjectAsync`), а не схемы БД и не типа запроса. Это принципиально слабее, чем защита на уровне хранилища: одна невнимательная правка DTO возвращает answer key в публичный ответ, и ничто в инфраструктуре этому не помешает.
 

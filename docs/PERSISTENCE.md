@@ -9,11 +9,11 @@
 - `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3;
 - Npgsql 10.0.3;
 - `UseNpgsql(connectionString)`;
-- application target — `net10.0`.
+- целевая платформа приложения — `net10.0`.
 
 EF/Npgsql находятся на stable major line 10, соответствующей application target `net10.0`. Все Microsoft EF Core packages и local `dotnet-ef` используют одинаковую patch-версию; prerelease line 11 не входит в runtime baseline. Следующий major upgrade должен выполняться отдельным compatibility change.
 
-Development connection:
+Строка подключения для разработки:
 
 ```text
 Host=localhost;Port=5432;Database=testapp;Username=testapp;Password=testapp;
@@ -21,29 +21,29 @@ Host=localhost;Port=5432;Database=testapp;Username=testapp;Password=testapp;
 
 Вне Development `ConnectionStrings:Database` обязателен; production credentials не хранятся в repository.
 
-## Source of truth
+## Источник истины
 
 PostgreSQL — единственный transactional store для mutable tests, immutable revisions, assignments, attempts/responses, idempotency records, Outbox, dead-letter actions и HTTP audit. Отдельной read database/cache layer сейчас нет.
 
-## Provider mappings
+## Сопоставление типов провайдера
 
-| .NET/domain value | PostgreSQL |
+| Значение .NET/домена | PostgreSQL |
 |---|---|
 | `Guid` и typed IDs | `uuid` |
 | `DateTimeOffset` | `timestamp with time zone` |
 | `bool` | `boolean` |
 | score/percentage | `numeric(precision, scale)` |
-| bounded strings | `character varying(n)` |
+| строки с ограничением длины | `character varying(n)` |
 | payload/result/error | `text` |
-| published questions snapshot | `jsonb` |
+| снимок опубликованных вопросов | `jsonb` |
 | enums | `integer` |
-| concurrency version | `bigint` |
+| версия параллельного доступа | `bigint` |
 
 Имена таблиц lower snake case. Property-derived column names сохраняют EF casing, поэтому raw PostgreSQL SQL должен quote такие identifiers.
 
 PostgreSQL `timestamptz` хранит instant, а не исходный timezone. Все сохраняемые `DateTimeOffset` канонизируются через `ToUniversalTime()`; API может принять эквивалентный ISO-8601 offset, но persisted/read representation имеет `+00:00`.
 
-## Schema invariants
+## Инварианты схемы
 
 ### Tests и revisions
 
@@ -53,14 +53,14 @@ PostgreSQL `timestamptz` хранит instant, а не исходный timezone
 
 ### Assignments и attempts
 
-Assignment indexes:
+Индексы назначений:
 
 ```text
 (TargetType, TargetId, Status)
 RevisionId
 ```
 
-Attempt indexes:
+Индексы попыток:
 
 ```text
 (AssignmentId, UserId)
@@ -77,9 +77,9 @@ Unique start key обеспечивает retry-safe start; attempt limit доп
 `idempotency_records`:
 
 - unique `(Operation, ActorId, RequestId)`;
-- optional SHA-256 request fingerprint;
-- serialized result;
-- `CreatedAt` retention index.
+- необязательный SHA-256 отпечаток запроса;
+- сериализованный результат;
+- индекс `CreatedAt` для очистки по сроку хранения.
 
 `outbox_messages` хранит delivery state; queue index покрывает:
 
@@ -114,7 +114,7 @@ dotnet ef migrations add <Name> \
 
 Переход EF/Npgsql 9 -> 10 не меняет текущую relational model, поэтому отдельная schema migration не создаётся. Baseline migration и её designer metadata сохраняют версию инструмента, которой они были сгенерированы; CI на EF Core 10 отдельно выполняет `migrations has-pending-model-changes`, а затем применяет baseline к пустой PostgreSQL 18 database из production image.
 
-Production migration-only mode:
+Production-режим только миграций:
 
 ```bash
 dotnet TestApp.Api.dll --migrate
@@ -158,7 +158,7 @@ UPDATE ... WHERE ConcurrencyVersion = old
 
 Attempt repository берёт session-level advisory lease на `(AssignmentId, UserId)`, затем в короткой transaction проверяет replay key, current count, limit и выполняет insert. Unique start index остаётся дополнительной race protection. Lease устраняет PostgreSQL SSI abort storm при одновременных стартах и действует между API replicas.
 
-## Distributed advisory locks
+## Распределённые advisory-блокировки
 
 Idempotency, Outbox и retention используют единый helper с session-level PostgreSQL locks:
 
@@ -170,20 +170,20 @@ SELECT pg_advisory_unlock(@key);
 Resource material включает database и namespace. SHA-256 детерминированно сокращается до signed 64-bit key. Dedicated Npgsql connection определяет lifetime; explicit unlock выполняется при dispose, а close остаётся safety net.
 
 - idempotency timeout — 30 секунд;
-- Outbox timeout — configured bounded value;
+- таймаут Outbox — настраиваемое ограниченное значение;
 - retention — immediate try, занятый цикл пропускается.
 
 Так replicas получают общую coordination semantics без Redis. Теоретическая 64-bit hash collision приводит к лишней сериализации, не к concurrent critical section.
 
-## Read-side policy
+## Политика стороны чтения
 
 Queries используют `AsNoTracking`, SQL-side filtering/count/order/paging, deterministic tie-breakers и не materialize `questions_json` без необходимости. High-cardinality paths требуют query-plan/performance evidence.
 
 ## Backup/restore
 
-Repository baseline:
+Baseline репозитория:
 
-- custom-format archive `pg_dump -Fc`;
+- архив в custom-формате `pg_dump -Fc`;
 - SHA-256 и `pg_restore --list` validation;
 - restore в disposable target;
 - table/migration counts и optional marker;
@@ -191,6 +191,6 @@ Repository baseline:
 
 Targets: RPO <= 24h, RTO <= 4h. Snapshots/WAL/PITR, encryption, offsite retention и measured staging restore — deployment responsibility. См. [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
-## PostgreSQL version policy
+## Политика версий PostgreSQL
 
 Baseline — PostgreSQL 18 stable. CI выполняет `SHOW server_version_num` и требует `>= 180000`. Перед major upgrade обязательны verified backup, isolated restore/upgrade, migration/integration/concurrency/lock/Outbox suites, production-image `--migrate` и performance evidence. Смена Docker tag не является production upgrade process.

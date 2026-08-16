@@ -19,59 +19,59 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 | ID | Feature | Status | Notes |
 |---|---|---|---|
-| CORE-001 | Test aggregate lifecycle | DONE | Draft/Published/Archived |
-| CORE-002 | Question authoring | DONE | add/update/remove/reorder |
-| CORE-003 | Answer option authoring | DONE | add/update/remove/reorder |
-| CORE-004 | SingleChoice | DONE | exactly one correct on publish |
-| CORE-005 | MultipleChoice | DONE | >=1 correct on publish |
-| CORE-006 | Test settings | DONE | pass percentage + time limit |
-| CORE-007 | Immutable published revision | DONE | JSON snapshot + version |
-| CORE-008 | Exact-set scoring | DONE | full points or zero per question |
-| CORE-009 | Test archive | DONE | terminal authoring state |
-| CAT-001 | Author catalog | DONE | search/status/paging |
-| CAT-002 | Revision list | DONE | immutable metadata |
-| ASSIGN-001 | User assignment | DONE | revision-scoped |
-| ASSIGN-002 | Group assignment | DONE | dynamic group claim membership |
-| ASSIGN-003 | Availability window | DONE | from/until |
-| ASSIGN-004 | Attempt limit | DONE | DB-safe start |
-| ASSIGN-005 | Cancel assignment | DONE | audit actor/time/reason |
-| ASSIGN-006 | Bulk assignment | DONE | <=500, idempotent |
-| ASSIGN-007 | Admin assignment queries | DONE | filters/detail/statistics |
-| ATT-001 | Start attempt | DONE | target/availability/limit |
-| ATT-002 | Answer/clear response | DONE | ownership + revision validation |
-| ATT-003 | Submit | DONE | scoring + outcome |
-| ATT-004 | Timeout | DONE | score preserved |
-| ATT-005 | Automatic expiration | DONE | background worker |
-| ATT-006 | Own attempt/result reads | DONE | student-safe |
-| RES-001 | Reviewer result list | DONE | test/revision/outcome filters |
-| RES-002 | Reviewer result detail | DONE | correctness breakdown |
-| DB-001 | PostgreSQL 18 | DONE | runtime + CI version assertion |
-| DB-002 | Optimistic concurrency | DONE | aggregate version -> 409 |
-| DB-003 | Npgsql schema baseline | DONE | native uuid/timestamptz/jsonb + model snapshot |
-| IDEM-001 | Distributed idempotency store | DONE | PostgreSQL advisory lease |
-| IDEM-002 | Idempotent publish | DONE | persistent result |
-| IDEM-003 | Idempotent assign/bulk | DONE | persistent result |
-| IDEM-004 | Idempotent submit | DONE | cached score |
-| OUT-001 | Transactional Outbox | DONE | IIntegrationEvent only |
-| OUT-002 | Retry/dead-letter | DONE | exponential backoff |
-| RMQ-001 | RabbitMQ publisher | DONE | confirms/persistent/mandatory |
-| RMQ-002 | RabbitMQ readiness | DONE | connection/channel/exchange |
-| SEC-BASE-001 | Keycloak JWT | DONE | sub/roles/groups |
-| SEC-BASE-002 | Role policies | DONE | author/admin/reviewer/operations |
-| API-BASE-001 | `/api/v1` | DONE | canonical API |
-| API-BASE-002 | legacy `/api/*` rewrite | DONE | compatibility |
-| API-BASE-003 | OpenAPI endpoint | DONE | `/openapi/v1.json` |
-| API-BASE-004 | ProblemDetails | DONE | application + exception errors |
-| OBS-001 | Correlation ID | DONE | `X-Correlation-ID` |
-| OBS-002 | HTTP audit | DONE | state-changing requests |
-| OBS-003 | OpenTelemetry | DONE | ASP.NET/HttpClient/runtime |
-| OPS-001 | Docker image | DONE | multi-stage/non-root |
-| OPS-002 | Compose stack | DONE | DB/RMQ/Keycloak/OTEL/Prometheus/Grafana/migrate/API |
-| OPS-003 | Migration-only mode | DONE | `--migrate`; database-only composition (STAB-005) |
-| TEST-001 | PostgreSQL integration suite | DONE | real provider |
-| TEST-002 | RabbitMQ integration suite | DONE | real broker |
-| TEST-003 | production image migration CI | DONE | release-path gate |
-| TEST-004 | Core/Domain/Application unit suites | DONE | 267 tests, 90.3% line coverage (`0.9.5`) |
+| CORE-001 | Test aggregate lifecycle | ГОТОВО | Draft/Published/Archived |
+| CORE-002 | Question authoring | ГОТОВО | add/update/remove/reorder |
+| CORE-003 | Answer option authoring | ГОТОВО | add/update/remove/reorder |
+| CORE-004 | SingleChoice | ГОТОВО | exactly one correct on publish |
+| CORE-005 | MultipleChoice | ГОТОВО | >=1 correct on publish |
+| CORE-006 | Test settings | ГОТОВО | pass percentage + time limit |
+| CORE-007 | Immutable published revision | ГОТОВО | JSON snapshot + version |
+| CORE-008 | Exact-set scoring | ГОТОВО | full points or zero per question |
+| CORE-009 | Test archive | ГОТОВО | terminal authoring state |
+| CAT-001 | Author catalog | ГОТОВО | search/status/paging |
+| CAT-002 | Revision list | ГОТОВО | immutable metadata |
+| ASSIGN-001 | User assignment | ГОТОВО | revision-scoped |
+| ASSIGN-002 | Group assignment | ГОТОВО | dynamic group claim membership |
+| ASSIGN-003 | Availability window | ГОТОВО | from/until |
+| ASSIGN-004 | Attempt limit | ГОТОВО | DB-safe start |
+| ASSIGN-005 | Cancel assignment | ГОТОВО | audit actor/time/reason |
+| ASSIGN-006 | Bulk assignment | ГОТОВО | <=500, idempotent |
+| ASSIGN-007 | Admin assignment queries | ГОТОВО | filters/detail/statistics |
+| ATT-001 | Start attempt | ГОТОВО | target/availability/limit |
+| ATT-002 | Answer/clear response | ГОТОВО | ownership + revision validation |
+| ATT-003 | Submit | ГОТОВО | scoring + outcome |
+| ATT-004 | Timeout | ГОТОВО | score preserved |
+| ATT-005 | Automatic expiration | ГОТОВО | background worker |
+| ATT-006 | Own attempt/result reads | ГОТОВО | student-safe |
+| RES-001 | Reviewer result list | ГОТОВО | test/revision/outcome filters |
+| RES-002 | Reviewer result detail | ГОТОВО | correctness breakdown |
+| DB-001 | PostgreSQL 18 | ГОТОВО | runtime + CI version assertion |
+| DB-002 | Optimistic concurrency | ГОТОВО | aggregate version -> 409 |
+| DB-003 | Npgsql schema baseline | ГОТОВО | native uuid/timestamptz/jsonb + model snapshot |
+| IDEM-001 | Distributed idempotency store | ГОТОВО | PostgreSQL advisory lease |
+| IDEM-002 | Idempotent publish | ГОТОВО | persistent result |
+| IDEM-003 | Idempotent assign/bulk | ГОТОВО | persistent result |
+| IDEM-004 | Idempotent submit | ГОТОВО | cached score |
+| OUT-001 | Transactional Outbox | ГОТОВО | IIntegrationEvent only |
+| OUT-002 | Retry/dead-letter | ГОТОВО | exponential backoff |
+| RMQ-001 | RabbitMQ publisher | ГОТОВО | confirms/persistent/mandatory |
+| RMQ-002 | RabbitMQ readiness | ГОТОВО | connection/channel/exchange |
+| SEC-BASE-001 | Keycloak JWT | ГОТОВО | sub/roles/groups |
+| SEC-BASE-002 | Role policies | ГОТОВО | author/admin/reviewer/operations |
+| API-BASE-001 | `/api/v1` | ГОТОВО | canonical API |
+| API-BASE-002 | legacy `/api/*` rewrite | ГОТОВО | compatibility |
+| API-BASE-003 | OpenAPI endpoint | ГОТОВО | `/openapi/v1.json` |
+| API-BASE-004 | ProblemDetails | ГОТОВО | application + exception errors |
+| OBS-001 | Correlation ID | ГОТОВО | `X-Correlation-ID` |
+| OBS-002 | HTTP audit | ГОТОВО | state-changing requests |
+| OBS-003 | OpenTelemetry | ГОТОВО | ASP.NET/HttpClient/runtime |
+| OPS-001 | Docker image | ГОТОВО | multi-stage/non-root |
+| OPS-002 | Compose stack | ГОТОВО | DB/RMQ/Keycloak/OTEL/Prometheus/Grafana/migrate/API |
+| OPS-003 | Migration-only mode | ГОТОВО | `--migrate`; database-only composition (STAB-005) |
+| TEST-001 | PostgreSQL integration suite | ГОТОВО | real provider |
+| TEST-002 | RabbitMQ integration suite | ГОТОВО | real broker |
+| TEST-003 | production image migration CI | ГОТОВО | release-path gate |
+| TEST-004 | Core/Domain/Application unit suites | ГОТОВО | 267 tests, 90.3% line coverage (`0.9.5`) |
 
 ---
 
@@ -79,14 +79,14 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 | ID | Priority | Status | Scope |
 |---|---:|---|---|
-| STAB-001 | P0 | DONE | actor-scoped StartAttempt replay before mutable assignment checks + cancellation/expiry/group regression tests |
-| STAB-002 | P0 | DONE | audit wraps exception mapping + response/audit equality tests for 400/409/412/500 |
-| STAB-003 | P0 | DONE | cycle-level Outbox/expiration worker recovery |
-| STAB-004 | P0 | DONE | RabbitMQ 4.3-compatible diagnostic probe + green D6 on `9916b98` |
-| STAB-005 | P0 | DONE | database-only `--migrate` configuration path |
-| STAB-006 | P1 | DONE | deterministic timestamp + ID pagination order |
-| STAB-007 | P1 | DONE | SQL joins/aggregates for reviewer/admin hot queries |
-| STAB-008 | P1 | DONE | unified domain/application failure contract: `Result<T, DomainError>` for reachable business rules instead of raw exceptions |
+| STAB-001 | P0 | ГОТОВО | actor-scoped StartAttempt replay before mutable assignment checks + cancellation/expiry/group regression tests |
+| STAB-002 | P0 | ГОТОВО | audit wraps exception mapping + response/audit equality tests for 400/409/412/500 |
+| STAB-003 | P0 | ГОТОВО | cycle-level Outbox/expiration worker recovery |
+| STAB-004 | P0 | ГОТОВО | RabbitMQ 4.3-compatible diagnostic probe + green D6 on `9916b98` |
+| STAB-005 | P0 | ГОТОВО | database-only `--migrate` configuration path |
+| STAB-006 | P1 | ГОТОВО | deterministic timestamp + ID pagination order |
+| STAB-007 | P1 | ГОТОВО | SQL joins/aggregates for reviewer/admin hot queries |
+| STAB-008 | P1 | ГОТОВО | unified domain/application failure contract: `Result<T, DomainError>` for reachable business rules instead of raw exceptions |
 
 `STAB-002` закрыт перестановкой middleware boundary: correlation/audit выполняется снаружи exception handler и наблюдает уже обработанный response. Regression suite проверяет равенство response/audit status для binding `400`, concurrency `409`, precondition `412` и unhandled `500`.
 
@@ -108,10 +108,10 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 ## CFG-001 — Fail-fast Database configuration
 
-- **Priority:** P0
-- **Effort:** S
-- **Status:** DONE
-- **Dependencies:** none
+- **Приоритет:** P0
+- **Трудоёмкость:** S
+- **Статус:** ГОТОВО
+- **Зависимости:** none
 
 ### Implemented scope
 
@@ -119,7 +119,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 - Development default оставить только явно;
 - validated options/startup check.
 
-### Acceptance
+### Критерии приёмки
 
 - Production without `ConnectionStrings:Database` fails before serving traffic;
 - secret не логируется;
@@ -127,11 +127,11 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 ## CFG-002 — Validate Keycloak configuration
 
-- **Priority:** P0
-- **Effort:** S
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** S
+- **Статус:** ГОТОВО
 
-### Acceptance
+### Критерии приёмки
 
 - Production requires non-empty Authority/Audience;
 - invalid URL rejected;
@@ -139,9 +139,9 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 ## CFG-003 — Typed RabbitMQ/worker options binding
 
-- **Priority:** P1
-- **Effort:** S
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** S
+- **Статус:** ГОТОВО
 
 Bind/validate:
 
@@ -151,11 +151,11 @@ Bind/validate:
 
 ## EDGE-001 — Trusted forwarded headers
 
-- **Priority:** P0
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
-### Acceptance
+### Критерии приёмки
 
 - configured KnownProxies/KnownNetworks;
 - untrusted `X-Forwarded-For` cannot spoof rate-limit partition;
@@ -163,11 +163,11 @@ Bind/validate:
 
 ## EDGE-002 — CORS policy
 
-- **Priority:** P0 if browser frontend deployed
-- **Effort:** S
-- **Status:** DONE
+- **Приоритет:** P0 if browser frontend deployed
+- **Трудоёмкость:** S
+- **Статус:** ГОТОВО
 
-### Acceptance
+### Критерии приёмки
 
 - explicit origin allow-list;
 - no `AllowAnyOrigin + credentials`;
@@ -175,17 +175,17 @@ Bind/validate:
 
 ## EDGE-003 — HTTPS/HSTS deployment policy
 
-- **Priority:** P0
-- **Effort:** S/M
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** S/M
+- **Статус:** ГОТОВО
 
 Document and test ingress termination behavior.
 
 ## EDGE-004 — Configurable rate limits
 
-- **Priority:** P0
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 ### Policies
 
@@ -194,7 +194,7 @@ Document and test ingress termination behavior.
 - reviewer/admin expensive read;
 - operations.
 
-### Acceptance
+### Критерии приёмки
 
 - configuration binding;
 - deterministic 429 tests;
@@ -202,26 +202,26 @@ Document and test ingress termination behavior.
 
 ## API-SEC-001 — Production OpenAPI policy
 
-- **Priority:** P0
-- **Effort:** S
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** S
+- **Статус:** ГОТОВО
 
 Configuration decides public/internal/disabled.
 
 ## CI-SEC-001 — Dependency vulnerability gate
 
-- **Priority:** P0
-- **Effort:** S/M
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** S/M
+- **Статус:** ГОТОВО
 
 - NuGet vulnerability check;
 - fail on high/critical agreed policy.
 
 ## CI-SEC-002 — Container image scan/SBOM
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 ---
 
@@ -229,9 +229,9 @@ Configuration decides public/internal/disabled.
 
 ## AUTHZ-001 — Test ownership model
 
-- **Priority:** P0
-- **Effort:** L
-- **Status:** DONE — selected `OwnerId` model for current single-organization scope
+- **Приоритет:** P0
+- **Трудоёмкость:** L
+- **Статус:** ГОТОВО — selected `OwnerId` model for current single-organization scope
 
 ### Options
 
@@ -248,51 +248,51 @@ Configuration decides public/internal/disabled.
 
 ## AUTHZ-002 — Author catalog isolation
 
-- **Priority:** P0
-- **Effort:** M
-- **Dependencies:** AUTHZ-001
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** M
+- **Зависимости:** AUTHZ-001
+- **Статус:** ГОТОВО
 
 Author sees only allowed scope; admin behavior explicitly defined.
 
 ## AUTHZ-003 — Authoring command ownership
 
-- **Priority:** P0
-- **Effort:** M
-- **Dependencies:** AUTHZ-001
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** M
+- **Зависимости:** AUTHZ-001
+- **Статус:** ГОТОВО
 
 Protect rename/settings/question/option/publish/archive.
 
 ## AUTHZ-004 — Revision access isolation
 
-- **Priority:** P0
-- **Effort:** S/M
-- **Dependencies:** AUTHZ-001
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** S/M
+- **Зависимости:** AUTHZ-001
+- **Статус:** ГОТОВО
 
 ## AUTHZ-005 — Reviewer result isolation
 
-- **Priority:** P0
-- **Effort:** M
-- **Dependencies:** AUTHZ-001
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** M
+- **Зависимости:** AUTHZ-001
+- **Статус:** ГОТОВО
 
 Two-author E2E negative test mandatory.
 
 ## AUTHZ-006 — Admin scope policy
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE — `test-admin` has explicit global scope
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО — `test-admin` has explicit global scope
 
 Decision: current `test-admin` scope is global. Workspace admin is reconsidered only with a Workspace/Tenant model.
 
 ## ID-001 — `(Issuer, Subject)` external identity
 
-- **Priority:** P1; P0 if multi-realm production
-- **Effort:** XL
-- **Status:** DECISION/PLANNED
+- **Приоритет:** P1; P0 if multi-realm production
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ/PLANNED
 
 ### Migration impact
 
@@ -310,9 +310,9 @@ Decision: current `test-admin` scope is global. Workspace admin is reconsidered 
 
 ## API-001 — Standard `Idempotency-Key` header
 
-- **Priority:** P0/P1
-- **Effort:** M
-- **Status:** DONE — header resolver/fingerprint compatibility, including true zero-length body (API-009)
+- **Приоритет:** P0/P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО — header resolver/fingerprint compatibility, including true zero-length body (API-009)
 
 ### Scope
 
@@ -322,7 +322,7 @@ Decision: current `test-admin` scope is global. Workspace admin is reconsidered 
 - start attempt;
 - submit.
 
-### Acceptance
+### Критерии приёмки
 
 - header required for designated commands;
 - body key transitional support;
@@ -333,10 +333,10 @@ Publish/start/submit accept a true zero-length body (nullable Minimal API body p
 
 ## API-002 — Idempotency request fingerprint
 
-- **Priority:** P0/P1
-- **Effort:** M
-- **Dependencies:** API-001
-- **Status:** DONE
+- **Приоритет:** P0/P1
+- **Трудоёмкость:** M
+- **Зависимости:** API-001
+- **Статус:** ГОТОВО
 
 Same key + different payload must not silently replay unrelated result.
 
@@ -344,13 +344,13 @@ Store canonical request hash with record.
 
 ## API-003 — ETag / `If-Match`
 
-- **Priority:** P1
-- **Effort:** M/L
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M/L
+- **Статус:** ГОТОВО
 
 Expose aggregate version on mutable author/admin resources.
 
-### Acceptance
+### Критерии приёмки
 
 - stale If-Match -> 412/409 policy documented;
 - no blind lost update;
@@ -358,17 +358,17 @@ Expose aggregate version on mutable author/admin resources.
 
 ## API-004 — Unified request validation
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 Length/range/required/enum validation before handler where transport-specific.
 
 ## API-005 — OpenAPI enrichment
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 - descriptions;
 - examples;
@@ -380,18 +380,18 @@ Length/range/required/enum validation before handler where transport-specific.
 
 ## API-006 — OpenAPI contract snapshot test
 
-- **Priority:** P1
-- **Effort:** S/M
-- **Dependencies:** API-005
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** S/M
+- **Зависимости:** API-005
+- **Статус:** ГОТОВО
 
 Detect accidental breaking changes.
 
 ## API-007 — Legacy `/api/*` deprecation
 
-- **Priority:** P2
-- **Effort:** S
-- **Status:** DONE — lifecycle headers/retirement behavior implemented; rewrite removal remains a future compatibility decision
+- **Приоритет:** P2
+- **Трудоёмкость:** S
+- **Статус:** ГОТОВО — lifecycle headers/retirement behavior implemented; rewrite removal remains a future compatibility decision
 
 ### Steps
 
@@ -402,18 +402,18 @@ Detect accidental breaking changes.
 
 ## API-008 — Stable filter/sort conventions
 
-- **Priority:** P2
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Needed before richer catalogs/reporting.
 
 ## API-009 — True empty-body header-only commands
 
-- **Priority:** P0/P1
-- **Effort:** S/M
-- **Status:** DONE
-- **Dependencies:** API-001
+- **Приоритет:** P0/P1
+- **Трудоёмкость:** S/M
+- **Статус:** ГОТОВО
+- **Зависимости:** API-001
 
 Publish/start/submit endpoint handlers принимают nullable request DTO (`PublishRequest?`/`StartAttemptRequest?`/`SubmitAttemptRequest?`); zero-length body binds to `null` and `IdempotencyKeyResolver.Resolve` falls back to `Guid.Empty` for the legacy body key, requiring the `Idempotency-Key` header. Covered by `EmptyBodyIdempotencyTests.cs` (real zero-length HTTP requests, no `Content`/payload). OpenAPI request body `required` flag is derived automatically from the now-nullable parameter type.
 
@@ -423,52 +423,52 @@ Publish/start/submit endpoint handlers принимают nullable request DTO (
 
 ## OPS-010 — Backup policy
 
-- **Priority:** P0
-- **Effort:** M
-- **Status:** DONE — repository logical baseline; provider PITR/scheduling remain deployment-owned
+- **Приоритет:** P0
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО — repository logical baseline; provider PITR/scheduling remain deployment-owned
 
 Repository baseline defines engineering RPO/RTO and portable retention; concrete schedule/encrypted storage/PITR remain deployment-owned.
 
 ## OPS-011 — Automated restore verification
 
-- **Priority:** P0
-- **Effort:** M/L
-- **Dependencies:** OPS-010
-- **Status:** DONE
+- **Приоритет:** P0
+- **Трудоёмкость:** M/L
+- **Зависимости:** OPS-010
+- **Статус:** ГОТОВО
 
 CI restores each generated backup to an isolated database and verifies schema, migration history and business marker.
 
 ## OPS-012 — Audit retention cleanup
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 Batch delete/archive with index-friendly range.
 
 ## OPS-013 — Idempotency retention cleanup
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 Retention must exceed maximum retry window/client guarantees.
 
 ## OPS-014 — Processed Outbox retention
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 Do not delete pending/dead-letter rows blindly.
 
 ## OPS-015 — Dead-letter requeue API
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
-### Acceptance
+### Критерии приёмки
 
 - admin-only;
 - audit;
@@ -479,36 +479,36 @@ Do not delete pending/dead-letter rows blindly.
 
 ## OPS-016 — Dead-letter acknowledge/drop
 
-- **Priority:** P2
-- **Effort:** M
-- **Status:** DONE — explicit audited `discard` terminal state selected
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО — explicit audited `discard` terminal state selected
 
 Needed only if operations requires permanent suppression state.
 
 ## OBS-010 — Metrics for Outbox lag
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 ## OBS-011 — Attempt expiration lag metric
 
-- **Priority:** P1
-- **Effort:** S/M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** S/M
+- **Статус:** ГОТОВО
 
 ## OBS-012 — API SLO dashboard
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE — Prometheus + Grafana added to `compose.yaml` (ADR-027); `deploy/grafana/dashboards/testapp-overview.json` implements the `docs/SLO_ALERTS.md` §6 dashboard minimum, provisioned automatically and CI-validated (`scripts/validate-observability-stack.sh`, workflow `observability`)
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО — Prometheus + Grafana added to `compose.yaml` (ADR-027); `deploy/grafana/dashboards/testapp-overview.json` implements the `docs/SLO_ALERTS.md` §6 dashboard minimum, provisioned automatically and CI-validated (`scripts/validate-observability-stack.sh`, workflow `observability`)
 
 ## OBS-013 — Alerts
 
-- **Priority:** P1
-- **Effort:** M
-- **Dependencies:** OBS-010..012
-- **Status:** DONE — rule expressions implemented for every `docs/SLO_ALERTS.md` §4 rule expressible from existing metrics (`deploy/prometheus/alerts.yml`, 6 page + 6 warning rules, CI-validated); routing to an actionable destination and the staging drill remain open (`docs/SLO_ALERTS.md` §7)
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Зависимости:** OBS-010..012
+- **Статус:** ГОТОВО — rule expressions implemented for every `docs/SLO_ALERTS.md` §4 rule expressible from existing metrics (`deploy/prometheus/alerts.yml`, 6 page + 6 warning rules, CI-validated); routing to an actionable destination and the staging drill remain open (`docs/SLO_ALERTS.md` §7)
 
 Alert on:
 
@@ -521,9 +521,9 @@ Alert on:
 
 ## PERF-001 — Load test baseline
 
-- **Priority:** P0 before sized production launch
-- **Effort:** L
-- **Status:** DONE — full PostgreSQL/RabbitMQ D6 gate green on `9916b98`
+- **Приоритет:** P0 before sized production launch
+- **Трудоёмкость:** L
+- **Статус:** ГОТОВО — full PostgreSQL/RabbitMQ D6 gate green on `9916b98`
 
 Scenarios documented in `TESTING.md`.
 
@@ -533,37 +533,37 @@ Scenarios documented in `TESTING.md`.
 
 ## EVT-001 — `TestRevisionPublishedV1`
 
-- **Priority:** P1 when consumer exists
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1 when consumer exists
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Must be explicit `IIntegrationEvent`; no raw aggregate serialization.
 
 ## EVT-002 — `TestAssignedV1`
 
-- **Priority:** P1 when notification/integration consumer exists
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1 when notification/integration consumer exists
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 ## EVT-003 — `AttemptCompletedV1`
 
-- **Priority:** P1 for analytics/notifications
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1 for analytics/notifications
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Prefer stable external completion contract rather than exposing internal submitted/timed-out event classes.
 
 ## EVT-004 — Integration event schema version policy
 
-- **Priority:** P1 before first external consumer
-- **Effort:** S/M
-- **Status:** PLANNED
+- **Приоритет:** P1 before first external consumer
+- **Трудоёмкость:** S/M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 ## EVT-005 — Consumer dedup reference implementation/test harness
 
-- **Priority:** P2
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 ---
 
@@ -571,77 +571,77 @@ Prefer stable external completion contract rather than exposing internal submitt
 
 ## AUTHOR-001 — Draft validation endpoint
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Returns publication problems without changing status.
 
 ## AUTHOR-002 — Clone test
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Creates new Draft with copied content and new IDs according to explicit policy.
 
 ## AUTHOR-003 — Create draft from published revision
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Useful for branching/copying historical version.
 
 ## AUTHOR-004 — Tags
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DECISION/PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ/PLANNED
 
 Need normalized tag storage/index/filtering.
 
 ## AUTHOR-005 — Category/subject
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 ## AUTHOR-006 — Rich catalog filters/sort
 
-- **Priority:** P1
-- **Effort:** M
-- **Dependencies:** AUTHOR-004/005 as selected
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Зависимости:** AUTHOR-004/005 as selected
 
 ## AUTHOR-007 — Versioned JSON export
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Do not export internal EF entity schema directly.
 
 ## AUTHOR-008 — Versioned JSON import
 
-- **Priority:** P1
-- **Effort:** L
-- **Dependencies:** AUTHOR-007
+- **Приоритет:** P1
+- **Трудоёмкость:** L
+- **Зависимости:** AUTHOR-007
 
 Full validation before persistence; no partial import.
 
 ## AUTHOR-009 — CSV import/export simple-choice
 
-- **Priority:** P2
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Only if business users need spreadsheet workflow.
 
 ## AUTHOR-010 — Question bank
 
-- **Priority:** P1/P2
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P1/P2
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Key decision: copy vs live reference. Recommendation: authoring may reference/copy, published revision always snapshots.
 
@@ -651,91 +651,91 @@ Key decision: copy vs live reference. Recommendation: authoring may reference/co
 
 ## ASMT-001 — Shuffle answer options
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Presentation order should be deterministic/stored per attempt if result review must reproduce UI.
 
 ## ASMT-002 — Shuffle questions
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 ## ASMT-003 — Question pools
 
-- **Priority:** P1/P2
-- **Effort:** L/XL
-- **Status:** DECISION
+- **Приоритет:** P1/P2
+- **Трудоёмкость:** L/XL
+- **Статус:** РЕШЕНИЕ
 
 Attempt must snapshot selected question IDs.
 
 ## ASMT-004 — Partial scoring strategy
 
-- **Priority:** P1
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Revision snapshots scoring strategy/version.
 
 ## ASMT-005 — Negative marking
 
-- **Priority:** P2
-- **Effort:** M/L
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** M/L
+- **Статус:** РЕШЕНИЕ
 
 Requires explicit minimum score/rounding policy.
 
 ## ASMT-006 — Numeric answer
 
-- **Priority:** P1
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Need tolerance/normalization rules.
 
 ## ASMT-007 — Short text auto-match
 
-- **Priority:** P2
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Normalization/localization complexity.
 
 ## ASMT-008 — FreeText manual grading
 
-- **Priority:** P1/P2
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P1/P2
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Requires new attempt grading lifecycle and reviewer write permissions.
 
 ## ASMT-009 — Ordering question
 
-- **Priority:** P2
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 ## ASMT-010 — Matching question
 
-- **Priority:** P2
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 ## ASMT-011 — Attachments/images
 
-- **Priority:** P2
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Requires object storage, scanning, signed access, content security.
 
 ## ASMT-012 — Rich text/Markdown
 
-- **Priority:** P1/P2
-- **Effort:** M/L
-- **Status:** DECISION
+- **Приоритет:** P1/P2
+- **Трудоёмкость:** M/L
+- **Статус:** РЕШЕНИЕ
 
 Requires rendering/sanitization policy in frontend.
 
@@ -745,49 +745,49 @@ Requires rendering/sanitization policy in frontend.
 
 ## ATT-010 — Attempt presentation DTO
 
-- **Priority:** P1 when frontend starts
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1 when frontend starts
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 `GET /api/v1/attempts/{id}/presentation` возвращает `AttemptPresentationView`: вопросы/варианты из immutable revision привязанной попытки, сохранённые ответы студента, `status`/`deadlineAt`/`serverTime`. Признака корректности нет ни на одном уровне DTO — граница закреплена тестом на сериализованном HTTP-ответе, а не только по полям (ADR-028). Существующий `GET /attempts/{id}` не менялся, чтобы не ломать v1 contract.
 
 ## ATT-011 — Resume active attempt
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 `GET /api/v1/assignments/{id}/attempts/active` отдаёт попытку студента в статусе `InProgress` для этого assignment или `404`, если возобновлять нечего. Клиент, потерявший `attemptId`, возобновляет работу вместо старта новой попытки (что израсходовало бы attempt limit). Завершённые попытки через resume не отдаются — они читаются через `/result`.
 
 ## ATT-012 — Explicit attempt start metadata
 
-- **Priority:** P2
-- **Effort:** S/M
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** S/M
+- **Статус:** РЕШЕНИЕ
 
 Client/device metadata only if privacy/business need.
 
 ## ATT-013 — Pause/resume clock
 
-- **Priority:** P3
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P3
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Not compatible with current simple deadline semantics without domain redesign.
 
 ## ATT-014 — Autosave batching
 
-- **Priority:** P2
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Current per-question PUT is already retryable via aggregate concurrency but not idempotency-keyed.
 
 ## ATT-015 — Attempt abandon
 
-- **Priority:** P2
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Need clear impact on attempt limit/result statistics.
 
@@ -797,41 +797,41 @@ Need clear impact on attempt limit/result statistics.
 
 ## ASN-010 — Assignment template
 
-- **Priority:** P1
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Reusable config for revision/window/limit/targets.
 
 ## ASN-011 — Campaign/batch entity
 
-- **Priority:** P1/P2
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P1/P2
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Useful if bulk assignments need lifecycle/report as one unit.
 
 ## ASN-012 — Scheduled future assignments
 
-- **Priority:** P1
-- **Effort:** S/M
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** S/M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Current `AvailableFrom` already supports future availability; feature mainly adds UX/query/filter/scheduling semantics.
 
 ## ASN-013 — Assignment duplicate prevention policy
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Current system allows multiple assignments of same revision/target with distinct IDs. Decide whether that is intentional.
 
 ## ASN-014 — Group membership semantics
 
-- **Priority:** P1
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Choose:
 
@@ -840,17 +840,17 @@ Choose:
 
 ## ASN-015 — Reassignment after completion
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DECISION
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
 
 Clarify whether new assignment or attempt-limit change is canonical.
 
 ## ASN-016 — Assignment reminder metadata
 
-- **Priority:** P2
-- **Effort:** M
-- **Dependencies:** notification integration
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Зависимости:** notification integration
 
 ---
 
@@ -858,9 +858,9 @@ Clarify whether new assignment or attempt-limit change is canonical.
 
 ## REP-010 — Test summary dashboard
 
-- **Priority:** P1
-- **Effort:** L
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** L
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Metrics:
 
@@ -872,49 +872,49 @@ Metrics:
 
 ## REP-011 — Revision comparison
 
-- **Priority:** P2
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Never mix results across revisions without explicit grouping.
 
 ## REP-012 — Question difficulty
 
-- **Priority:** P1/P2
-- **Effort:** L
-- **Status:** PLANNED after sufficient data
+- **Приоритет:** P1/P2
+- **Трудоёмкость:** L
+- **Статус:** ЗАПЛАНИРОВАНО after sufficient data
 
 Group by `(RevisionId, QuestionId)`.
 
 ## REP-013 — Answer distribution
 
-- **Priority:** P2
-- **Effort:** L
-- **Status:** PLANNED
+- **Приоритет:** P2
+- **Трудоёмкость:** L
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Reviewer/admin only; careful correctness exposure.
 
 ## REP-014 — CSV result export
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Authorization + audit + streaming response.
 
 ## REP-015 — Analytics projection tables
 
-- **Priority:** P2
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Only after query/load measurements.
 
 ## REP-016 — External warehouse
 
-- **Priority:** P3
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P3
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Requires integration event catalog and real analytics scale need.
 
@@ -924,38 +924,38 @@ Requires integration event catalog and real analytics scale need.
 
 ## NOTIF-001 — Assignment-created notification contract
 
-- **Priority:** P1/P2
-- **Effort:** M
-- **Dependencies:** EVT-002
-- **Status:** DECISION
+- **Приоритет:** P1/P2
+- **Трудоёмкость:** M
+- **Зависимости:** EVT-002
+- **Статус:** РЕШЕНИЕ
 
 ## NOTIF-002 — Deadline reminder scheduler
 
-- **Priority:** P2
-- **Effort:** L
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** L
+- **Статус:** РЕШЕНИЕ
 
 Should produce event/job, not send email inside transaction.
 
 ## NOTIF-003 — Completion/result notification
 
-- **Priority:** P2
-- **Effort:** M/L
-- **Dependencies:** EVT-003
+- **Приоритет:** P2
+- **Трудоёмкость:** M/L
+- **Зависимости:** EVT-003
 
 ## INT-001 — Webhook delivery adapter
 
-- **Priority:** P2
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P2
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Only if external consumers cannot consume RabbitMQ.
 
 ## INT-002 — Webhook signatures/retry
 
-- **Priority:** P2
-- **Effort:** L
-- **Dependencies:** INT-001
+- **Приоритет:** P2
+- **Трудоёмкость:** L
+- **Зависимости:** INT-001
 
 ---
 
@@ -963,32 +963,32 @@ Only if external consumers cannot consume RabbitMQ.
 
 ## TEN-001 — Workspace aggregate
 
-- **Priority:** P1/P2 depending deployment
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** P1/P2 depending deployment
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 ## TEN-002 — Workspace membership
 
-- **Priority:** same
-- **Effort:** XL
-- **Dependencies:** TEN-001, ID-001 likely
+- **Приоритет:** same
+- **Трудоёмкость:** XL
+- **Зависимости:** TEN-001, ID-001 likely
 
 ## TEN-003 — Workspace-scoped roles
 
-- **Priority:** same
-- **Effort:** L
+- **Приоритет:** same
+- **Трудоёмкость:** L
 
 ## TEN-004 — Workspace data isolation
 
-- **Priority:** P0 if multi-tenant
-- **Effort:** XL
+- **Приоритет:** P0 if multi-tenant
+- **Трудоёмкость:** XL
 
 Every read/write query must become workspace-aware and indexed.
 
 ## TEN-005 — Tenant-aware audit/Outbox
 
-- **Priority:** P1
-- **Effort:** L
+- **Приоритет:** P1
+- **Трудоёмкость:** L
 
 ---
 
@@ -996,31 +996,31 @@ Every read/write query must become workspace-aware and indexed.
 
 ## UX-001 — Student test-taking presentation API
 
-- **Priority:** P1
-- **Effort:** M/L
-- **Status:** DONE — закрыт вместе с ATT-010/ATT-011
+- **Приоритет:** P1
+- **Трудоёмкость:** M/L
+- **Статус:** ГОТОВО — закрыт вместе с ATT-010/ATT-011
 
 Student-safe question/options DTO + текущие ответы + deadline реализованы; см. ATT-010, ATT-011 и ADR-028.
 
 ## UX-002 — Author editing API ergonomics
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** PLANNED
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 May include batch reorder/update to reduce chatty UI.
 
 ## UX-003 — Typed client SDK generation
 
-- **Priority:** P2
-- **Effort:** M
-- **Dependencies:** stable enriched OpenAPI
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Зависимости:** stable enriched OpenAPI
 
 ## UX-004 — Frontend application
 
-- **Priority:** product-dependent
-- **Effort:** XL
-- **Status:** DECISION
+- **Приоритет:** product-dependent
+- **Трудоёмкость:** XL
+- **Статус:** РЕШЕНИЕ
 
 Not part of current repository baseline.
 
@@ -1030,39 +1030,39 @@ Not part of current repository baseline.
 
 ## DEV-001 — Central package management
 
-- **Priority:** P2
-- **Effort:** S/M
-- **Status:** PLANNED
+- **Приоритет:** P2
+- **Трудоёмкость:** S/M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 Introduce `Directory.Packages.props` if package count continues growing.
 
 ## DEV-002 — Standard EF migration tooling/snapshot
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО
 
 Repeatable `dotnet ef` workflow реализован через `AppDbContextDesignFactory`; PostgreSQL baseline имеет designer metadata и `AppDbContextModelSnapshot`.
 
 ## DEV-003 — Architecture dependency tests
 
-- **Priority:** P1
-- **Effort:** M
-- **Status:** DONE — assembly reference direction baseline
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ГОТОВО — assembly reference direction baseline
 
 Automate Domain-no-EF/API and layer reference constraints.
 
 ## DEV-004 — Formatter/analyzer CI
 
-- **Priority:** P2
-- **Effort:** S/M
-- **Status:** PLANNED
+- **Приоритет:** P2
+- **Трудоёмкость:** S/M
+- **Статус:** ЗАПЛАНИРОВАНО
 
 ## DEV-005 — Conventional changelog/release notes
 
-- **Priority:** P1 before 1.0
-- **Effort:** S
-- **Status:** DONE
+- **Приоритет:** P1 before 1.0
+- **Трудоёмкость:** S
+- **Статус:** ГОТОВО
 
 `CHANGELOG.md` (repo root) реализован по формату Keep a Changelog + SemVer, с явно задокументированным отклонением: до первого git-тега версии совпадают с фазами `docs/ROADMAP.md` (`0.8.x` … `0.9.4`), а не с датами. Записи покрывают Phase A–D7 (включая все `STAB-001..008` и `API-009`), плюс открытый `[Unreleased]` раздел с оставшимися Phase E gaps. Conventional Commits prefixes рекомендованы (не обязательны) начиная с `1.0.0`.
 
