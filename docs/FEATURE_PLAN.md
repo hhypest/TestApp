@@ -817,17 +817,17 @@ CI восстанавливает каждую созданную резервн
 - **Трудоёмкость:** S/M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Current `AvailableFrom` already supports future availability; feature mainly adds UX/query/filter/scheduling semantics.
+Текущее поле `AvailableFrom` уже поддерживает доступность в будущем; фича добавляет главным образом семантику интерфейса, запросов, фильтрации и планирования.
 
-## ASN-013 — Assignment duplicate prevention policy
+## ASN-013 — Политика предотвращения дублей назначений
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-Current system allows multiple assignments of same revision/target with distinct IDs. Decide whether that is intentional.
+Сейчас система допускает несколько назначений одной ревизии на одну цель с разными ID. Нужно решить, намеренно ли это.
 
-## ASN-014 — Group membership semantics
+## ASN-014 — Семантика членства в группе
 
 - **Приоритет:** P1
 - **Трудоёмкость:** L
@@ -835,18 +835,18 @@ Current system allows multiple assignments of same revision/target with distinct
 
 Choose:
 
-- dynamic at access time (current);
-- snapshot membership at assignment time.
+- динамическое на момент доступа (текущее);
+- снимок членства на момент назначения.
 
-## ASN-015 — Reassignment after completion
+## ASN-015 — Повторное назначение после завершения
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-Clarify whether new assignment or attempt-limit change is canonical.
+Уточнить, что считается каноническим: новое назначение или изменение лимита попыток.
 
-## ASN-016 — Assignment reminder metadata
+## ASN-016 — Метаданные напоминаний по назначению
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M
@@ -856,7 +856,7 @@ Clarify whether new assignment or attempt-limit change is canonical.
 
 # K. Reporting/analytics
 
-## REP-010 — Test summary dashboard
+## REP-010 — Сводный дашборд по тесту
 
 - **Приоритет:** P1
 - **Трудоёмкость:** L
@@ -865,93 +865,93 @@ Clarify whether new assignment or attempt-limit change is canonical.
 Metrics:
 
 - attempts;
-- completion rate;
-- pass rate;
-- average score;
-- average duration.
+- доля завершения;
+- доля прохождения;
+- средний балл;
+- средняя длительность.
 
-## REP-011 — Revision comparison
+## REP-011 — Сравнение ревизий
 
 - **Приоритет:** P2
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-Never mix results across revisions without explicit grouping.
+Никогда не смешивать результаты разных ревизий без явной группировки.
 
-## REP-012 — Question difficulty
+## REP-012 — Сложность вопроса
 
 - **Приоритет:** P1/P2
 - **Трудоёмкость:** L
 - **Статус:** ЗАПЛАНИРОВАНО after sufficient data
 
-Group by `(RevisionId, QuestionId)`.
+Группировка по `(RevisionId, QuestionId)`.
 
-## REP-013 — Answer distribution
+## REP-013 — Распределение ответов
 
 - **Приоритет:** P2
 - **Трудоёмкость:** L
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Reviewer/admin only; careful correctness exposure.
+Только для рецензента и администратора; раскрытие правильности требует осторожности.
 
-## REP-014 — CSV result export
+## REP-014 — Экспорт результатов в CSV
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Authorization + audit + streaming response.
+Авторизация + аудит + потоковый ответ.
 
-## REP-015 — Analytics projection tables
+## REP-015 — Проекционные таблицы аналитики
 
 - **Приоритет:** P2
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Only after query/load measurements.
+Только после измерений запросов и нагрузки.
 
-## REP-016 — External warehouse
+## REP-016 — Внешнее хранилище данных
 
 - **Приоритет:** P3
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Requires integration event catalog and real analytics scale need.
+Требует каталога интеграционных событий и реальной потребности в масштабе аналитики.
 
 ---
 
 # L. Notifications/integrations
 
-## NOTIF-001 — Assignment-created notification contract
+## NOTIF-001 — Контракт уведомления о создании назначения
 
 - **Приоритет:** P1/P2
 - **Трудоёмкость:** M
 - **Зависимости:** EVT-002
 - **Статус:** РЕШЕНИЕ
 
-## NOTIF-002 — Deadline reminder scheduler
+## NOTIF-002 — Планировщик напоминаний о дедлайне
 
 - **Приоритет:** P2
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-Should produce event/job, not send email inside transaction.
+Должен создавать событие или задание, а не отправлять письмо внутри транзакции.
 
-## NOTIF-003 — Completion/result notification
+## NOTIF-003 — Уведомление о завершении и результате
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M/L
 - **Зависимости:** EVT-003
 
-## INT-001 — Webhook delivery adapter
+## INT-001 — Адаптер доставки webhook
 
 - **Приоритет:** P2
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Only if external consumers cannot consume RabbitMQ.
+Только если внешние потребители не могут читать RabbitMQ.
 
-## INT-002 — Webhook signatures/retry
+## INT-002 — Подписи и повторы webhook
 
 - **Приоритет:** P2
 - **Трудоёмкость:** L
@@ -961,40 +961,40 @@ Only if external consumers cannot consume RabbitMQ.
 
 # M. Workspace/multi-tenancy
 
-## TEN-001 — Workspace aggregate
+## TEN-001 — Агрегат Workspace
 
 - **Приоритет:** P1/P2 depending deployment
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-## TEN-002 — Workspace membership
+## TEN-002 — Членство в Workspace
 
 - **Приоритет:** same
 - **Трудоёмкость:** XL
 - **Зависимости:** TEN-001, ID-001 likely
 
-## TEN-003 — Workspace-scoped roles
+## TEN-003 — Роли в области Workspace
 
 - **Приоритет:** same
 - **Трудоёмкость:** L
 
-## TEN-004 — Workspace data isolation
+## TEN-004 — Изоляция данных Workspace
 
 - **Приоритет:** P0 if multi-tenant
 - **Трудоёмкость:** XL
 
-Every read/write query must become workspace-aware and indexed.
+Каждый запрос чтения и записи обязан учитывать workspace и быть проиндексирован.
 
-## TEN-005 — Tenant-aware audit/Outbox
+## TEN-005 — Аудит и Outbox с учётом арендатора
 
 - **Приоритет:** P1
 - **Трудоёмкость:** L
 
 ---
 
-# N. Frontend/client readiness
+# N. Готовность фронтенда и клиентов
 
-## UX-001 — Student test-taking presentation API
+## UX-001 — API представления теста для студента
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M/L
@@ -1002,41 +1002,41 @@ Every read/write query must become workspace-aware and indexed.
 
 Student-safe question/options DTO + текущие ответы + deadline реализованы; см. ATT-010, ATT-011 и ADR-028.
 
-## UX-002 — Author editing API ergonomics
+## UX-002 — Эргономика API редактирования для автора
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-May include batch reorder/update to reduce chatty UI.
+Может включать пакетное переупорядочивание и обновление, чтобы снизить болтливость интерфейса.
 
-## UX-003 — Typed client SDK generation
+## UX-003 — Генерация типизированного клиентского SDK
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M
 - **Зависимости:** stable enriched OpenAPI
 
-## UX-004 — Frontend application
+## UX-004 — Фронтенд-приложение
 
 - **Приоритет:** product-dependent
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Not part of current repository baseline.
+Не входит в текущий baseline репозитория.
 
 ---
 
-# O. Developer experience
+# O. Опыт разработчика
 
-## DEV-001 — Central package management
+## DEV-001 — Централизованное управление пакетами
 
 - **Приоритет:** P2
 - **Трудоёмкость:** S/M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Introduce `Directory.Packages.props` if package count continues growing.
+Ввести `Directory.Packages.props`, если число пакетов продолжит расти.
 
-## DEV-002 — Standard EF migration tooling/snapshot
+## DEV-002 — Стандартный инструментарий миграций EF и снимок модели
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
@@ -1044,21 +1044,21 @@ Introduce `Directory.Packages.props` if package count continues growing.
 
 Repeatable `dotnet ef` workflow реализован через `AppDbContextDesignFactory`; PostgreSQL baseline имеет designer metadata и `AppDbContextModelSnapshot`.
 
-## DEV-003 — Architecture dependency tests
+## DEV-003 — Тесты архитектурных зависимостей
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО — assembly reference direction baseline
 
-Automate Domain-no-EF/API and layer reference constraints.
+Автоматизировать запрет ссылок Domain на EF/API и ограничения ссылок между слоями.
 
-## DEV-004 — Formatter/analyzer CI
+## DEV-004 — CI форматирования и анализаторов
 
 - **Приоритет:** P2
 - **Трудоёмкость:** S/M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-## DEV-005 — Conventional changelog/release notes
+## DEV-005 — Changelog и release notes по соглашению
 
 - **Приоритет:** P1 before 1.0
 - **Трудоёмкость:** S
@@ -1070,7 +1070,7 @@ Automate Domain-no-EF/API and layer reference constraints.
 
 ---
 
-# P. Recommended implementation order
+# P. Рекомендуемый порядок реализации
 
 Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
 
@@ -1099,28 +1099,28 @@ Automate Domain-no-EF/API and layer reference constraints.
 
 Feature можно брать в реализацию, когда известны:
 
-- actor/use case;
-- business outcome;
-- authorization scope;
-- aggregate ownership/state changes;
-- API contract;
-- persistence impact;
-- retry/idempotency/concurrency semantics;
-- sensitive data impact;
-- test plan;
+- актор и use case;
+- бизнес-результат;
+- область авторизации;
+- владение агрегатом и изменения состояния;
+- контракт API;
+- влияние на хранилище;
+- семантика повторов, идемпотентности и параллельного доступа;
+- влияние на чувствительные данные;
+- план тестирования;
 - migration/backfill plan, если schema меняется.
 
 # R. Definition of Done для feature
 
 - code реализован по layer boundaries;
-- domain invariants unit-tested;
+- доменные инварианты покрыты модульными тестами;
 - PostgreSQL integration tests при persistence change;
-- HTTP E2E happy + negative auth;
+- сквозной HTTP-сценарий: позитивный и негативный по авторизации;
 - concurrency/idempotency test если применимо;
 - student correctness boundary проверен;
 - OpenAPI актуален;
 - `docs/` обновлены;
-- full CI green;
-- production image builds;
-- production image `--migrate` succeeds;
+- полный CI зелёный;
+- production-образ собирается;
+- production-образ успешно выполняет `--migrate`;
 - feature status в этом файле изменён на `DONE`.
