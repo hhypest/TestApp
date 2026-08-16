@@ -348,68 +348,68 @@ GitHub Actions `dotnet` workflow:
 
 Отдельный `observability` workflow (path-triggered на `deploy/prometheus/**`, `deploy/grafana/**`, `deploy/otel-collector-config.yaml`, `src/TestApp.Infrastructure/Observability/**`, `compose.yaml`) поднимает полный stack и запускает `scripts/validate-observability-stack.sh`: `promtool check config/rules`, здоровье Prometheus targets, наличие ожидаемых metric families, здоровье Grafana Prometheus datasource и присутствие provisioned dashboard.
 
-### Merge/release gate
+### Гейт слияния и релиза
 
 Нельзя считать commit production-capable, если зелёны unit tests, но не прошёл migration-only container step.
 
 ## 12. Test requirements по типу изменения
 
-### Domain rule
+### Доменное правило
 
 Обязательно:
 
-- Domain test happy path;
-- boundary values;
-- invalid transition;
-- regression existing state.
+- позитивный сценарий в Domain-тесте;
+- граничные значения;
+- недопустимый переход;
+- регрессия существующего состояния.
 
-### New command
+### Новая команда
 
 Обязательно:
 
-- Application/domain test;
-- HTTP happy path;
-- authorization negative path;
+- тест Application/Domain;
+- позитивный HTTP-сценарий;
+- негативный сценарий авторизации;
 - idempotency/concurrency test если операция unsafe/retryable.
 
-### New query
+### Новый запрос
 
 Обязательно:
 
-- SQL-side filtering/paging integration test;
+- интеграционный тест фильтрации и постраничного вывода на стороне SQL;
 - visibility/authorization;
 - student sensitive-data check если DTO связан с assessment content.
 
-### Database migration
+### Миграция базы данных
 
 Обязательно:
 
-- empty DB migrate;
+- миграция на пустой БД;
 - existing-data upgrade scenario, если изменение nontrivial;
-- schema/index regression;
+- регрессия схемы и индексов;
 - production-image `--migrate`.
 
-### Integration event
+### Интеграционное событие
 
 Обязательно:
 
-- serialization contract;
+- контракт сериализации;
 - EventId/MessageId;
 - routing key;
-- no-sensitive-data assertion;
-- duplicate delivery consumer expectation/contract.
+- проверка отсутствия чувствительных данных;
+- ожидания и контракт потребителя при дублирующей доставке.
 
-### Security change
+### Изменение безопасности
 
 Обязательно:
 
 - anonymous;
-- wrong role;
-- wrong resource owner/target;
-- correct role/owner;
-- no data leakage.
+- неверная роль;
+- неверный владелец или цель ресурса;
+- корректные роль и владелец;
+- отсутствие утечки данных.
 
-## 13. Test data principles
+## 13. Принципы тестовых данных
 
 - IDs генерировать typed factory/Guid v7 там, где это соответствует production.
 - Fixed clock использовать для deadline/time rules.
@@ -417,30 +417,30 @@ GitHub Actions `dotnet` workflow:
 - Для external broker synchronization использовать deterministic topology/confirm semantics.
 - Test должен самостоятельно создавать required state, а не зависеть от порядка выполнения других tests.
 
-## 14. Current coverage gaps
+## 14. Текущие пробелы покрытия
 
 ### Закрыто `2026-08-16`
 
-- application handler suite beyond StartAttempt — `AuthoringCommandTests.cs`, `AssignmentAndAttemptCommandTests.cs`;
+- набор тестов Application-обработчиков помимо StartAttempt — `AuthoringCommandTests.cs`, `AssignmentAndAttemptCommandTests.cs`;
 - scoring/question invariants — `PublishedRevisionScoringTests.cs`, `TestAuthoringInvariantTests.cs` (табличные тесты по границам; полноценный property-based подход не вводился, см. ниже);
-- `AttemptScore`/error mapping invariants — `AttemptLifecycleTests.cs`, `ResultMonadTests.cs`;
-- student read models (`/api/v1/me/*`, attempt detail/result) — `StudentReadModelQueryTests.cs`;
+- инварианты `AttemptScore` и отображения ошибок — `AttemptLifecycleTests.cs`, `ResultMonadTests.cs`;
+- модели чтения студента (`/api/v1/me/*`, детали и результат попытки) — `StudentReadModelQueryTests.cs`;
 - audit trail pagination и фильтры — `AuditTrailPaginationTests.cs`.
 
 ### P1 (остаётся)
 
-- concurrency test submit vs background timeout;
-- multiple API replicas idempotency scenario;
+- тест гонки между отправкой и фоновым таймаутом;
+- сценарий идемпотентности при нескольких репликах API;
 - query-plan/EXPLAIN evidence для reviewer/admin hot queries под production-scale data (функциональная корректность SQL join/tie-breaker rewrite покрыта `AdminReadModelQueryTests.cs`);
 - real Keycloak smoke integration (сейчас только через Postman/Newman workflow);
 - property-based тесты для scoring — текущие тесты табличные и проверяют выбранные границы, а не произвольные входы.
 
 ### P2
 
-- endurance/soak Outbox;
-- failover/restart PostgreSQL/RabbitMQ scenarios;
-- staging/platform backup restore drill;
-- contract tests for frontend/SDK.
+- длительное нагрузочное тестирование Outbox;
+- сценарии отказа и перезапуска PostgreSQL/RabbitMQ;
+- учебное восстановление из резервной копии на staging/платформе;
+- контрактные тесты для фронтенда и SDK.
 
 ### Сознательно не покрыто
 
@@ -448,16 +448,16 @@ GitHub Actions `dotnet` workflow:
 - `DatabaseHealthCheck` — покрыт косвенно через `/health/ready` в HTTP-тестах, но не имеет собственного unit-теста на ветку сбоя подключения;
 - positional record DTO без поведения (например `AdminAssignmentAttemptSummary`) — покрытие таких типов означало бы тестирование компилятора.
 
-## 15. Performance testing baseline
+## 15. Базовые нагрузочные тесты
 
 Реализованный D6 workflow покрывает:
 
-- bulk assignments;
-- simultaneous attempt starts;
-- high-frequency answer writes;
-- mass deadline expiration;
-- reviewer result pagination;
-- Outbox backlog recovery.
+- массовые назначения;
+- одновременные старты попыток;
+- частая запись ответов;
+- массовое истечение дедлайнов;
+- постраничный обход результатов рецензентом;
+- восстановление backlog Outbox.
 
 Thresholds и artifacts описаны в `PERFORMANCE.md`.
 
@@ -467,13 +467,13 @@ Verification status: **PASSED** на PostgreSQL implementation commit `9916b98`.
 
 - p50/p95/p99 latency;
 - requests/sec;
-- DB CPU/connections/locks;
-- rows scanned;
-- deadlocks/concurrency conflicts;
-- Outbox lag;
-- worker batch duration.
+- CPU, соединения и блокировки БД;
+- количество просканированных строк;
+- взаимоблокировки и конфликты параллельного доступа;
+- отставание Outbox;
+- длительность пакета воркера.
 
-## 16. Test naming
+## 16. Именование тестов
 
 Предпочтительный формат поведения:
 

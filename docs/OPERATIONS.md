@@ -2,7 +2,7 @@
 
 > Статус: local/container runtime и repository operational automation D1–D6 **Implemented**; platform-specific secret store, PITR, alert routing и release rehearsal остаются deployment work.
 
-## 1. Runtime topology
+## 1. Топология времени выполнения
 
 Стандартный local Compose stack:
 
@@ -18,7 +18,7 @@ graph TD
     MIG[Migrate job] --> DB
 ```
 
-Compose services:
+Сервисы Compose:
 
 - `postgres`;
 - `rabbitmq`;
@@ -29,11 +29,11 @@ Compose services:
 - `migrate`;
 - `api`.
 
-## 2. Local quick start
+## 2. Быстрый локальный старт
 
 Перед первым запуском:
 
-- Docker Engine/compatible runtime;
+- Docker Engine или совместимая среда выполнения;
 - Docker Compose v2.
 
 Запуск:
@@ -44,7 +44,7 @@ docker compose up --build
 
 PostgreSQL использует новый volume `testapp-postgres`. Старый MariaDB volume не удаляется автоматически. Не применяйте `docker compose down -v`, пока не подтверждены backup/cutover и допустимость удаления всех Compose volumes.
 
-### Host ports
+### Порты на хосте
 
 | Service | Host |
 |---|---|
@@ -52,13 +52,13 @@ PostgreSQL использует новый volume `testapp-postgres`. Стары
 | Keycloak | `http://localhost:8081` |
 | PostgreSQL | `localhost:5432` |
 | RabbitMQ AMQP | `localhost:5672` |
-| RabbitMQ management | `http://localhost:15672` |
+| Панель управления RabbitMQ | `http://localhost:15672` |
 | OTLP gRPC | `localhost:4317` |
 | OTLP HTTP | `localhost:4318` |
 | Prometheus | `http://localhost:9090` |
 | Grafana | `http://localhost:3000` |
 
-## 3. Development credentials
+## 3. Учётные данные для разработки
 
 **Только local development. Не использовать в production.**
 
@@ -72,13 +72,13 @@ RabbitMQ:
 testapp/testapp
 ```
 
-Keycloak bootstrap:
+Начальная учётная запись Keycloak:
 
 ```text
 bootstrap-admin / bootstrap-admin
 ```
 
-Dev realm users:
+Пользователи dev-realm:
 
 ```text
 admin   / admin   -> test-admin
@@ -86,26 +86,26 @@ author  / author  -> test-author
 student / student -> group students
 ```
 
-Keycloak realm import:
+Импорт realm Keycloak:
 
 ```text
 deploy/keycloak/testapp-realm.json
 ```
 
-## 4. Docker image
+## 4. Docker-образ
 
-`Dockerfile` — multi-stage .NET build/runtime image.
+`Dockerfile` — многоэтапный образ сборки и выполнения .NET.
 
-Operational expectations:
+Эксплуатационные ожидания:
 
 - runtime process слушает configured ASP.NET port;
 - container работает от non-root application user;
 - тот же image используется и для API, и для migration-only mode;
 - schema migration не требует отдельного tooling image.
 
-## 5. Migration strategy
+## 5. Стратегия миграций
 
-### 5.1 Migration-only command
+### 5.1 Команда режима только миграций
 
 ```bash
 dotnet TestApp.Api.dll --migrate
@@ -117,7 +117,7 @@ dotnet TestApp.Api.dll --migrate
 docker run ... testapp-api:<tag> --migrate
 ```
 
-### 5.2 Local Compose order
+### 5.2 Порядок запуска в локальном Compose
 
 ```text
 PostgreSQL healthy
@@ -129,7 +129,7 @@ migrate exits 0
 API starts
 ```
 
-### 5.3 Production order
+### 5.3 Порядок в production
 
 Recommended:
 
@@ -151,7 +151,7 @@ API replicas не должны одновременно применять schem
 
 `Database:ApplyMigrationsOnStartup` в Production должен быть `false`/default false.
 
-## 6. Configuration catalog
+## 6. Каталог конфигурации
 
 ### Database
 
@@ -195,9 +195,9 @@ OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 
 Без `OTEL_EXPORTER_OTLP_ENDPOINT` exporter не подключается.
 
-### Attempt expiration
+### Истечение попыток
 
-Infrastructure defaults:
+Значения Infrastructure по умолчанию:
 
 ```text
 BatchSize = 100
@@ -206,9 +206,9 @@ PollInterval = 30 seconds
 
 Options уже загружаются/валидируются из `AttemptExpiration:BatchSize` и `AttemptExpiration:PollIntervalSeconds`.
 
-### Outbox delivery
+### Доставка Outbox
 
-Default internal options:
+Внутренние значения по умолчанию:
 
 ```text
 BatchSize = 100
@@ -221,11 +221,11 @@ AdvisoryLockTimeoutSeconds = 5
 
 Options загружаются/валидируются из секции `Outbox`. При invalid range startup завершается fail-fast.
 
-### Migration-only composition
+### Композиция режима только миграций
 
 `--migrate` загружает только `RuntimeConfiguration.LoadDatabase`; Keycloak/RabbitMQ/worker/CORS/rate-limit/OpenAPI/reverse-proxy configuration не загружается и соответствующие DI-регистрации пропускаются. Migration job/container может получать только `ConnectionStrings:Database` (и опционально `Database:ApplyMigrationsOnStartup`) без остальных runtime secrets/config — см. `compose.yaml` сервис `migrate`.
 
-## 7. Health endpoints
+## 7. Health-эндпоинты
 
 ### Liveness
 
@@ -243,7 +243,7 @@ GET /health/ready
 
 Проверяет:
 
-- PostgreSQL connectivity;
+- доступность PostgreSQL;
 - RabbitMQ connection/channel/exchange access, **только если RabbitMQ delivery включён**.
 
 При critical dependency failure readiness должна вернуть unhealthy/503 и исключить instance из traffic.
@@ -252,13 +252,13 @@ GET /health/ready
 
 Текущая instrumentation:
 
-- ASP.NET Core requests;
-- outgoing HttpClient;
-- .NET runtime metrics.
+- запросы ASP.NET Core;
+- исходящие запросы HttpClient;
+- метрики среды выполнения .NET.
 
 Health endpoints исключаются из request traces, чтобы probes не создавали telemetry noise.
 
-Local collector config:
+Конфигурация локального коллектора:
 
 ```text
 deploy/otel-collector-config.yaml
@@ -274,15 +274,15 @@ Collector пишет traces только в `debug` exporter (нет configured 
 - Нет активного HTTP-пробинга `/health/ready` (например, `blackbox_exporter`) — правило `TestAppMetricsPipelineDown` проверяет только доступность OTel Collector metrics endpoint, а не реальную readiness API.
 - Трейсы (`traces` pipeline) по-прежнему уходят только в `debug` exporter — выбор backend для трейсинга (Tempo/Jaeger/другой) остаётся открытым и не обязателен, пока нет измеренной потребности в distributed tracing (см. ADR-027).
 
-## 9. Structured request telemetry
+## 9. Структурированная телеметрия запросов
 
 `RequestTelemetryMiddleware` логирует:
 
-- HTTP method;
+- HTTP-метод;
 - path;
-- status code;
-- duration ms;
-- trace/correlation identifier.
+- код статуса;
+- длительность в мс;
+- идентификатор трассировки и корреляции.
 
 Не следует добавлять в request logs raw access token, passwords, correct-answer payload или arbitrary body.
 
@@ -305,7 +305,7 @@ client correlation ID
     ↔ trace ID
 ```
 
-## 11. Audit operations
+## 11. Операции аудита
 
 Endpoint:
 
@@ -335,19 +335,19 @@ Audit не содержит body/query payload.
 
 Repository-level bounded cleanup реализован для audit, idempotency и processed Outbox rows:
 
-- typed retention periods/batch size/poll interval;
+- типизированные сроки хранения, размер пакета и интервал опроса;
 - PostgreSQL advisory lock между replicas;
-- index-friendly bounded deletes;
+- ограниченные удаления, дружественные к индексам;
 - pending/retrying/active dead-letter Outbox rows не удаляются;
 - deleted-row counters экспортируются через `TestApp.Operations`.
 
 Deployment owner всё ещё определяет фактические retention periods, archival/export и необходимость immutable/WORM external audit sink.
 
-### Audit status contract
+### Контракт статуса аудита
 
 Audit/correlation middleware оборачивает exception mapping и сохраняет финальный HTTP status. Regression coverage подтверждает равенство response/audit для handled `400/409`, precondition `412` и real `500`. При incident triage correlation ID остаётся ключом сопоставления audit, HTTP log и trace.
 
-## 12. Outbox operations
+## 12. Операции Outbox
 
 Endpoint:
 
@@ -358,11 +358,11 @@ role: test-admin
 
 Использовать для проверки:
 
-- growing pending backlog;
-- retry growth;
-- dead-letter count;
-- oldest pending age;
-- repeated error reason.
+- растущая очередь необработанных;
+- рост числа повторов;
+- количество dead-letter;
+- возраст самого старого необработанного;
+- повторяющаяся причина ошибки.
 
 ### Runbook: Outbox backlog растёт
 
@@ -374,7 +374,7 @@ role: test-admin
 6. Не удалять rows вручную до выяснения причины.
 7. После восстановления transport processor автоматически продолжит due retries.
 
-### Runbook: dead-letter message
+### Runbook: сообщение в dead-letter
 
 1. Зафиксировать message ID/type/error/attempt count.
 2. Проверить, временная это ошибка или permanent schema/routing issue.
@@ -384,7 +384,7 @@ role: test-admin
 6. Если message доказанно устарел, выполнить audited `POST .../{eventId}/discard`; это terminal state, не physical delete.
 7. Не редактировать payload и delivery columns вручную.
 
-## 13. Attempt expiration operations
+## 13. Операции истечения попыток
 
 `OverdueAttemptProcessor` работает внутри API process.
 
@@ -393,23 +393,23 @@ role: test-admin
 Проверить:
 
 - application instance жив;
-- worker startup logs;
-- DB connectivity;
-- deadline timestamps;
-- concurrency conflicts;
+- логи запуска воркера;
+- доступность БД;
+- отметки времени дедлайнов;
+- конфликты параллельного доступа;
 - error logs по AttemptId.
 
 Worker batch-based и eventual: изменение не обязано произойти ровно в момент deadline; default scan cadence около 30 секунд.
 
-### Worker cycle-level recovery
+### Восстановление воркера на уровне цикла
 
 Per-attempt processing exceptions логируются; initial/batch DB scan также покрыт cycle-level recovery boundary (`RunCycleAsync`) — как у expiration worker, так и у Outbox batch query/lock/failure-state persistence. Transient dependency failure логируется и worker продолжает на следующий poll tick вместо завершения hosted worker/process.
 
-## 14. PostgreSQL 18 operational policy
+## 14. Эксплуатационная политика PostgreSQL 18
 
 CI выполняет `SHOW server_version_num` и гарантирует PostgreSQL 18+ (`>= 180000`).
 
-### Upgrade rule
+### Правило обновления
 
 Перед изменением PostgreSQL line:
 
@@ -433,7 +433,7 @@ Repository baseline реализован:
 - `scripts/postgresql-restore-verify.sh` восстанавливает только в disposable target database;
 - проверяются table counts, EF migration history и optional business marker;
 - основной CI выполняет recovery drill после migration production image;
-- engineering targets: RPO <= 24h, RTO <= 4h.
+- инженерные цели: RPO <= 24 ч, RTO <= 4 ч.
 
 До production deployment необходимо:
 
@@ -445,11 +445,11 @@ Repository baseline реализован:
 
 Полный runbook: `BACKUP_RESTORE.md`.
 
-### D6 performance verification
+### Проверка производительности D6
 
 PostgreSQL baseline подтверждён полным green run на implementation commit `9916b98`. Artifact содержит 8771/8771 successful checks, HTTP failure rate 0, expiration drain 1247 -> 0 за 14 s и Outbox drain 100 -> 0 за 1 s. RabbitMQ probe использует поддерживаемую 4.3 durable queue topology в одноразовом CI volume.
 
-## 16. Deployment smoke checklist
+## 16. Чек-лист дымового прогона после развёртывания
 
 После rollout:
 
@@ -467,15 +467,15 @@ OTEL -> traces/metrics arrive
 
 Для migration release дополнительно выполнить representative create/publish/assign/start/submit flow в staging.
 
-## 17. Scaling model
+## 17. Модель масштабирования
 
 API можно горизонтально масштабировать при общей PostgreSQL/RabbitMQ/Keycloak инфраструктуре.
 
 Cross-instance safety уже предусмотрена для:
 
-- optimistic aggregate concurrency;
-- unsafe idempotent operations;
-- Outbox message processing.
+- оптимистичный параллельный доступ к агрегатам;
+- небезопасные идемпотентные операции;
+- обработка сообщений Outbox.
 
 Background attempt expiration может выполняться на нескольких replicas: optimistic concurrency делает duplicate attempt completion безопасным, хотя при большом scale можно позже выделить dedicated worker role.
 
@@ -490,7 +490,7 @@ Background attempt expiration может выполняться на неско�
 
 До этого hosted services внутри modular monolith достаточны.
 
-## 19. Production readiness gaps
+## 19. Пробелы готовности к production
 
 До production 1.0 закрыть:
 
@@ -498,6 +498,6 @@ Background attempt expiration может выполняться на неско�
 - deployed secret manager/injection и encrypted backup schedule/PITR policy;
 - реальные dashboard/alert routes и alert drill;
 - immutable dependency/action/image pinning и более узкий secret-scan allowlist;
-- documented rollback/forward-fix release rehearsal.
+- задокументированная репетиция релиза с откатом и исправлением вперёд.
 
 Trusted proxies, CORS/TLS/HSTS configuration contract, configurable rate limiting, repository retention, dead-letter API, security/image scan и SBOM уже реализованы и не должны оставаться в списке отсутствующих возможностей.
