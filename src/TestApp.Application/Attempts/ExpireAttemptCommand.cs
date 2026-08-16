@@ -30,6 +30,8 @@ public sealed class ExpireAttemptCommandHandler(
             return Error.Conflict("attempt.completed", "The attempt is already completed.");
         }
 
+        // The deadline rule itself lives in TestAttempt.Timeout (ADR-030); this is only an early-out that
+        // avoids loading the revision for the attempts the background sweep picked up too eagerly.
         var now = clock.UtcNow;
         if (!attempt.IsExpiredAt(now))
             return Error.Conflict("attempt.not_expired", "The attempt deadline has not expired yet.");

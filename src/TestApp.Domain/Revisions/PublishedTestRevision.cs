@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using TestApp.Core.Monads;
 using TestApp.Domain.Attempts;
 using TestApp.Domain.Common;
@@ -6,8 +7,13 @@ using TestApp.Domain.Tests;
 
 namespace TestApp.Domain.Revisions;
 
-public readonly record struct PublishedTestRevisionId(Guid Value)
+public readonly record struct PublishedTestRevisionId
 {
+    [JsonConstructor]
+    public PublishedTestRevisionId(Guid value) => Value = StrongIdGuard.Ensure(value, "Revision id", nameof(value));
+
+    public Guid Value { get; }
+
     public static PublishedTestRevisionId New() => new(Guid.CreateVersion7());
 }
 

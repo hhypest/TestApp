@@ -40,7 +40,7 @@ Baseline `2026-08-16`, `dotnet test --collect:"XPlat Code Coverage"` (line cover
 | TestApp.Api | 86.7% |
 | **Всего** | **90.3%** |
 
-Всего 282 теста: 26 Core, 106 Domain, 45 Application, 105 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); presentation/resume добавил 15 интеграционных тестов сверх этого замера.
+Всего 314 тестов: 26 Core, 137 Domain, 45 Application, 106 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); presentation/resume добавил 15 интеграционных тестов, `STAB-009` — 31 domain и 1 integration сверх этого замера.
 
 Покрытие воспроизводится локально: `coverlet.collector` подключён во всех четырёх test projects.
 
@@ -425,7 +425,10 @@ Workflow `dotnet` в GitHub Actions:
 - scoring/question invariants — `PublishedRevisionScoringTests.cs`, `TestAuthoringInvariantTests.cs` (табличные тесты по границам; полноценный property-based подход не вводился, см. ниже);
 - инварианты `AttemptScore` и отображения ошибок — `AttemptLifecycleTests.cs`, `ResultMonadTests.cs`;
 - модели чтения студента (`/api/v1/me/*`, детали и результат попытки) — `StudentReadModelQueryTests.cs`;
-- audit trail pagination и фильтры — `AuditTrailPaginationTests.cs`.
+- audit trail pagination и фильтры — `AuditTrailPaginationTests.cs`;
+- контракт value objects (`STAB-009`) — `ValueObjectInvariantTests.cs`: отказ идентификаторов от `Guid.Empty`, согласованность конструктора и фабрики внешних идентификаторов, диапазон `AttemptScore`, round-trip `PublishedQuestion` через `System.Text.Json`. Последний закрывает путь материализации `jsonb`-колонки, который до этого не проверялся ни одним unit-тестом и на котором был найден реальный дефект (см. ADR-029);
+- семантика таймаута (`ADR-030`) — пять тестов в `AttemptLifecycleTests.cs` разделяют deadline-путь и административный `ForceTimeout`;
+- отказ транспорта от нулевого GUID в route/query/body — `RequestValidationContractTests.The_empty_guid_is_answered_by_the_transport_and_never_reaches_the_domain_guard`.
 
 ### P1 (остаётся)
 

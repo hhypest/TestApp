@@ -272,7 +272,7 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 ### Stabilization/correctness
 
-Все P0/P1 stabilization findings текущего backlog (STAB-001..008) закрыты; domain/application errors и value-object invariants имеют единый `Result<T, DomainError>` failure contract (ADR-026).
+Все P0/P1 stabilization findings текущего backlog (STAB-001..009) закрыты: business rules, достижимые через application use case, возвращают `Result<T, DomainError>` (ADR-026), а value objects валидируют себя сами — strong identifiers отвергают `Guid.Empty`, `AttemptScore` требует `0 <= Earned <= Maximum`, `TestAttempt.Timeout` требует наступившего deadline (ADR-029, ADR-030).
 
 Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 90.3% (267 тестов) и закрыл четыре дефекта, найденных при чтении непокрытых участков: порядок проверок в `ReorderQuestion`/`ReorderAnswerOption` (404 вместо 409), смена типа вопроса в обход инварианта single-choice, отсутствие tie-breaker в audit pagination (пропуск STAB-006) и nullable-аннотация `Result.TryGetError`. Роль, определяющая owner-scope, консолидирована в одном месте. Детали — `docs/TESTING.md` §2/§14 и `CHANGELOG.md`.
 

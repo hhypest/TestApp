@@ -222,6 +222,12 @@ public sealed class AssignmentAndAttemptCommandTests
 
     // --------------------------------------------------------- manual timeout
 
+    /// <summary>
+    /// The attempt built by <c>NewAttempt()</c> has no deadline at all, so this is the case ADR-030 keeps
+    /// alive: the manual endpoint closes attempts the clock never will, and it is the only handler allowed
+    /// to do so. Every other caller of the timeout path goes through the deadline-checked
+    /// <c>TestAttempt.Timeout</c>.
+    /// </summary>
     [Fact]
     public async Task An_administrator_can_time_out_an_in_progress_attempt()
     {

@@ -417,6 +417,13 @@ Failed
 
 Timeout тоже вычисляет реальный score по сохранённым responses; он не означает автоматически 0 points.
 
+Завершить попытку по таймауту можно двумя путями, и агрегат их различает (ADR-030):
+
+- `Timeout(...)` — автоматический путь. Требует, чтобы deadline уже наступил, иначе `attempt.not_expired` (409). Попытку без deadline этим путём завершить нельзя.
+- `ForceTimeout(...)` — ручное завершение администратором (`POST /api/v1/attempts/{id}/timeout`, `tests:assign`). Deadline не требуется; остальные инварианты (`InProgress`, `CompletedAt >= StartedAt`) сохраняются.
+
+Оба пути дают статус `TimedOut` и событие `AttemptTimedOut` — различие видно в audit trail, а не в форме события.
+
 ## 9. Доменные события
 
 Текущие domain events включают:
@@ -476,11 +483,16 @@ Test.OwnerId = Keycloak sub создавшего автора
 
 Эти concepts перечислены в `FEATURE_PLAN.md` как planned/decision-required и не являются частью текущего domain contract.
 
-### Известные invariant gaps до 1.0
+### Value-object contract
 
-- positional constructors strong IDs позволяют создать `Guid.Empty`, а `ExternalUserId`/`ExternalGroupId` позволяют обойти validating factory;
-- `AttemptScore` сам не запрещает negative values или `Earned > Maximum`;
-- admin `Timeout` принимает вычисленный caller score/outcome и не требует, чтобы deadline уже наступил;
-- string validation в части `Result<..., DomainError>` methods всё ещё может выбросить `ArgumentException`.
+Закрыто `2026-08-16` (`STAB-009`, ADR-029/ADR-030) — раздел перечислял четыре пробела, все они устранены:
 
-Application/API сейчас поставляют корректные значения и validation boundary, но aggregate/value-object contract должен стать self-validating и единообразным до public 1.0 freeze.
+- strong IDs (`TestId`, `QuestionId`, `AnswerOptionId`, `TestAssignmentId`, `TestAttemptId`, `PublishedTestRevisionId`) отвергают `Guid.Empty` в конструкторе;
+- `ExternalUserId`/`ExternalGroupId` проверяют значение в конструкторе, поэтому `new` больше не обходит `FromSubject`/`FromExternalId`;
+- `AttemptScore` требует `0 <= Earned <= Maximum` и `Maximum >= 0`;
+- `TestAttempt.Timeout` требует наступившего deadline и отвечает `attempt.not_expired`; административное завершение живой попытки выделено в `ForceTimeout` (ADR-030).
+
+Остаются два ограничения, которые не устраняются средствами языка и потому фиксируются здесь явно:
+
+- `default(TId)`/`new TId()` для struct-идентификаторов недостижимо запретить — неявный parameterless конструктор структуры всегда доступен. Инвариант закрывает явные пути построения; нулевой GUID из внешнего запроса отвергается на границе транспорта (`RequestValidationFilter`, `NotEmptyGuidAttribute`) до попадания в модель.
+- guard-инварианты, недостижимые при корректно сформированном caller (null Id в `Entity`, unreachable switch default, длина внешних идентификаторов), намеренно остаются исключениями — критерий отбора см. ADR-026.

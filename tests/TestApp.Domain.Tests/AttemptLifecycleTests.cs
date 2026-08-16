@@ -304,24 +304,104 @@ public sealed class AttemptLifecycleTests
         Assert.Equal(AttemptOutcome.Passed, attempt.Outcome);
     }
 
+    /// <summary>
+    /// ADR-030: the deadline is the authority on <see cref="TestAttempt.Timeout"/>. Before STAB-009 the
+    /// aggregate accepted any timestamp, so an attempt could be closed as timed out before its deadline —
+    /// or with no deadline at all — and only the calling handler stood between that and a student's score.
+    /// </summary>
+    [Fact]
+    public void Timeout_is_refused_before_the_deadline_is_reached()
+    {
+        var deadline = Start.AddMinutes(30);
+        var attempt = NewAttempt(deadline);
+
+        var result = attempt.Timeout(deadline.AddSeconds(-1), AnyScore, passed: false);
+
+        Assert.True(result.TryGetError(out var error));
+        Assert.Equal("attempt.not_expired", error.Code);
+        Assert.Equal(AttemptStatus.InProgress, attempt.Status);
+    }
+
+    [Fact]
+    public void Timeout_is_refused_when_the_attempt_has_no_deadline()
+    {
+        var attempt = NewAttempt();
+
+        var result = attempt.Timeout(Start.AddYears(1), AnyScore, passed: false);
+
+        Assert.True(result.TryGetError(out var error));
+        Assert.Equal("attempt.not_expired", error.Code);
+        Assert.Equal(AttemptStatus.InProgress, attempt.Status);
+    }
+
+    /// <summary>
+    /// The administrator path keeps the capability the deadline path gives up: ending an attempt the clock
+    /// will never end. It is a separate method so the call site has to say which authority it is using.
+    /// </summary>
+    [Fact]
+    public void Force_timeout_closes_an_attempt_that_has_no_deadline()
+    {
+        var attempt = NewAttempt();
+        var score = new AttemptScore(1m, 4m);
+
+        var result = attempt.ForceTimeout(Start.AddMinutes(5), score, passed: false);
+
+        Assert.False(result.TryGetError(out _));
+        Assert.Equal(AttemptStatus.TimedOut, attempt.Status);
+        Assert.Equal(AttemptOutcome.Failed, attempt.Outcome);
+        Assert.Equal(score, attempt.Score);
+    }
+
+    [Fact]
+    public void Force_timeout_still_refuses_a_completion_time_before_the_start()
+    {
+        var attempt = NewAttempt();
+
+        var result = attempt.ForceTimeout(Start.AddMinutes(-1), AnyScore, passed: false);
+
+        Assert.True(result.TryGetError(out var error));
+        Assert.Equal("attempt.completed_at", error.Code);
+        Assert.Equal(AttemptStatus.InProgress, attempt.Status);
+    }
+
+    [Fact]
+    public void Both_timeout_paths_raise_the_same_completion_event()
+    {
+        var deadline = Start.AddMinutes(30);
+        var expired = NewAttempt(deadline);
+        var forced = NewAttempt();
+
+        Assert.False(expired.Timeout(deadline, AnyScore, passed: false).TryGetError(out _));
+        Assert.False(forced.ForceTimeout(Start.AddMinutes(5), AnyScore, passed: false).TryGetError(out _));
+
+        Assert.Contains(expired.DomainEvents, e => e is AttemptTimedOut);
+        Assert.Contains(forced.DomainEvents, e => e is AttemptTimedOut);
+        Assert.Equal(AttemptStatus.TimedOut, expired.Status);
+        Assert.Equal(AttemptStatus.TimedOut, forced.Status);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void A_completed_attempt_cannot_be_completed_again(bool submitFirst)
     {
-        var attempt = NewAttempt();
+        var deadline = Start.AddMinutes(5);
+        var attempt = NewAttempt(deadline);
         var first = submitFirst
-            ? attempt.Submit(Start.AddMinutes(5), AnyScore, passed: true)
-            : attempt.Timeout(Start.AddMinutes(5), AnyScore, passed: false);
+            ? attempt.Submit(Start.AddMinutes(4), AnyScore, passed: true)
+            : attempt.Timeout(deadline, AnyScore, passed: false);
         Assert.False(first.TryGetError(out _));
 
         var submitAgain = attempt.Submit(Start.AddMinutes(6), AnyScore, passed: true);
         var timeoutAgain = attempt.Timeout(Start.AddMinutes(6), AnyScore, passed: false);
+        var forceTimeoutAgain = attempt.ForceTimeout(Start.AddMinutes(6), AnyScore, passed: false);
 
         Assert.True(submitAgain.TryGetError(out var submitError));
         Assert.Equal("attempt.completed", submitError.Code);
         Assert.True(timeoutAgain.TryGetError(out var timeoutError));
         Assert.Equal("attempt.completed", timeoutError.Code);
+        Assert.True(forceTimeoutAgain.TryGetError(out var forceTimeoutError));
+        Assert.Equal("attempt.completed", forceTimeoutError.Code);
     }
 
     [Fact]

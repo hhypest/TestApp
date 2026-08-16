@@ -34,6 +34,19 @@ public sealed class RequestValidationFilter : IEndpointFilter
                 continue;
             }
 
+            if (value is Guid routedOrQueriedId && routedOrQueriedId == Guid.Empty)
+            {
+                // The strong identifiers refuse the zero GUID (ADR-029), so it has to be answered here
+                // rather than by letting the constructor throw. A route segment names a resource, and a
+                // resource that can never exist is a 404 — which is also what this used to return before
+                // the identifiers started validating. A query filter is an input value, so it is a 400.
+                if (context.HttpContext.Request.RouteValues.ContainsKey(parameterName))
+                    return Results.NotFound();
+
+                AddError(errors, ToJsonName(parameterName), "The value must not be an empty GUID.");
+                continue;
+            }
+
             if (value is IApiRequest request)
                 ValidateRequest(request, string.Empty, errors);
         }

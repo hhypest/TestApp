@@ -121,6 +121,50 @@ public sealed class RequestValidationContractTests
         await AssertDomainValidationProblem(invalidAttemptLimit, "assignment.attempt_limit", ct);
     }
 
+    /// <summary>
+    /// The strong identifiers refuse <see cref="Guid.Empty"/> since STAB-009/ADR-029, so the transport has
+    /// to answer the zero GUID before the constructor gets the chance to throw — otherwise any client could
+    /// turn a domain guard into a 500. A route segment names a resource that cannot exist (404, unchanged
+    /// from the behaviour before the identifiers validated); a query filter or a body field is an input
+    /// value (400).
+    /// </summary>
+    [Fact]
+    public async Task The_empty_guid_is_answered_by_the_transport_and_never_reaches_the_domain_guard()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        await using var factory = CreateFactory(database.ConnectionString);
+        using var client = factory.CreateClient();
+        var empty = Guid.Empty;
+
+        Authenticate(client, "author-empty-guid", "test-author");
+
+        using (var routeId = await client.GetAsync($"/api/v1/tests/{empty}/editor", ct))
+            Assert.Equal(HttpStatusCode.NotFound, routeId.StatusCode);
+
+        using (var nestedRouteId = await client.PostAsJsonAsync(
+                   $"/api/v1/tests/{empty}/questions",
+                   new QuestionWriteRequest("Pick one", QuestionType.SingleChoice, 1m, 1),
+                   ct))
+            Assert.Equal(HttpStatusCode.NotFound, nestedRouteId.StatusCode);
+
+        Authenticate(client, "admin-empty-guid", "test-admin");
+
+        using (var queryFilter = await client.GetAsync($"/api/v1/assignments?testId={empty}", ct))
+            await AssertValidationProblem(queryFilter, ct);
+
+        using (var bodyReference = await client.PostAsJsonAsync(
+                   "/api/v1/assignments",
+                   new AssignRequest(empty, "student-1", null, DateTimeOffset.UtcNow, null, null, Guid.NewGuid()),
+                   ct))
+            await AssertValidationProblem(bodyReference, ct);
+
+        // A real, unknown identifier keeps reporting "not found" rather than "invalid": the guard added by
+        // STAB-009 is about the zero GUID only, not about identifiers that simply do not resolve.
+        using var unknown = await client.GetAsync($"/api/v1/tests/{Guid.CreateVersion7()}/editor", ct);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
     private static async Task AssertDomainValidationProblem(HttpResponseMessage response, string expectedCode, CancellationToken ct)
     {
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

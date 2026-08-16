@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using TestApp.Core.Monads;
 using TestApp.Domain.Assignments;
 using TestApp.Domain.Common;
@@ -9,16 +10,48 @@ using TestApp.Domain.Tests;
 
 namespace TestApp.Domain.Attempts;
 
-public readonly record struct TestAttemptId(Guid Value)
+public readonly record struct TestAttemptId
 {
+    [JsonConstructor]
+    public TestAttemptId(Guid value) => Value = StrongIdGuard.Ensure(value, "Attempt id", nameof(value));
+
+    public Guid Value { get; }
+
     public static TestAttemptId New() => new(Guid.CreateVersion7());
 }
 
 public enum AttemptStatus { InProgress = 1, Submitted = 2, TimedOut = 3 }
 public enum AttemptOutcome { Passed = 1, Failed = 2 }
 
-public sealed record AttemptScore(decimal Earned, decimal Maximum)
+/// <summary>
+/// Points earned out of the points available on the published revision the attempt was started from.
+/// </summary>
+/// <remarks>
+/// The constructor is the only construction path open to application code, so the range invariant holds for
+/// every score the model produces. The private parameterless constructor exists solely for EF Core
+/// materialisation of the owned <c>score_earned</c>/<c>score_maximum</c> columns — reading back a row that
+/// was written before the invariant existed must not throw, which is the same materialisation contract the
+/// aggregates themselves use.
+/// </remarks>
+public sealed record AttemptScore
 {
+    private AttemptScore() { }
+
+    public AttemptScore(decimal earned, decimal maximum)
+    {
+        if (maximum < 0m)
+            throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "Maximum score cannot be negative.");
+        if (earned < 0m)
+            throw new ArgumentOutOfRangeException(nameof(earned), earned, "Earned score cannot be negative.");
+        if (earned > maximum)
+            throw new ArgumentOutOfRangeException(nameof(earned), earned, "Earned score cannot exceed the maximum score.");
+
+        Earned = earned;
+        Maximum = maximum;
+    }
+
+    public decimal Earned { get; private set; }
+    public decimal Maximum { get; private set; }
     public decimal Percentage => Maximum <= 0 ? 0 : Math.Round(Earned / Maximum * 100m, 2);
 }
 
@@ -126,11 +159,35 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
         return this;
     }
 
+    /// <summary>
+    /// Closes the attempt because its own deadline has passed. The deadline is the authority: an attempt
+    /// whose deadline has not been reached — including an attempt started from a revision without a time
+    /// limit, which has no deadline at all — cannot be timed out through this path.
+    /// </summary>
     public Result<TestAttempt, DomainError> Timeout(DateTimeOffset timedOutAt, AttemptScore score, bool passed)
     {
         timedOutAt = timedOutAt.ToUniversalTime();
         var active = EnsureInProgress(); if (active.IsFailure) return active;
         if (timedOutAt < StartedAt) return DomainError.Validation("attempt.completed_at", "Completion time cannot be earlier than start time.");
+        if (!IsExpiredAt(timedOutAt)) return DomainError.Conflict("attempt.not_expired", "The attempt deadline has not expired yet.");
+        return CompleteTimedOut(timedOutAt, score, passed);
+    }
+
+    /// <summary>
+    /// Closes the attempt on an operator's authority rather than the clock's. Used by the manual
+    /// administrator timeout, which exists precisely to end attempts the deadline will never end —
+    /// an attempt with no time limit, or one that has to be closed early. See ADR-030.
+    /// </summary>
+    public Result<TestAttempt, DomainError> ForceTimeout(DateTimeOffset timedOutAt, AttemptScore score, bool passed)
+    {
+        timedOutAt = timedOutAt.ToUniversalTime();
+        var active = EnsureInProgress(); if (active.IsFailure) return active;
+        if (timedOutAt < StartedAt) return DomainError.Validation("attempt.completed_at", "Completion time cannot be earlier than start time.");
+        return CompleteTimedOut(timedOutAt, score, passed);
+    }
+
+    private Result<TestAttempt, DomainError> CompleteTimedOut(DateTimeOffset timedOutAt, AttemptScore score, bool passed)
+    {
         Complete(AttemptStatus.TimedOut, timedOutAt, score, passed);
         Raise(new AttemptTimedOut(Id, score, Outcome!.Value, timedOutAt));
         return this;

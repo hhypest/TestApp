@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using TestApp.Core.Monads;
 using TestApp.Domain.Common;
 using TestApp.Domain.Entities;
@@ -12,8 +13,13 @@ public static class TestAssignmentLimits
     public const int CancelReasonMaxLength = 1000;
 }
 
-public readonly record struct TestAssignmentId(Guid Value)
+public readonly record struct TestAssignmentId
 {
+    [JsonConstructor]
+    public TestAssignmentId(Guid value) => Value = StrongIdGuard.Ensure(value, "Assignment id", nameof(value));
+
+    public Guid Value { get; }
+
     public static TestAssignmentId New() => new(Guid.CreateVersion7());
 }
 

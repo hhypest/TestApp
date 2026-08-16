@@ -281,7 +281,9 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 # 7. `1.0.0` — Фаза E: стабилизация / кандидат в production-релиз
 
 **Приоритет: P0**  
-**Статус: В РАБОТЕ — фаза D7 закрыта, пункты 13–15 готовы, из пункта 10 готова часть про release notes (DEV-005), из пункта 12 готова local/CI-часть (OBS-012/013, ADR-027), остальное из 1–12 открыто**
+**Статус: В РАБОТЕ — фаза D7 закрыта, пункты 13–16 готовы, из пункта 10 готова часть про release notes (DEV-005), из пункта 12 готова local/CI-часть (OBS-012/013, ADR-027), остальное из 1–12 открыто**
+
+> Пункт 15 до `2026-08-16` формулировался шире, чем закрывал: он объединял application-level failure contract (действительно закрытый STAB-008) и self-validating value objects, которые ADR-026 сознательно оставлял открытыми, — и при этом был помечен `DONE`, тогда как `DOMAIN_MODEL.md` §11 продолжал перечислять те же пробелы как открытые. Расхождение нашёл независимый аудит ветки на `0b94db3`. Пункт разделён на 15 и 16; оба закрыты, 16 — через STAB-009.
 
 До freeze 1.0 требуется:
 
@@ -299,7 +301,8 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 12. дашборды и алерты SLO отработаны против staging (**ГОТОВО локально/в CI:** Prometheus + Grafana добавлены в `compose.yaml`, дашборд и выражения правил алертов реализованы и проверяются в CI — OBS-012/OBS-013, ADR-027; остаётся открытым — маршрутизация алертов в actionable-назначение, readiness-пробер и сам drill на staging, см. `docs/SLO_ALERTS.md` §7);
 13. **DONE:** deterministic pagination order (`timestamp + ID`) на всех paged read models;
 14. **DONE:** reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;
-15. **DONE:** domain/application error и value-object invariants имеют единый ожидаемый failure contract (STAB-008, ADR-026).
+15. **DONE:** domain/application error contract единый — business rules, достижимые через application use case, возвращают `Result<T, DomainError>`, а не сырые исключения (STAB-008, ADR-026);
+16. **DONE:** value objects валидируют себя сами — strong identifiers отвергают `Guid.Empty`, `AttemptScore` требует `0 <= Earned <= Maximum`, `TestAttempt.Timeout` требует наступившего deadline (STAB-009, ADR-029, ADR-030).
 
 **1.0 definition:** production-safe core assessment workflow, а не максимальное число типов вопросов.
 

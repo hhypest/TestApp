@@ -37,7 +37,7 @@ public sealed record OrderRequest(int Order) : IApiRequest;
 public sealed record PublishRequest(Guid IdempotencyKey) : IApiRequest;
 
 public sealed record AssignRequest(
-    Guid RevisionId,
+    [property: NotEmptyGuid] Guid RevisionId,
     [property: StringLength(ExternalIdentityLimits.MaxIdentifierLength)] string? UserId,
     [property: StringLength(ExternalIdentityLimits.MaxIdentifierLength)] string? GroupId,
     DateTimeOffset AvailableFrom,
@@ -50,7 +50,7 @@ public sealed record BulkAssignmentTargetRequest(
     [property: StringLength(ExternalIdentityLimits.MaxIdentifierLength)] string? GroupId) : IApiRequest;
 
 public sealed record BulkAssignRequest(
-    Guid RevisionId,
+    [property: NotEmptyGuid] Guid RevisionId,
     [property: Required] IReadOnlyCollection<BulkAssignmentTargetRequest> Targets,
     DateTimeOffset AvailableFrom,
     DateTimeOffset? AvailableUntil,
@@ -67,4 +67,4 @@ public sealed record StartAttemptRequest(Guid IdempotencyKey) : IApiRequest;
 public sealed record SubmitAttemptRequest(Guid IdempotencyKey) : IApiRequest;
 
 public sealed record AnswerQuestionRequest(
-    [property: Required] IReadOnlyCollection<Guid> OptionIds) : IApiRequest;
+    [property: Required, NotEmptyGuid] IReadOnlyCollection<Guid> OptionIds) : IApiRequest;

@@ -154,7 +154,8 @@ public sealed class TimeoutAttemptCommandHandler(
         var revision = await revisions.GetAsync(attempt.RevisionId, ct);
         if (revision is null) return Error.NotFound("revision.not_found", "Published test revision was not found.");
         var score = revision.CalculateScore(attempt.Responses);
-        var result = attempt.Timeout(clock.UtcNow, score, revision.IsPassed(score));
+        // Manual administrator timeout: the operator's authority, not the deadline (ADR-030).
+        var result = attempt.ForceTimeout(clock.UtcNow, score, revision.IsPassed(score));
         var error = result.Match<Error?>(_ => null, e => e.ToApplicationError());
         if (error is not null) return error;
         await unitOfWork.SaveChangesAsync(ct);

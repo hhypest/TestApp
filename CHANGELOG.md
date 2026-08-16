@@ -8,7 +8,7 @@
 
 ## [Unreleased] — на пути к `1.0.0` (Phase E)
 
-Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта, `0.9.5` закрыл coverage/review pass, `0.9.6` — student presentation/resume (Phase F0 досрочно). Открытые пункты 1.0 release gate (`docs/ROADMAP.md` Phase E) вне этой ветки кода:
+Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта, `0.9.5` закрыл coverage/review pass, `0.9.6` — student presentation/resume (Phase F0 досрочно), `0.9.7` — self-validating value objects (`STAB-009`). Открытые пункты 1.0 release gate (`docs/ROADMAP.md` Phase E) вне этой ветки кода:
 
 - staging restore drill с измеренным RTO;
 - маршрутизация алертов в actionable destination (Alertmanager + pager/chat) и alert drill против staging;
@@ -21,6 +21,30 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 
 - `CHANGELOG.md` (этот файл) — `DEV-005`.
 - Prometheus + Grafana в `compose.yaml` как local/CI observability backend позади OTel Collector: provisioned dashboard (`TestApp Overview`) и alert rule expressions, реализующие весь технически выразимый контракт `docs/SLO_ALERTS.md` §4/§6 — `OBS-012`, `OBS-013`, ADR-027. Новый CI workflow `observability` и `scripts/validate-observability-stack.sh` держат стек в проверенном состоянии.
+
+## [0.9.7] — Self-validating value objects (`STAB-009`)
+
+Закрывает четыре «invariant gaps до 1.0», которые `docs/DOMAIN_MODEL.md` §11 перечислял сам и которые подтвердил независимый аудит ветки на `0b94db3`. Соответствует пункту 16 Phase E gate.
+
+### Changed
+
+- Strong identifiers (`TestId`, `QuestionId`, `AnswerOptionId`, `TestAssignmentId`, `TestAttemptId`, `PublishedTestRevisionId`) отвергают `Guid.Empty` в конструкторе. `ExternalUserId`/`ExternalGroupId` перенесли проверку из фабрик в конструктор, поэтому `new` больше не обходит `FromSubject`/`FromExternalId`. См. ADR-029 — там же объяснено, почему конструктор, а не приватный конструктор со статической фабрикой.
+- `AttemptScore` требует `0 <= Earned <= Maximum` и `Maximum >= 0`.
+- `TestAttempt.Timeout` требует наступившего deadline и отвечает `attempt.not_expired` (409), если он не наступил или его нет. Ручное административное завершение живой попытки выделено в новый метод `TestAttempt.ForceTimeout` — возможность сохранена (`POST /api/v1/attempts/{id}/timeout` работает как раньше), но call site теперь обязан назвать, чьей властью он закрывает попытку. См. ADR-030: это продуктовое решение, а не только техническое.
+
+### Fixed
+
+- **Нулевой GUID больше не превращается в `500`.** Поскольку identifiers отказываются строиться из `Guid.Empty`, транспорт отвечает раньше конструктора: `404` для route-сегмента (как и до появления валидации), `400 request.validation` для query-фильтра и для GUID-полей тела запроса (`NotEmptyGuidAttribute`). Контракт задокументирован в `docs/API.md` §5.
+- **Молчаливая потеря идентификаторов при чтении `jsonb`.** Промежуточная версия правки объявляла `Value` как get-only свойство: сборка и все 177 unit-тестов проходили, но `System.Text.Json` не мог ни вызвать конструктор, ни записать свойство и отдавал `Guid.Empty` для каждого идентификатора внутри `PublishedTestRevision.Questions`. Дефект пойман новым round-trip-тестом, а не интеграционным прогоном; закрыт `[JsonConstructor]`, который заодно делает материализацию `jsonb` валидируемой.
+
+### Tests
+
+- `ValueObjectInvariantTests.cs` — 18 тестов контракта value objects, включая round-trip `PublishedQuestion` через `System.Text.Json` (подтверждённо red без `[JsonConstructor]`).
+- Пять тестов timeout-семантики в `AttemptLifecycleTests.cs` разделяют deadline-путь и `ForceTimeout`.
+- HTTP-контракт нулевого GUID — `RequestValidationContractTests`.
+- Итог: 314 тестов (26 Core, 137 Domain, 45 Application, 106 Integration), сборка без предупреждений.
+
+Документация: ADR-029, ADR-030, `docs/DOMAIN_MODEL.md` §8.7/§11, `docs/API.md` §5/§14, `docs/ROADMAP.md` Phase E (пункт 15 разделён на 15 и 16 — он был помечен `DONE`, но формулировался шире того, что закрывал STAB-008; расхождение с `DOMAIN_MODEL.md` §11 нашёл тот же аудит), `docs/FEATURE_PLAN.md` `STAB-009`, `docs/TESTING.md` §2/§14.
 
 ## [0.9.6] — Student-safe attempt presentation и resume
 
