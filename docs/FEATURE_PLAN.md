@@ -75,7 +75,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 ---
 
-## Current `0.9.4` stabilization backlog
+## Текущий backlog стабилизации `0.9.4`
 
 | ID | Priority | Status | Scope |
 |---|---:|---|---|
@@ -104,28 +104,28 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 ---
 
-# B. Production hardening baseline
+# B. Базовое усиление для production
 
-## CFG-001 — Fail-fast Database configuration
+## CFG-001 — Конфигурация базы данных с ранним отказом
 
 - **Приоритет:** P0
 - **Трудоёмкость:** S
 - **Статус:** ГОТОВО
 - **Зависимости:** none
 
-### Implemented scope
+### Реализованный объём
 
 - убрать production fallback `testapp/testapp`;
 - Development default оставить только явно;
-- validated options/startup check.
+- проверенные опции и стартовая проверка.
 
 ### Критерии приёмки
 
-- Production without `ConnectionStrings:Database` fails before serving traffic;
+- production без `ConnectionStrings:Database` падает до приёма трафика;
 - secret не логируется;
-- integration test host startup failure.
+- интеграционный тест падения запуска хоста.
 
-## CFG-002 — Validate Keycloak configuration
+## CFG-002 — Валидация конфигурации Keycloak
 
 - **Приоритет:** P0
 - **Трудоёмкость:** S
@@ -133,11 +133,11 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 
 ### Критерии приёмки
 
-- Production requires non-empty Authority/Audience;
-- invalid URL rejected;
-- HTTPS metadata remains required outside Development.
+- production требует непустых Authority/Audience;
+- некорректный URL отклоняется;
+- HTTPS для метаданных остаётся обязательным вне Development.
 
-## CFG-003 — Typed RabbitMQ/worker options binding
+## CFG-003 — Типизированная привязка опций RabbitMQ и воркеров
 
 - **Приоритет:** P1
 - **Трудоёмкость:** S
@@ -146,10 +146,10 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 Bind/validate:
 
 - RabbitMQ;
-- Outbox delivery;
-- attempt expiration.
+- доставка Outbox;
+- истечение попыток.
 
-## EDGE-001 — Trusted forwarded headers
+## EDGE-001 — Доверенные forwarded-заголовки
 
 - **Приоритет:** P0
 - **Трудоёмкость:** M
@@ -157,11 +157,11 @@ Bind/validate:
 
 ### Критерии приёмки
 
-- configured KnownProxies/KnownNetworks;
-- untrusted `X-Forwarded-For` cannot spoof rate-limit partition;
-- scheme/IP tests.
+- настроенные KnownProxies/KnownNetworks;
+- недоверенный `X-Forwarded-For` не может подменить ключ партиционирования rate limit;
+- тесты схемы и IP.
 
-## EDGE-002 — CORS policy
+## EDGE-002 — Политика CORS
 
 - **Приоритет:** P0 if browser frontend deployed
 - **Трудоёмкость:** S
@@ -169,19 +169,19 @@ Bind/validate:
 
 ### Критерии приёмки
 
-- explicit origin allow-list;
+- явный список разрешённых источников;
 - no `AllowAnyOrigin + credentials`;
-- env-specific config.
+- конфигурация под окружение.
 
-## EDGE-003 — HTTPS/HSTS deployment policy
+## EDGE-003 — Политика HTTPS/HSTS при развёртывании
 
 - **Приоритет:** P0
 - **Трудоёмкость:** S/M
 - **Статус:** ГОТОВО
 
-Document and test ingress termination behavior.
+Задокументировать и протестировать поведение терминации на ingress.
 
-## EDGE-004 — Configurable rate limits
+## EDGE-004 — Настраиваемые лимиты частоты
 
 - **Приоритет:** P0
 - **Трудоёмкость:** M
@@ -190,34 +190,34 @@ Document and test ingress termination behavior.
 ### Policies
 
 - general;
-- student write;
-- reviewer/admin expensive read;
+- запись студента;
+- тяжёлое чтение рецензента и администратора;
 - operations.
 
 ### Критерии приёмки
 
-- configuration binding;
+- привязка конфигурации;
 - deterministic 429 tests;
-- correlation still returned on rejection.
+- корреляция возвращается и при отклонении.
 
-## API-SEC-001 — Production OpenAPI policy
+## API-SEC-001 — Политика OpenAPI в production
 
 - **Приоритет:** P0
 - **Трудоёмкость:** S
 - **Статус:** ГОТОВО
 
-Configuration decides public/internal/disabled.
+Конфигурация определяет режим: публичный, внутренний или выключенный.
 
-## CI-SEC-001 — Dependency vulnerability gate
+## CI-SEC-001 — Гейт уязвимостей зависимостей
 
 - **Приоритет:** P0
 - **Трудоёмкость:** S/M
 - **Статус:** ГОТОВО
 
-- NuGet vulnerability check;
-- fail on high/critical agreed policy.
+- проверка уязвимостей NuGet;
+- падение при high/critical согласно принятой политике.
 
-## CI-SEC-002 — Container image scan/SBOM
+## CI-SEC-002 — Сканирование образа и SBOM
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
@@ -227,7 +227,7 @@ Configuration decides public/internal/disabled.
 
 # C. Ownership и authorization
 
-## AUTHZ-001 — Test ownership model
+## AUTHZ-001 — Модель владения тестом
 
 - **Приоритет:** P0
 - **Трудоёмкость:** L
@@ -239,74 +239,74 @@ Configuration decides public/internal/disabled.
 
 **B. Workspace + membership** — правильнее для multi-team/multi-tenant.
 
-### Minimum acceptance
+### Минимальные критерии приёмки
 
-- every Test has non-null ownership scope;
-- creation assigns current actor;
-- migration/backfill existing tests;
-- indexed SQL filters.
+- у каждого `Test` есть непустая область владения;
+- при создании владельцем становится текущий актор;
+- миграция и заполнение существующих тестов;
+- индексируемые SQL-фильтры.
 
-## AUTHZ-002 — Author catalog isolation
-
-- **Приоритет:** P0
-- **Трудоёмкость:** M
-- **Зависимости:** AUTHZ-001
-- **Статус:** ГОТОВО
-
-Author sees only allowed scope; admin behavior explicitly defined.
-
-## AUTHZ-003 — Authoring command ownership
+## AUTHZ-002 — Изоляция каталога автора
 
 - **Приоритет:** P0
 - **Трудоёмкость:** M
 - **Зависимости:** AUTHZ-001
 - **Статус:** ГОТОВО
 
-Protect rename/settings/question/option/publish/archive.
+Автор видит только разрешённую область; поведение администратора определено явно.
 
-## AUTHZ-004 — Revision access isolation
+## AUTHZ-003 — Владение при командах авторинга
+
+- **Приоритет:** P0
+- **Трудоёмкость:** M
+- **Зависимости:** AUTHZ-001
+- **Статус:** ГОТОВО
+
+Защитить переименование, настройки, вопросы, варианты, публикацию и архивирование.
+
+## AUTHZ-004 — Изоляция доступа к ревизиям
 
 - **Приоритет:** P0
 - **Трудоёмкость:** S/M
 - **Зависимости:** AUTHZ-001
 - **Статус:** ГОТОВО
 
-## AUTHZ-005 — Reviewer result isolation
+## AUTHZ-005 — Изоляция результатов рецензирования
 
 - **Приоритет:** P0
 - **Трудоёмкость:** M
 - **Зависимости:** AUTHZ-001
 - **Статус:** ГОТОВО
 
-Two-author E2E negative test mandatory.
+Сквозной негативный тест с двумя авторами обязателен.
 
-## AUTHZ-006 — Admin scope policy
+## AUTHZ-006 — Политика области администратора
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО — `test-admin` has explicit global scope
 
-Decision: current `test-admin` scope is global. Workspace admin is reconsidered only with a Workspace/Tenant model.
+Решение: текущая область `test-admin` глобальная. Администратор уровня workspace пересматривается только вместе с моделью Workspace/Tenant.
 
-## ID-001 — `(Issuer, Subject)` external identity
+## ID-001 — Внешняя идентичность `(Issuer, Subject)`
 
 - **Приоритет:** P1; P0 if multi-realm production
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ/PLANNED
 
-### Migration impact
+### Влияние на миграцию
 
 - assignments;
 - attempts;
 - idempotency;
 - audit;
 - ownership;
-- integration events;
+- интеграционные события;
 - indexes.
 
 ---
 
-# D. API contract maturity
+# D. Зрелость контракта API
 
 ## API-001 — Standard `Idempotency-Key` header
 
@@ -318,29 +318,29 @@ Decision: current `test-admin` scope is global. Workspace admin is reconsidered 
 
 - publish;
 - assign;
-- bulk assign;
-- start attempt;
+- массовое назначение;
+- старт попытки;
 - submit.
 
 ### Критерии приёмки
 
-- header required for designated commands;
-- body key transitional support;
-- generated OpenAPI;
-- stable validation error.
+- заголовок обязателен для назначенных команд;
+- переходная поддержка ключа в теле;
+- сгенерированный OpenAPI;
+- стабильная ошибка валидации.
 
-Publish/start/submit accept a true zero-length body (nullable Minimal API body parameter); the key may live only in the `Idempotency-Key` header (API-009).
+Публикация, старт и отправка принимают настоящее тело нулевой длины (nullable-параметр тела Minimal API); ключ может находиться только в заголовке `Idempotency-Key` (API-009).
 
-## API-002 — Idempotency request fingerprint
+## API-002 — Отпечаток запроса для идемпотентности
 
 - **Приоритет:** P0/P1
 - **Трудоёмкость:** M
 - **Зависимости:** API-001
 - **Статус:** ГОТОВО
 
-Same key + different payload must not silently replay unrelated result.
+Тот же ключ с другим payload не должен молча возвращать несвязанный результат.
 
-Store canonical request hash with record.
+Хранить канонический хеш запроса вместе с записью.
 
 ## API-003 — ETag / `If-Match`
 
@@ -348,23 +348,23 @@ Store canonical request hash with record.
 - **Трудоёмкость:** M/L
 - **Статус:** ГОТОВО
 
-Expose aggregate version on mutable author/admin resources.
+Публиковать версию агрегата на изменяемых ресурсах автора и администратора.
 
 ### Критерии приёмки
 
-- stale If-Match -> 412/409 policy documented;
-- no blind lost update;
-- OpenAPI examples.
+- задокументированная политика устаревшего If-Match -> 412/409;
+- отсутствие незаметной потери обновления;
+- примеры в OpenAPI.
 
-## API-004 — Unified request validation
+## API-004 — Единая валидация запросов
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО
 
-Length/range/required/enum validation before handler where transport-specific.
+Валидация длины, диапазона, обязательности и перечислений до обработчика там, где она специфична для транспорта.
 
-## API-005 — OpenAPI enrichment
+## API-005 — Обогащение OpenAPI
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
@@ -372,20 +372,20 @@ Length/range/required/enum validation before handler where transport-specific.
 
 - descriptions;
 - examples;
-- policy/security metadata;
+- метаданные политик и безопасности;
 - ProblemDetails;
-- enum values;
+- значения перечислений;
 - pagination;
 - idempotency.
 
-## API-006 — OpenAPI contract snapshot test
+## API-006 — Снимочный контрактный тест OpenAPI
 
 - **Приоритет:** P1
 - **Трудоёмкость:** S/M
 - **Зависимости:** API-005
 - **Статус:** ГОТОВО
 
-Detect accidental breaking changes.
+Обнаруживать случайные ломающие изменения.
 
 ## API-007 — Legacy `/api/*` deprecation
 
@@ -395,20 +395,20 @@ Detect accidental breaking changes.
 
 ### Steps
 
-1. response deprecation/sunset headers if desired;
-2. client migration;
-3. telemetry of legacy usage;
-4. remove rewrite in next major/version window.
+1. заголовки deprecation/sunset в ответе при необходимости;
+2. миграция клиентов;
+3. телеметрия использования легаси;
+4. удаление переписывания в следующем мажорном окне версий.
 
-## API-008 — Stable filter/sort conventions
+## API-008 — Стабильные соглашения фильтрации и сортировки
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Needed before richer catalogs/reporting.
+Необходимо до появления более богатых каталогов и отчётности.
 
-## API-009 — True empty-body header-only commands
+## API-009 — Команды с настоящим пустым телом и ключом только в заголовке
 
 - **Приоритет:** P0/P1
 - **Трудоёмкость:** S/M
@@ -419,34 +419,34 @@ Publish/start/submit endpoint handlers принимают nullable request DTO (
 
 ---
 
-# E. Operational reliability
+# E. Эксплуатационная надёжность
 
-## OPS-010 — Backup policy
+## OPS-010 — Политика резервного копирования
 
 - **Приоритет:** P0
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО — repository logical baseline; provider PITR/scheduling remain deployment-owned
 
-Repository baseline defines engineering RPO/RTO and portable retention; concrete schedule/encrypted storage/PITR remain deployment-owned.
+Baseline репозитория задаёт инженерные RPO/RTO и переносимые сроки хранения; конкретное расписание, шифрованное хранилище и PITR остаются за развёртыванием.
 
-## OPS-011 — Automated restore verification
+## OPS-011 — Автоматическая проверка восстановления
 
 - **Приоритет:** P0
 - **Трудоёмкость:** M/L
 - **Зависимости:** OPS-010
 - **Статус:** ГОТОВО
 
-CI restores each generated backup to an isolated database and verifies schema, migration history and business marker.
+CI восстанавливает каждую созданную резервную копию в изолированную базу и проверяет схему, историю миграций и бизнес-маркер.
 
-## OPS-012 — Audit retention cleanup
+## OPS-012 — Очистка аудита по сроку хранения
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО
 
-Batch delete/archive with index-friendly range.
+Пакетное удаление или архивирование по диапазону, дружественному индексам.
 
-## OPS-013 — Idempotency retention cleanup
+## OPS-013 — Очистка записей идемпотентности по сроку хранения
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
