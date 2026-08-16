@@ -198,6 +198,8 @@ legacy /api/* -> /api/v1/* rewrite
         ↓
 UseRouting
         ↓
+CORS (if enabled)
+        ↓
 RequestTelemetryMiddleware
         ↓
 CorrelationAuditMiddleware

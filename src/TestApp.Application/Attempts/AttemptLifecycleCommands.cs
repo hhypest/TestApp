@@ -77,7 +77,7 @@ public sealed class ClearAnswerCommandHandler(
             if (revision is null) return Error.NotFound("revision.not_found", "Published test revision was not found.");
             var score = revision.CalculateScore(attempt.Responses);
             var timedOut = attempt.Timeout(now, score, revision.IsPassed(score));
-            if (timedOut.Match(_ => true, _ => false)) await unitOfWork.SaveChangesAsync(ct);
+            if (timedOut.IsSuccess) await unitOfWork.SaveChangesAsync(ct);
             return Error.Conflict("attempt.expired", "The attempt deadline has expired.");
         }
         var result = attempt.ClearAnswer(command.QuestionId, now);

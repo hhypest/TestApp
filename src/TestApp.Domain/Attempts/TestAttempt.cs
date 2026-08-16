@@ -97,7 +97,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     public Result<TestAttempt, DomainError> Answer(QuestionId questionId, IEnumerable<AnswerOptionId> optionIds, DateTimeOffset answeredAt)
     {
         answeredAt = answeredAt.ToUniversalTime();
-        var active = EnsureWritable(answeredAt); if (active.Match(_ => false, _ => true)) return active;
+        var active = EnsureWritable(answeredAt); if (active.IsFailure) return active;
         ArgumentNullException.ThrowIfNull(optionIds);
         var selected = optionIds.Distinct().ToArray();
         if (selected.Length == 0) return DomainError.Validation("attempt.answer.empty", "At least one answer option must be selected.");
@@ -109,7 +109,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     public Result<TestAttempt, DomainError> ClearAnswer(QuestionId questionId, DateTimeOffset now)
     {
         now = now.ToUniversalTime();
-        var active = EnsureWritable(now); if (active.Match(_ => false, _ => true)) return active;
+        var active = EnsureWritable(now); if (active.IsFailure) return active;
         var response = _responses.SingleOrDefault(x => x.Id == questionId);
         if (response is null) return DomainError.NotFound("attempt.question.not_found", "Question is not part of this attempt.");
         response.Clear(); Touch(); return this;
@@ -118,7 +118,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     public Result<TestAttempt, DomainError> Submit(DateTimeOffset submittedAt, AttemptScore score, bool passed)
     {
         submittedAt = submittedAt.ToUniversalTime();
-        var active = EnsureInProgress(); if (active.Match(_ => false, _ => true)) return active;
+        var active = EnsureInProgress(); if (active.IsFailure) return active;
         if (submittedAt < StartedAt) return DomainError.Validation("attempt.completed_at", "Completion time cannot be earlier than start time.");
         if (IsExpiredAt(submittedAt)) return DomainError.Conflict("attempt.expired", "The attempt deadline has expired.");
         Complete(AttemptStatus.Submitted, submittedAt, score, passed);
@@ -129,7 +129,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     public Result<TestAttempt, DomainError> Timeout(DateTimeOffset timedOutAt, AttemptScore score, bool passed)
     {
         timedOutAt = timedOutAt.ToUniversalTime();
-        var active = EnsureInProgress(); if (active.Match(_ => false, _ => true)) return active;
+        var active = EnsureInProgress(); if (active.IsFailure) return active;
         if (timedOutAt < StartedAt) return DomainError.Validation("attempt.completed_at", "Completion time cannot be earlier than start time.");
         Complete(AttemptStatus.TimedOut, timedOutAt, score, passed);
         Raise(new AttemptTimedOut(Id, score, Outcome!.Value, timedOutAt));
@@ -144,7 +144,7 @@ public sealed class TestAttempt : AggregateRoot<TestAttemptId>
     private Result<TestAttempt, DomainError> EnsureWritable(DateTimeOffset now)
     {
         var active = EnsureInProgress();
-        if (active.Match(_ => false, _ => true)) return active;
+        if (active.IsFailure) return active;
         return IsExpiredAt(now) ? DomainError.Conflict("attempt.expired", "The attempt deadline has expired.") : this;
     }
 
