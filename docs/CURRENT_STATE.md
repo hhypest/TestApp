@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-16. Phase A–D7 полностью реализованы (STAB-001..008, API-009, PostgreSQL migration, EF Core 10 upgrade). Exact-head evidence определяется последними GitHub Actions runs ветки.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-16. Phase A–D7 полностью реализованы (STAB-001..008, API-009, PostgreSQL migration, EF Core 10 upgrade), плюс observability backend (Prometheus/Grafana, ADR-027) и coverage/review pass `0.9.5` (267 тестов, 90.3% line coverage). Exact-head evidence определяется последними GitHub Actions runs ветки.
 
 ## 1. Назначение системы
 
@@ -272,6 +272,8 @@ Per-message publish failures обрабатываются, и cycle-level failur
 ### Stabilization/correctness
 
 Все P0/P1 stabilization findings текущего backlog (STAB-001..008) закрыты; domain/application errors и value-object invariants имеют единый `Result<T, DomainError>` failure contract (ADR-026).
+
+Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 90.3% (267 тестов) и закрыл четыре дефекта, найденных при чтении непокрытых участков: порядок проверок в `ReorderQuestion`/`ReorderAnswerOption` (404 вместо 409), смена типа вопроса в обход инварианта single-choice, отсутствие tie-breaker в audit pagination (пропуск STAB-006) и nullable-аннотация `Result.TryGetError`. Роль, определяющая owner-scope, консолидирована в одном месте. Детали — `docs/TESTING.md` §2/§14 и `CHANGELOG.md`.
 
 ### Operational reliability
 

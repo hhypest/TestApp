@@ -8,7 +8,7 @@
 
 ## [Unreleased] — на пути к `1.0.0` (Phase E)
 
-Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта — см. запись ниже. Открытые пункты 1.0 release gate (`docs/ROADMAP.md` Phase E) вне этой ветки кода:
+Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта, `0.9.5` закрыл coverage/review pass. Открытые пункты 1.0 release gate (`docs/ROADMAP.md` Phase E) вне этой ветки кода:
 
 - staging restore drill с измеренным RTO;
 - маршрутизация алертов в actionable destination (Alertmanager + pager/chat) и alert drill против staging;
@@ -21,6 +21,29 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта 
 
 - `CHANGELOG.md` (этот файл) — `DEV-005`.
 - Prometheus + Grafana в `compose.yaml` как local/CI observability backend позади OTel Collector: provisioned dashboard (`TestApp Overview`) и alert rule expressions, реализующие весь технически выразимый контракт `docs/SLO_ALERTS.md` §4/§6 — `OBS-012`, `OBS-013`, ADR-027. Новый CI workflow `observability` и `scripts/validate-observability-stack.sh` держат стек в проверенном состоянии.
+
+## [0.9.5] — Test coverage and review pass before 1.0 RC
+
+### Fixed
+
+- `ReorderQuestion`/`ReorderAnswerOption` возвращали `409 order_duplicate` вместо `404 not_found`, если переупорядочиваемый ID не существует, а целевой порядок занят — проверка существования теперь выполняется первой.
+- Смена типа вопроса `MultipleChoice -> SingleChoice` больше не оставляет несколько правильных вариантов: это состояние уже запрещено при добавлении/изменении варианта, а теперь отклоняется и на пути смены типа (`409 test.single_choice.multiple_correct`), а не всплывает позже при публикации.
+- Audit trail pagination (`GET /api/v1/operations/audit`) получил детерминированный tie-breaker (`OccurredAt`, затем `Id`) — тот же дефект, что `STAB-006` закрыл в read models, но пропущенный в audit. Записи могли дублироваться или пропадать между страницами при равных timestamp.
+- `Result.TryGetError` аннотирован `[MaybeNullWhen(false)]`: out-параметр объявлен non-nullable, но на success равен `null`, из-за чего неправильное использование не ловилось анализом nullable-состояния.
+
+### Changed
+
+- Роль, определяющая global vs owner-scoped видимость данных, была продублирована в четырёх местах (три — hardcoded string literal). Консолидирована в `TestApp.Application/Common/ActorScope.cs`: частичное переименование роли теперь невозможно — оно бы молча расширило или сузило доступ автора к чужим данным.
+
+### Added
+
+- Новый test project `tests/TestApp.Core.Tests` для `Result<TSuccess, TFailure>` — failure contract, через который выражены все domain/application правила.
+- Domain suites: `TestAuthoringInvariantTests`, `AttemptLifecycleTests`, `AssignmentLifecycleTests`, `PublishedRevisionScoringTests`.
+- Application suites: `AuthoringCommandTests`, `AssignmentAndAttemptCommandTests` (ownership, If-Match precondition, отсутствие commit при отклонённой команде).
+- Integration suites: `StudentReadModelQueryTests` (`/api/v1/me/*` и attempt detail/result — были 0%), `AuditTrailPaginationTests`.
+- `coverlet.collector` во всех test projects, чтобы покрытие было воспроизводимо.
+
+Итог: 98 -> 267 тестов, line coverage 81.1% -> 90.3% (Core 47.5% -> 96.7%, Domain 75.8% -> 93.8%, Application 67.4% -> 90.3%). Подробности и оставшиеся gaps — `docs/TESTING.md` §2 и §14.
 
 ## [0.9.4] — Phase D7: Correctness/stabilization fixes
 

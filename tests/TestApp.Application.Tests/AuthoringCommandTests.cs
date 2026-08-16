@@ -26,7 +26,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new AddQuestionCommandHandler(fixture.Tests, Actor.For(Stranger), fixture.UnitOfWork)
-            .Handle(new AddQuestionCommand(fixture.Test.Id, "New", QuestionType.SingleChoice, 1m, 5), default);
+            .Handle(new AddQuestionCommand(fixture.Test.Id, "New", QuestionType.SingleChoice, 1m, 5), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Forbidden, "test.forbidden");
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
@@ -38,7 +38,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new UpdateQuestionCommandHandler(fixture.Tests, Actor.Admin(Stranger), fixture.UnitOfWork)
-            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Edited by admin", QuestionType.SingleChoice, 2m), default);
+            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Edited by admin", QuestionType.SingleChoice, 2m), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, fixture.UnitOfWork.SaveCount);
@@ -50,7 +50,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.Empty();
 
         var result = await new UpdateQuestionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new UpdateQuestionCommand(TestId.New(), QuestionId.New(), "Text", QuestionType.SingleChoice, 1m), default);
+            .Handle(new UpdateQuestionCommand(TestId.New(), QuestionId.New(), "Text", QuestionType.SingleChoice, 1m), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "test.not_found");
     }
@@ -64,7 +64,7 @@ public sealed class AuthoringCommandTests
         var staleVersion = fixture.Test.ConcurrencyVersion + 99;
 
         var result = await new UpdateQuestionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Edited", QuestionType.SingleChoice, 1m, staleVersion), default);
+            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Edited", QuestionType.SingleChoice, 1m, staleVersion), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.PreconditionFailed, "concurrency.precondition_failed");
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
@@ -76,7 +76,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new UpdateQuestionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Edited", QuestionType.SingleChoice, 1m, fixture.Test.ConcurrencyVersion), default);
+            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Edited", QuestionType.SingleChoice, 1m, fixture.Test.ConcurrencyVersion), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, fixture.UnitOfWork.SaveCount);
@@ -90,7 +90,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new ReorderQuestionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ReorderQuestionCommand(fixture.Test.Id, QuestionId.New(), fixture.QuestionOrder), default);
+            .Handle(new ReorderQuestionCommand(fixture.Test.Id, QuestionId.New(), fixture.QuestionOrder), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "test.question.not_found");
     }
@@ -103,7 +103,7 @@ public sealed class AuthoringCommandTests
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
 
         var result = await new ReorderQuestionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ReorderQuestionCommand(fixture.Test.Id, second, fixture.QuestionOrder), default);
+            .Handle(new ReorderQuestionCommand(fixture.Test.Id, second, fixture.QuestionOrder), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Conflict, "test.question.order_duplicate");
     }
@@ -114,7 +114,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new RemoveQuestionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new RemoveQuestionCommand(fixture.Test.Id, fixture.QuestionId), default);
+            .Handle(new RemoveQuestionCommand(fixture.Test.Id, fixture.QuestionId), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(fixture.Test.Questions);
@@ -129,7 +129,7 @@ public sealed class AuthoringCommandTests
         fixture.AddOption("B", isCorrect: true, order: 1);
 
         var result = await new UpdateQuestionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Q", QuestionType.SingleChoice, 1m), default);
+            .Handle(new UpdateQuestionCommand(fixture.Test.Id, fixture.QuestionId, "Q", QuestionType.SingleChoice, 1m), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Conflict, "test.single_choice.multiple_correct");
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
@@ -144,7 +144,7 @@ public sealed class AuthoringCommandTests
         var option = fixture.AddOption("Original", isCorrect: false, order: 0);
 
         var result = await new UpdateAnswerOptionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new UpdateAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option, "Updated", true), default);
+            .Handle(new UpdateAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option, "Updated", true), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         var stored = fixture.Question.Options.Single(o => o.Id == option);
@@ -159,7 +159,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new UpdateAnswerOptionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new UpdateAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, AnswerOptionId.New(), "Text", false), default);
+            .Handle(new UpdateAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, AnswerOptionId.New(), "Text", false), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "test.answer_option.not_found");
     }
@@ -171,7 +171,7 @@ public sealed class AuthoringCommandTests
         var option = fixture.AddOption("Removable", isCorrect: false, order: 0);
 
         var result = await new RemoveAnswerOptionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new RemoveAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option), default);
+            .Handle(new RemoveAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(fixture.Question.Options);
@@ -185,7 +185,7 @@ public sealed class AuthoringCommandTests
         fixture.AddOption("Occupying slot 0", isCorrect: true, order: 0);
 
         var result = await new ReorderAnswerOptionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ReorderAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, AnswerOptionId.New(), 0), default);
+            .Handle(new ReorderAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, AnswerOptionId.New(), 0), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "test.answer_option.not_found");
     }
@@ -197,7 +197,7 @@ public sealed class AuthoringCommandTests
         var option = fixture.AddOption("Movable", isCorrect: true, order: 0);
 
         var result = await new ReorderAnswerOptionCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ReorderAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option, 4), default);
+            .Handle(new ReorderAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option, 4), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(4, fixture.Question.Options.Single(o => o.Id == option).Order);
@@ -210,7 +210,7 @@ public sealed class AuthoringCommandTests
         var option = fixture.AddOption("Theirs", isCorrect: true, order: 0);
 
         var result = await new ReorderAnswerOptionCommandHandler(fixture.Tests, Actor.For(Stranger), fixture.UnitOfWork)
-            .Handle(new ReorderAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option, 1), default);
+            .Handle(new ReorderAnswerOptionCommand(fixture.Test.Id, fixture.QuestionId, option, 1), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Forbidden, "test.forbidden");
     }
@@ -223,7 +223,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new ArchiveTestCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ArchiveTestCommand(fixture.Test.Id), default);
+            .Handle(new ArchiveTestCommand(fixture.Test.Id), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(TestStatus.Archived, fixture.Test.Status);
@@ -237,7 +237,7 @@ public sealed class AuthoringCommandTests
         Assert.False(fixture.Test.Archive().TryGetError(out _));
 
         var result = await new ArchiveTestCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ArchiveTestCommand(fixture.Test.Id), default);
+            .Handle(new ArchiveTestCommand(fixture.Test.Id), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Conflict, "test.archived");
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
@@ -249,7 +249,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new ArchiveTestCommandHandler(fixture.Tests, Actor.For(Stranger), fixture.UnitOfWork)
-            .Handle(new ArchiveTestCommand(fixture.Test.Id), default);
+            .Handle(new ArchiveTestCommand(fixture.Test.Id), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Forbidden, "test.forbidden");
         Assert.Equal(TestStatus.Draft, fixture.Test.Status);
@@ -261,7 +261,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new ChangeTestSettingsCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ChangeTestSettingsCommand(fixture.Test.Id, 101m, null), default);
+            .Handle(new ChangeTestSettingsCommand(fixture.Test.Id, 101m, null), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsFailure);
         Assert.Equal(0, fixture.UnitOfWork.SaveCount);
@@ -273,7 +273,7 @@ public sealed class AuthoringCommandTests
         var fixture = Fixture.WithQuestion();
 
         var result = await new ChangeTestSettingsCommandHandler(fixture.Tests, Actor.For(Author), fixture.UnitOfWork)
-            .Handle(new ChangeTestSettingsCommand(fixture.Test.Id, 80m, 45), default);
+            .Handle(new ChangeTestSettingsCommand(fixture.Test.Id, 80m, 45), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(80m, fixture.Test.Settings.PassingPercentage);

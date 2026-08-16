@@ -18,13 +18,33 @@
 
 ## 2. Test suites
 
-Solution содержит три .NET test projects:
+Solution содержит четыре .NET test projects:
 
 ```text
+tests/TestApp.Core.Tests
 tests/TestApp.Domain.Tests
 tests/TestApp.Application.Tests
 tests/TestApp.IntegrationTests
 ```
+
+### Измеренное покрытие
+
+Baseline `2026-08-16`, `dotnet test --collect:"XPlat Code Coverage"` (line coverage, без EF migrations и generated OpenAPI кода):
+
+| Проект | Line coverage |
+|---|---:|
+| TestApp.Core | 96.7% |
+| TestApp.Domain | 93.8% |
+| TestApp.Application | 90.3% |
+| TestApp.Infrastructure | 91.7% |
+| TestApp.Api | 86.7% |
+| **Всего** | **90.3%** |
+
+Всего 267 тестов: 26 Core, 106 Domain, 45 Application, 90 Integration.
+
+Покрытие воспроизводится локально: `coverlet.collector` подключён во всех четырёх test projects.
+
+**Как читать эти цифры.** Процент сам по себе ничего не гарантирует — он полезен как индикатор *непокрытых* участков, а не как цель. До `2026-08-16` распределение было перевёрнутым: Core 47.5%, Application 67.4%, Domain 75.8% при Api/Infrastructure ~87%, то есть слои с бизнес-правилами были покрыты хуже всего и почти исключительно косвенно — через integration tests. Именно чтение непокрытых участков выявило четыре дефекта (см. `CHANGELOG.md`, запись `0.9.5`), а не сам факт низкого процента.
 
 Репозиторий также содержит отдельный импортируемый API test project:
 
@@ -47,52 +67,53 @@ tests/TestApp.Postman
 
 Запуск и data-cleanup описаны в [`tests/TestApp.Postman/README.md`](../tests/TestApp.Postman/README.md).
 
-## 3. Domain tests
-
-Current file:
+## 3. Core tests
 
 ```text
-TestAggregateTests.cs
+ResultMonadTests.cs
 ```
 
-Проверяет core business behavior без EF/HTTP:
+`Result<TSuccess, TFailure>` — это failure contract, через который выражены все domain и application правила, поэтому он проверяется отдельно: конструирование и implicit conversions, `TryGetError`, `Map`/`Bind`/`Ensure`/`Tap`, все перегрузки `Match` (sync, `Task`, `ValueTask`, cancellable), short-circuit семантика при failure и композиция в pipeline.
 
-- Test lifecycle;
-- publication validation;
-- settings;
-- immutable published revision;
-- scoring/outcome;
-- attempt deadline;
-- aggregate invariants.
+## 4. Domain tests
+
+```text
+TestAggregateTests.cs             ownership, STAB-008 failure contract
+TestAuthoringInvariantTests.cs    ordering, option uniqueness, question type, publication
+AttemptLifecycleTests.cs          answer/clear/submit/timeout, deadline boundary
+AssignmentLifecycleTests.cs       targeting, availability window, cancellation
+PublishedRevisionScoringTests.cs  snapshot immutability, ValidateAnswer, exact-set scoring
+```
+
+Проверяет core business behavior без EF/HTTP: lifecycle, publication validation, settings, immutable published revision, exact-set scoring/outcome, attempt deadline и aggregate invariants.
+
+Отдельно закреплены границы, которые легко нарушить незаметно: `IsExpiredAt`/`IsAvailableAt`/`IsPassed` инклюзивны на границе, exact-set scoring не даёт частичных баллов, а reorder-операции сообщают `not_found` раньше, чем `order_duplicate`.
 
 ### Правило
 
 Если новая business rule может быть проверена без Infrastructure, основной regression test должен находиться в Domain.Tests.
 
-## 4. Application tests
-
-Current file:
+## 5. Application tests
 
 ```text
-StartAttemptTests.cs
+StartAttemptTests.cs                   idempotent start, eligibility, attempt limit
+AuthoringCommandTests.cs               ownership, If-Match precondition, question/option commands
+AssignmentAndAttemptCommandTests.cs    assignment administration, clear answer, manual timeout
 ```
 
 Фокус:
 
 - orchestration use case;
-- target user/group validation;
-- availability;
-- attempt limit behavior через abstractions;
-- request validation;
-- handler-level business mapping;
+- ownership boundary (`test-author` vs `test-admin`) и `403 test.forbidden`;
+- optimistic concurrency precondition (`ExpectedVersion` -> `412`);
+- target user/group validation, availability, attempt limit через abstractions;
+- domain error -> application error mapping;
 - actor-scoped idempotent replay после cancellation, expiry и потери group membership;
 - повторная eligibility validation для нового key и изоляция key между actors.
 
-### Текущий gap
+Test doubles считают вызовы `IUnitOfWork.SaveChangesAsync`, поэтому отклонённая команда проверяется не только по возвращённой ошибке, но и по отсутствию commit.
 
-Application unit coverage заметно меньше integration coverage. Новые complex handlers должны получать targeted unit tests, если сценарии можно проверить быстрее и точнее без PostgreSQL.
-
-## 5. Integration tests
+## 6. Integration tests
 
 Integration tests являются критической частью проекта и работают против real PostgreSQL service в CI. RabbitMQ-specific tests работают против real RabbitMQ service.
 
@@ -232,7 +253,7 @@ outbox row
 
 Проверяет active RabbitMQ readiness connection/channel/exchange access.
 
-## 6. PostgreSQL test database strategy
+## 7. PostgreSQL test database strategy
 
 `PostgreSqlTestDatabase`:
 
@@ -248,7 +269,7 @@ outbox row
 - constraints/indexes/provider behavior не подменяются SQLite/in-memory provider;
 - можно безопасно запускать integration tests параллельно при отсутствии конфликтующих external resources.
 
-## 7. Почему SQLite/in-memory provider запрещён для persistence regressions
+## 8. Почему SQLite/in-memory provider запрещён для persistence regressions
 
 Provider-specific behavior, которое должно проверяться на PostgreSQL:
 
@@ -265,7 +286,7 @@ Provider-specific behavior, которое должно проверяться �
 
 Поэтому persistence test на SQLite не является эквивалентом production validation.
 
-## 8. RabbitMQ test strategy
+## 9. RabbitMQ test strategy
 
 CI environment variable:
 
@@ -283,7 +304,7 @@ RabbitMQ tests используют real broker service container.
 - не оставлять race между queue binding и publish;
 - проверять publisher lifecycle/disposal.
 
-## 9. API authentication in tests
+## 10. API authentication in tests
 
 HTTP integration tests заменяют production JWT scheme на test authentication scheme на уровне `ConfigureTestServices`.
 
@@ -300,7 +321,7 @@ Test principal формирует:
 
 Keycloak claim mapping должен иметь отдельные integration/unit tests. Полный real-Keycloak token E2E можно добавить как slower environment test, но он не должен заменять быстрый API suite.
 
-## 10. CI pipeline
+## 11. CI pipeline
 
 GitHub Actions `dotnet` workflow:
 
@@ -330,7 +351,7 @@ GitHub Actions `dotnet` workflow:
 
 Нельзя считать commit production-capable, если зелёны unit tests, но не прошёл migration-only container step.
 
-## 11. Test requirements по типу изменения
+## 12. Test requirements по типу изменения
 
 ### Domain rule
 
@@ -387,7 +408,7 @@ GitHub Actions `dotnet` workflow:
 - correct role/owner;
 - no data leakage.
 
-## 12. Test data principles
+## 13. Test data principles
 
 - IDs генерировать typed factory/Guid v7 там, где это соответствует production.
 - Fixed clock использовать для deadline/time rules.
@@ -395,19 +416,23 @@ GitHub Actions `dotnet` workflow:
 - Для external broker synchronization использовать deterministic topology/confirm semantics.
 - Test должен самостоятельно создавать required state, а не зависеть от порядка выполнения других tests.
 
-## 13. Current coverage gaps
+## 14. Current coverage gaps
 
-До 1.0 необходимо расширить:
+### Закрыто `2026-08-16`
 
-### P1
+- application handler suite beyond StartAttempt — `AuthoringCommandTests.cs`, `AssignmentAndAttemptCommandTests.cs`;
+- scoring/question invariants — `PublishedRevisionScoringTests.cs`, `TestAuthoringInvariantTests.cs` (табличные тесты по границам; полноценный property-based подход не вводился, см. ниже);
+- `AttemptScore`/error mapping invariants — `AttemptLifecycleTests.cs`, `ResultMonadTests.cs`;
+- student read models (`/api/v1/me/*`, attempt detail/result) — `StudentReadModelQueryTests.cs`;
+- audit trail pagination и фильтры — `AuditTrailPaginationTests.cs`.
 
-- property-style tests для scoring/question invariants;
-- application handler suite beyond StartAttempt;
+### P1 (остаётся)
+
 - concurrency test submit vs background timeout;
 - multiple API replicas idempotency scenario;
-- query-plan/EXPLAIN evidence для reviewer/admin hot queries под production-scale data (функциональная корректность SQL join/tie-breaker rewrite уже покрыта `AdminReadModelQueryTests.cs`);
-- strong-ID/AttemptScore/error mapping invariants;
-- real Keycloak smoke integration.
+- query-plan/EXPLAIN evidence для reviewer/admin hot queries под production-scale data (функциональная корректность SQL join/tie-breaker rewrite покрыта `AdminReadModelQueryTests.cs`);
+- real Keycloak smoke integration (сейчас только через Postman/Newman workflow);
+- property-based тесты для scoring — текущие тесты табличные и проверяют выбранные границы, а не произвольные входы.
 
 ### P2
 
@@ -416,7 +441,13 @@ GitHub Actions `dotnet` workflow:
 - staging/platform backup restore drill;
 - contract tests for frontend/SDK.
 
-## 14. Performance testing baseline
+### Сознательно не покрыто
+
+- `AppDbContextDesignFactory` — design-time entry point для `dotnet ef`, в runtime не участвует;
+- `DatabaseHealthCheck` — покрыт косвенно через `/health/ready` в HTTP-тестах, но не имеет собственного unit-теста на ветку сбоя подключения;
+- positional record DTO без поведения (например `AdminAssignmentAttemptSummary`) — покрытие таких типов означало бы тестирование компилятора.
+
+## 15. Performance testing baseline
 
 Реализованный D6 workflow покрывает:
 
@@ -441,7 +472,7 @@ Verification status: **PASSED** на PostgreSQL implementation commit `9916b98`.
 - Outbox lag;
 - worker batch duration.
 
-## 15. Test naming
+## 16. Test naming
 
 Предпочтительный формат поведения:
 
@@ -459,7 +490,7 @@ Processor_marks_message_processed_only_after_RabbitMQ_delivery
 
 Название должно описывать гарантию, а не implementation detail.
 
-## 16. Definition of Done для тестов
+## 17. Definition of Done для тестов
 
 Фича не Done, если:
 

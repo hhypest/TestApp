@@ -35,7 +35,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new CancelAssignmentCommandHandler(
                 new AssignmentRepo(assignment), new Actor(Admin), new Clock(Now.AddHours(1)), unitOfWork)
-            .Handle(new CancelAssignmentCommand(assignment.Id, "  superseded  "), default);
+            .Handle(new CancelAssignmentCommand(assignment.Id, "  superseded  "), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(AssignmentStatus.Cancelled, assignment.Status);
@@ -51,7 +51,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new CancelAssignmentCommandHandler(
                 new AssignmentRepo(null), new Actor(Admin), new Clock(Now), unitOfWork)
-            .Handle(new CancelAssignmentCommand(TestAssignmentId.New(), null), default);
+            .Handle(new CancelAssignmentCommand(TestAssignmentId.New(), null), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "assignment.not_found");
         Assert.Equal(0, unitOfWork.SaveCount);
@@ -66,7 +66,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new CancelAssignmentCommandHandler(
                 new AssignmentRepo(assignment), new Actor(Admin), new Clock(Now), unitOfWork)
-            .Handle(new CancelAssignmentCommand(assignment.Id, null), default);
+            .Handle(new CancelAssignmentCommand(assignment.Id, null), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Conflict, "assignment.cancelled");
         Assert.Equal(0, unitOfWork.SaveCount);
@@ -81,7 +81,7 @@ public sealed class AssignmentAndAttemptCommandTests
         var until = Now.AddDays(3);
 
         var result = await new ChangeAssignmentWindowCommandHandler(new AssignmentRepo(assignment), unitOfWork)
-            .Handle(new ChangeAssignmentWindowCommand(assignment.Id, from, until), default);
+            .Handle(new ChangeAssignmentWindowCommand(assignment.Id, from, until), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(from, assignment.AvailableFrom);
@@ -96,7 +96,7 @@ public sealed class AssignmentAndAttemptCommandTests
         var unitOfWork = new RecordingUnitOfWork();
 
         var result = await new ChangeAssignmentWindowCommandHandler(new AssignmentRepo(assignment), unitOfWork)
-            .Handle(new ChangeAssignmentWindowCommand(assignment.Id, Now.AddDays(3), Now.AddDays(1)), default);
+            .Handle(new ChangeAssignmentWindowCommand(assignment.Id, Now.AddDays(3), Now.AddDays(1)), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Validation, "assignment.window");
         Assert.Equal(0, unitOfWork.SaveCount);
@@ -109,7 +109,7 @@ public sealed class AssignmentAndAttemptCommandTests
         var unitOfWork = new RecordingUnitOfWork();
 
         var result = await new ChangeAssignmentAttemptLimitCommandHandler(new AssignmentRepo(assignment), unitOfWork)
-            .Handle(new ChangeAssignmentAttemptLimitCommand(assignment.Id, 5), default);
+            .Handle(new ChangeAssignmentAttemptLimitCommand(assignment.Id, 5), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(5, assignment.AttemptLimit);
@@ -122,7 +122,7 @@ public sealed class AssignmentAndAttemptCommandTests
         var unitOfWork = new RecordingUnitOfWork();
 
         var result = await new ChangeAssignmentAttemptLimitCommandHandler(new AssignmentRepo(assignment), unitOfWork)
-            .Handle(new ChangeAssignmentAttemptLimitCommand(assignment.Id, 0), default);
+            .Handle(new ChangeAssignmentAttemptLimitCommand(assignment.Id, 0), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Validation, "assignment.attempt_limit");
         Assert.Equal(2, assignment.AttemptLimit);
@@ -136,9 +136,9 @@ public sealed class AssignmentAndAttemptCommandTests
         var unitOfWork = new RecordingUnitOfWork();
 
         var window = await new ChangeAssignmentWindowCommandHandler(new AssignmentRepo(assignment), unitOfWork)
-            .Handle(new ChangeAssignmentWindowCommand(assignment.Id, Now, Now.AddDays(1)), default);
+            .Handle(new ChangeAssignmentWindowCommand(assignment.Id, Now, Now.AddDays(1)), TestContext.Current.CancellationToken);
         var limit = await new ChangeAssignmentAttemptLimitCommandHandler(new AssignmentRepo(assignment), unitOfWork)
-            .Handle(new ChangeAssignmentAttemptLimitCommand(assignment.Id, 3), default);
+            .Handle(new ChangeAssignmentAttemptLimitCommand(assignment.Id, 3), TestContext.Current.CancellationToken);
 
         AssertError(window, ErrorType.Conflict, "assignment.cancelled");
         AssertError(limit, ErrorType.Conflict, "assignment.cancelled");
@@ -156,7 +156,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new ClearAnswerCommandHandler(
                 new AttemptRepo(attempt), new RevisionRepo(revision), new Actor(Student), new Clock(Now.AddMinutes(1)), unitOfWork)
-            .Handle(new ClearAnswerCommand(attempt.Id, questionId), default);
+            .Handle(new ClearAnswerCommand(attempt.Id, questionId), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(attempt.Responses.Single(r => r.Id == questionId).SelectedOptions);
@@ -171,7 +171,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new ClearAnswerCommandHandler(
                 new AttemptRepo(attempt), new RevisionRepo(revision), new Actor(OtherStudent), new Clock(Now), unitOfWork)
-            .Handle(new ClearAnswerCommand(attempt.Id, questionId), default);
+            .Handle(new ClearAnswerCommand(attempt.Id, questionId), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Forbidden, "attempt.forbidden");
         Assert.Equal(0, unitOfWork.SaveCount);
@@ -185,7 +185,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new ClearAnswerCommandHandler(
                 new AttemptRepo(null), new RevisionRepo(revision), new Actor(Student), new Clock(Now), unitOfWork)
-            .Handle(new ClearAnswerCommand(TestAttemptId.New(), questionId), default);
+            .Handle(new ClearAnswerCommand(TestAttemptId.New(), questionId), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "attempt.not_found");
     }
@@ -200,7 +200,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new ClearAnswerCommandHandler(
                 new AttemptRepo(attempt), new RevisionRepo(revision), new Actor(Student), new Clock(Now.AddHours(1)), unitOfWork)
-            .Handle(new ClearAnswerCommand(attempt.Id, questionId), default);
+            .Handle(new ClearAnswerCommand(attempt.Id, questionId), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Conflict, "attempt.expired");
         Assert.Equal(AttemptStatus.TimedOut, attempt.Status);
@@ -215,7 +215,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new ClearAnswerCommandHandler(
                 new AttemptRepo(attempt), new RevisionRepo(revision), new Actor(Student), new Clock(Now), unitOfWork)
-            .Handle(new ClearAnswerCommand(attempt.Id, QuestionId.New()), default);
+            .Handle(new ClearAnswerCommand(attempt.Id, QuestionId.New()), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "attempt.question.not_found");
     }
@@ -231,7 +231,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new TimeoutAttemptCommandHandler(
                 new AttemptRepo(attempt), new RevisionRepo(revision), new Clock(Now.AddMinutes(5)), unitOfWork)
-            .Handle(new TimeoutAttemptCommand(attempt.Id), default);
+            .Handle(new TimeoutAttemptCommand(attempt.Id), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(AttemptStatus.TimedOut, attempt.Status);
@@ -246,7 +246,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new TimeoutAttemptCommandHandler(
                 new AttemptRepo(attempt), new RevisionRepo(revision), new Clock(Now.AddMinutes(5)), new RecordingUnitOfWork())
-            .Handle(new TimeoutAttemptCommand(attempt.Id), default);
+            .Handle(new TimeoutAttemptCommand(attempt.Id), TestContext.Current.CancellationToken);
 
         var score = result.Match(value => value, error => throw new Xunit.Sdk.XunitException(error.Message));
         Assert.Equal(1m, score.Earned);
@@ -262,7 +262,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new TimeoutAttemptCommandHandler(
                 new AttemptRepo(attempt), new RevisionRepo(revision), new Clock(Now.AddMinutes(5)), unitOfWork)
-            .Handle(new TimeoutAttemptCommand(attempt.Id), default);
+            .Handle(new TimeoutAttemptCommand(attempt.Id), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.Conflict, "attempt.completed");
         Assert.Equal(0, unitOfWork.SaveCount);
@@ -275,7 +275,7 @@ public sealed class AssignmentAndAttemptCommandTests
 
         var result = await new TimeoutAttemptCommandHandler(
                 new AttemptRepo(null), new RevisionRepo(revision), new Clock(Now), new RecordingUnitOfWork())
-            .Handle(new TimeoutAttemptCommand(TestAttemptId.New()), default);
+            .Handle(new TimeoutAttemptCommand(TestAttemptId.New()), TestContext.Current.CancellationToken);
 
         AssertError(result, ErrorType.NotFound, "attempt.not_found");
     }

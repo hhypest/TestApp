@@ -15,6 +15,7 @@ Backend-система создания, публикации, назначен�
 | API | Minimal API, canonical `/api/v1` |
 | Deployment | Docker/Compose + migration-only mode |
 | CI | GitHub Actions + real PostgreSQL/RabbitMQ integration tests |
+| Тесты | 267 (Core/Domain/Application/Integration), line coverage 90.3% |
 
 ## Документация
 
@@ -234,6 +235,7 @@ Development credentials находятся в [docs/OPERATIONS.md](docs/OPERATIO
 dotnet restore TestApp.slnx
 dotnet build TestApp.slnx --no-restore --configuration Release
 dotnet test TestApp.slnx --no-build --configuration Release
+dotnet test TestApp.slnx --no-build --configuration Release --collect:"XPlat Code Coverage"
 node tests/TestApp.Postman/scripts/validate.mjs
 docker compose -f compose.yaml config --quiet
 docker build -t testapp-api:local .
