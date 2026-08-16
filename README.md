@@ -8,14 +8,14 @@ Backend-система создания, публикации, назначен�
 |---|---|
 | Runtime | .NET 10 |
 | Persistence | PostgreSQL 18 |
-| ORM | EF Core 10.0.11 + Npgsql EF provider 10.0.3 |
-| Identity | Keycloak / JWT Bearer |
-| Messaging | Transactional Outbox + RabbitMQ 4.3.x |
+| ORM | EF Core 10.0.11 + провайдер Npgsql EF 10.0.3 |
+| Идентификация | Keycloak / JWT Bearer |
+| Обмен сообщениями | Транзакционный Outbox + RabbitMQ 4.3.x |
 | Observability | OpenTelemetry 1.17.0 + Prometheus/Grafana (local/CI, ADR-027) |
-| API | Minimal API, canonical `/api/v1` |
-| Deployment | Docker/Compose + migration-only mode |
-| CI | GitHub Actions + real PostgreSQL/RabbitMQ integration tests |
-| Тесты | 267 (Core/Domain/Application/Integration), line coverage 90.3% |
+| API | Minimal API, канонический `/api/v1` |
+| Развёртывание | Docker/Compose + режим только миграций |
+| CI | GitHub Actions + интеграционные тесты на реальных PostgreSQL/RabbitMQ |
+| Тесты | 282 (Core/Domain/Application/Integration), покрытие строк 90.3% |
 
 ## Документация
 
@@ -36,12 +36,12 @@ Backend-система создания, публикации, назначен�
 - [SLO и alerts](docs/SLO_ALERTS.md)
 - [Performance / capacity](docs/PERFORMANCE.md)
 - [Тестирование](docs/TESTING.md)
-- [Postman API tests](tests/TestApp.Postman/README.md)
+- [Тесты API в Postman](tests/TestApp.Postman/README.md)
 - [Архитектурные решения](docs/DECISIONS.md)
 - [Дорожная карта](docs/ROADMAP.md)
 - [Детальный план фич](docs/FEATURE_PLAN.md)
 
-Документация различает **Implemented**, **Verifying**, **Planned** и **Decision required**, чтобы наличие automation не путалось с пройденным exit gate, а план развития — с уже существующим функционалом.
+Документация различает **Реализовано**, **Проверяется**, **Запланировано** и **Требуется решение**, чтобы наличие автоматизации не путалось с пройденным выходным гейтом, а план развития — с уже существующим функционалом.
 
 ## Архитектура
 
@@ -89,21 +89,21 @@ author/admin
 
 - `SingleChoice`;
 - `MultipleChoice`;
-- passing percentage;
-- optional time limit;
-- availability windows;
-- attempt limits;
-- bulk assignments;
-- automatic timeout worker;
-- exact-set scoring;
-- reviewer correctness breakdown;
-- student-safe result DTO.
+- порог прохождения в процентах;
+- необязательное ограничение по времени;
+- окна доступности;
+- лимиты попыток;
+- массовые назначения;
+- фоновый воркер автоматического таймаута;
+- оценивание по точному совпадению набора;
+- разбор правильности для рецензента;
+- безопасный для студента DTO результата.
 
 ## Identity и authorization
 
 Keycloak — source of truth для пользователей/групп/системных ролей.
 
-Canonical claims:
+Канонические claims:
 
 ```text
 sub
@@ -122,7 +122,7 @@ test-admin
 
 ## API
 
-Canonical base:
+Канонический базовый путь:
 
 ```text
 /api/v1
@@ -159,7 +159,7 @@ Migrations:
 src/TestApp.Infrastructure/Persistence/Migrations
 ```
 
-Production migration-only mode:
+Production-режим только миграций:
 
 ```bash
 dotnet TestApp.Api.dll --migrate
@@ -183,11 +183,11 @@ API replicas в Production не должны конкурировать за sch
 RabbitMQ transport реализован:
 
 - at-least-once;
-- publisher confirms;
-- persistent messages;
+- подтверждения публикации;
+- устойчивые сообщения;
 - EventId -> MessageId;
 - retry/backoff/dead-letter;
-- multi-instance advisory lock;
+- advisory-блокировка между несколькими экземплярами;
 - readiness.
 
 При этом production integration event catalog ещё должен быть определён отдельно — обычные domain events не публикуются наружу автоматически.
@@ -195,17 +195,17 @@ RabbitMQ transport реализован:
 ## Observability и audit
 
 - `X-Correlation-ID`;
-- structured request telemetry;
+- структурированная телеметрия запросов;
 - durable audit для POST/PUT/PATCH/DELETE;
-- OpenTelemetry ASP.NET Core/HttpClient/runtime metrics;
-- optional OTLP exporter;
+- метрики OpenTelemetry для ASP.NET Core/HttpClient/runtime;
+- необязательный экспортер OTLP;
 - admin operational endpoints для audit и Outbox;
 - retention cleanup для audit/idempotency/processed Outbox;
-- audited dead-letter detail/requeue/discard;
+- аудируемые просмотр, повторная постановка и отбрасывание dead-letter;
 - operational metrics и SLO/alert contract;
 - Prometheus + Grafana в Compose stack — provisioned dashboard и alert rule expressions для `docs/SLO_ALERTS.md` контракта (ADR-027).
 
-## Local Docker Compose
+## Локальный запуск через Docker Compose
 
 Запуск полного development stack:
 
@@ -219,7 +219,7 @@ docker compose up --build
 - Keycloak — `http://localhost:8081`;
 - PostgreSQL 18 — `localhost:5432`;
 - RabbitMQ AMQP — `localhost:5672`;
-- RabbitMQ management — `http://localhost:15672`;
+- панель управления RabbitMQ — `http://localhost:15672`;
 - OTLP gRPC — `localhost:4317`;
 - OTLP HTTP — `localhost:4318`;
 - Prometheus — `http://localhost:9090`;

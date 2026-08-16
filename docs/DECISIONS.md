@@ -117,7 +117,7 @@
 **Последствия:**
 
 - CQRS separation без distributed consistency;
-- `AsNoTracking`, SQL filters/paging;
+- `AsNoTracking`, фильтрация и постраничный вывод на стороне SQL;
 - отдельный read store вводится только при измеренной необходимости.
 
 ## ADR-010 — Optimistic concurrency через aggregate version

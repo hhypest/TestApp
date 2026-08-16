@@ -79,7 +79,7 @@ docker compose down -v
 
 Эта команда удаляет local Compose volumes и все находящиеся в них данные.
 
-## Dead-letter endpoints
+## Эндпоинты dead-letter
 
 На чистом стенде dead-letter сообщений обычно нет, поэтому destructive recovery requests не запускаются автоматически:
 
@@ -89,7 +89,7 @@ docker compose down -v
 
 `deadLetterEventId` автоматически заполняется первым элементом `recentDeadLetters`, если он есть. Requeue и discard намеренно требуют ручного opt-in, потому что это взаимоисключающие operational действия.
 
-## Local credentials
+## Локальные учётные данные
 
 Environment использует fixture-учётные данные из `deploy/keycloak/testapp-realm.json`:
 

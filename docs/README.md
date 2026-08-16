@@ -8,69 +8,69 @@
 
 Документы разделяют четыре типа информации:
 
-- **Implemented** — поведение существует в текущем коде и должно подтверждаться тестами/CI.
-- **Verifying** — код или automation существуют, но обязательный exit gate ещё не завершился green.
-- **Planned** — согласованный технический следующий шаг, но код ещё не считается реализованным.
-- **Decision required** — продуктовая или архитектурная гипотеза; до отдельного решения она не должна восприниматься как обязательство.
+- **Реализовано** — поведение существует в текущем коде и должно подтверждаться тестами/CI.
+- **Проверяется** — код или автоматизация существуют, но обязательный выходной гейт ещё не завершился зелёным.
+- **Запланировано** — согласованный технический следующий шаг, но код ещё не считается реализованным.
+- **Требуется решение** — продуктовая или архитектурная гипотеза; до отдельного решения она не должна восприниматься как обязательство.
 
 Если документация расходится с кодом, приоритет источников истины следующий:
 
-1. Domain/Application/Infrastructure/API code и database migrations.
-2. Automated tests, generated OpenAPI и exact-head CI evidence.
+1. Код слоёв Domain/Application/Infrastructure/API и миграции базы данных.
+2. Автотесты, сгенерированный OpenAPI и свидетельства CI на точном head.
 3. `CURRENT_STATE.md` — фактический снимок текущего baseline.
-4. `ROADMAP.md` — milestones и exit gates.
-5. `FEATURE_PLAN.md` — атомарные feature statuses/dependencies.
-6. Тематические документы — долговечные contracts, design и runbooks.
+4. `ROADMAP.md` — вехи и выходные гейты.
+5. `FEATURE_PLAN.md` — атомарные статусы фич и их зависимости.
+6. Тематические документы — долгоживущие контракты, проектные решения и runbook'и.
 
 ## Карта документов
 
 | Документ | Назначение |
 |---|---|
 | [CURRENT_STATE.md](CURRENT_STATE.md) | Точный снимок реализованных возможностей, ограничений и технического долга |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Модульная архитектура, зависимости проектов, CQRS flow, request pipeline и background workers |
-| [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | Aggregates, value objects, lifecycle, инварианты, scoring и state transitions |
-| [API.md](API.md) | Canonical `/api/v1`, legacy compatibility, endpoints, authorization, DTO, ошибки, pagination и idempotency |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Модульная архитектура, зависимости проектов, поток CQRS, конвейер запроса и фоновые воркеры |
+| [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | Агрегаты, объекты-значения, жизненный цикл, инварианты, оценивание и переходы состояний |
+| [API.md](API.md) | Канонический `/api/v1`, совместимость с легаси, эндпоинты, авторизация, DTO, ошибки, постраничный вывод и идемпотентность |
 | [USER_GUIDE.md](USER_GUIDE.md) | Пошаговые сценарии по ролям (test-author/test-admin/student) поверх HTTP API |
-| [PERSISTENCE.md](PERSISTENCE.md) | PostgreSQL 18, EF mappings, schema, migrations, optimistic concurrency и advisory locks |
-| [EVENTS_AND_OUTBOX.md](EVENTS_AND_OUTBOX.md) | Domain/integration events, transactional Outbox, RabbitMQ, retry/dead-letter и delivery semantics |
-| [SECURITY.md](SECURITY.md) | Keycloak/JWT claims, роли/policies, owner isolation, rate limiting, audit и remaining security backlog |
-| [OPERATIONS.md](OPERATIONS.md) | Docker Compose, migrations, health, OpenTelemetry, RabbitMQ, runbooks и конфигурация |
-| [BACKUP_RESTORE.md](BACKUP_RESTORE.md) | Logical backup/restore baseline, RPO/RTO и recovery drill |
-| [SLO_ALERTS.md](SLO_ALERTS.md) | Operational metrics, SLO thresholds, alert policy и triage |
-| [PERFORMANCE.md](PERFORMANCE.md) | D6 load/capacity scenarios, thresholds и verification status |
-| [TESTING.md](TESTING.md) | Стратегия тестирования, текущие suites, CI gates и требования к новым фичам |
-| [CODE_REVIEW.md](CODE_REVIEW.md) | Правила структуры файлов, размера изменений и reviewability checklist |
+| [PERSISTENCE.md](PERSISTENCE.md) | PostgreSQL 18, сопоставления EF, схема, миграции, optimistic concurrency и advisory-блокировки |
+| [EVENTS_AND_OUTBOX.md](EVENTS_AND_OUTBOX.md) | Доменные и интеграционные события, транзакционный Outbox, RabbitMQ, повторы/dead-letter и семантика доставки |
+| [SECURITY.md](SECURITY.md) | Claims Keycloak/JWT, роли и политики, изоляция по владельцу, ограничение частоты, аудит и открытый backlog безопасности |
+| [OPERATIONS.md](OPERATIONS.md) | Docker Compose, миграции, health-проверки, OpenTelemetry, RabbitMQ, runbook'и и конфигурация |
+| [BACKUP_RESTORE.md](BACKUP_RESTORE.md) | Базовое логическое резервное копирование и восстановление, RPO/RTO и учебное восстановление |
+| [SLO_ALERTS.md](SLO_ALERTS.md) | Эксплуатационные метрики, пороги SLO, политика алертов и их разбор |
+| [PERFORMANCE.md](PERFORMANCE.md) | Сценарии нагрузки и ёмкости D6, пороги и статус проверки |
+| [TESTING.md](TESTING.md) | Стратегия тестирования, текущие наборы тестов, гейты CI и требования к новым фичам |
+| [CODE_REVIEW.md](CODE_REVIEW.md) | Правила структуры файлов, размера изменений и чек-лист пригодности к ревью |
 | [DECISIONS.md](DECISIONS.md) | Зафиксированные архитектурные решения и сознательно неиспользуемые технологии |
 | [ROADMAP.md](ROADMAP.md) | Последовательная дорожная карта релизов и технических этапов |
 | [FEATURE_PLAN.md](FEATURE_PLAN.md) | Детальный каталог фич с ID, приоритетами, зависимостями и критериями готовности |
-| [CHANGELOG.md](../CHANGELOG.md) | Пользовательский changelog по версиям/фазам roadmap (Keep a Changelog + SemVer) |
+| [CHANGELOG.md](../CHANGELOG.md) | Пользовательский журнал изменений по версиям и фазам дорожной карты (Keep a Changelog + SemVer) |
 
 ## Технологический baseline
 
-**Implemented:**
+**Реализовано:**
 
 - .NET 10;
 - DDD + Clean Architecture + CQRS в modular monolith;
-- EF Core 10.0.11 + Npgsql EF provider 10.0.3;
+- EF Core 10.0.11 + провайдер Npgsql EF 10.0.3;
 - PostgreSQL 18;
-- Keycloak как внешний Identity Provider;
-- Minimal API + JWT Bearer;
-- RabbitMQ 4.3.x transport для Outbox;
+- Keycloak как внешний провайдер идентификации;
+- Minimal API + JWT Bearer-аутентификация;
+- транспорт RabbitMQ 4.3.x для Outbox;
 - OpenTelemetry 1.17.0;
 - Docker/Compose;
-- GitHub Actions с реальными PostgreSQL/RabbitMQ service containers.
+- GitHub Actions с реальными сервис-контейнерами PostgreSQL/RabbitMQ.
 
 ## Базовый словарь
 
 - **Test** — изменяемое рабочее определение теста.
-- **PublishedTestRevision** — immutable snapshot опубликованного теста.
+- **PublishedTestRevision** — неизменяемый снимок опубликованного теста.
 - **Assignment** — назначение конкретной revision пользователю или группе.
 - **Attempt** — попытка конкретного пользователя по конкретному assignment/revision.
 - **Actor** — пользователь, идентифицированный внешним `sub` из Keycloak.
-- **Domain event** — внутреннее бизнес-событие aggregate.
-- **Integration event** — явно отмеченное событие, разрешённое к выходу через Outbox.
-- **Outbox** — durable запись integration event в той же PostgreSQL transaction, что и бизнес-изменение.
-- **Idempotency lease** — PostgreSQL advisory lock, сериализующий повторяемые unsafe operations между API instances.
+- **Доменное событие** — внутреннее бизнес-событие агрегата.
+- **Интеграционное событие** — явно отмеченное событие, разрешённое к выходу через Outbox.
+- **Outbox** — устойчивая запись интеграционного события в той же транзакции PostgreSQL, что и бизнес-изменение.
+- **Аренда идемпотентности** — advisory-блокировка PostgreSQL, сериализующая повторяемые небезопасные операции между экземплярами API.
 
 ## Правило актуализации
 
