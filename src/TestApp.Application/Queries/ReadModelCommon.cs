@@ -1,4 +1,5 @@
 using TestApp.Application.Abstractions;
+using TestApp.Application.Common;
 using TestApp.Domain.Identity;
 
 namespace TestApp.Application.Queries;
@@ -18,8 +19,5 @@ internal static class Paging
 
 internal static class AuthorReadScope
 {
-    public static ExternalUserId? OwnerFilter(ICurrentActor actor) =>
-        actor.Roles.Any(role => string.Equals(role, "test-admin", StringComparison.OrdinalIgnoreCase))
-            ? null
-            : actor.UserId;
+    public static ExternalUserId? OwnerFilter(ICurrentActor actor) => ActorScope.OwnerFilter(actor);
 }

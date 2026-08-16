@@ -1,4 +1,6 @@
-﻿namespace TestApp.Core.Monads;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace TestApp.Core.Monads;
 
 public readonly struct Result<TSuccess, TFailure>
     where TSuccess : notnull
@@ -32,7 +34,12 @@ public readonly struct Result<TSuccess, TFailure>
 
     public static implicit operator Result<TSuccess, TFailure>(TFailure failure) => Failure(failure);
 
-    public bool TryGetError(out TFailure error)
+    /// <summary>
+    /// Yields the failure value when this result is a failure. On success the
+    /// out parameter carries no meaningful value, so it is annotated for the
+    /// compiler's null-state analysis rather than left as a bare <c>out</c>.
+    /// </summary>
+    public bool TryGetError([MaybeNullWhen(false)] out TFailure error)
     {
         error = _failure;
         return IsFailure;

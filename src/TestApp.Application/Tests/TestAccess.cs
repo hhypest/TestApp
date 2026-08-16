@@ -7,8 +7,6 @@ namespace TestApp.Application.Tests;
 
 internal static class TestAccess
 {
-    private const string AdminRole = "test-admin";
-
     public static Error? EnsureCanManage(Test test, ICurrentActor actor) =>
         IsAdmin(actor) || test.IsOwnedBy(actor.UserId)
             ? null
@@ -21,9 +19,7 @@ internal static class TestAccess
                 "concurrency.precondition_failed",
                 $"The test has changed. Expected version {expectedVersion.Value}, current version {test.ConcurrencyVersion}.");
 
-    public static ExternalUserId? OwnerFilter(ICurrentActor actor) =>
-        IsAdmin(actor) ? null : actor.UserId;
+    public static ExternalUserId? OwnerFilter(ICurrentActor actor) => ActorScope.OwnerFilter(actor);
 
-    public static bool IsAdmin(ICurrentActor actor) =>
-        actor.Roles.Any(role => string.Equals(role, AdminRole, StringComparison.OrdinalIgnoreCase));
+    public static bool IsAdmin(ICurrentActor actor) => ActorScope.IsAdmin(actor);
 }

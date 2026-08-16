@@ -126,6 +126,7 @@ public sealed class AuditTrail(DbContextOptions<AppDbContext> options, TimeProvi
         var totalCount = await query.CountAsync(ct);
         var rows = await query
             .OrderByDescending(x => x.OccurredAt)
+            .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new AuditEntryView(

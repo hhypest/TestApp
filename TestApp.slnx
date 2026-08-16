@@ -3,5 +3,5 @@
   <Folder Name="/src/">
     <Project Path="src/TestApp.Core/TestApp.Core.csproj" /><Project Path="src/TestApp.Domain/TestApp.Domain.csproj" /><Project Path="src/TestApp.Messaging/TestApp.Messaging.csproj" /><Project Path="src/TestApp.Application/TestApp.Application.csproj" /><Project Path="src/TestApp.Infrastructure/TestApp.Infrastructure.csproj" /><Project Path="src/TestApp.Api/TestApp.Api.csproj" />
   </Folder>
-  <Folder Name="/tests/"><Project Path="tests/TestApp.Domain.Tests/TestApp.Domain.Tests.csproj" /><Project Path="tests/TestApp.Application.Tests/TestApp.Application.Tests.csproj" /><Project Path="tests/TestApp.IntegrationTests/TestApp.IntegrationTests.csproj" /></Folder>
+  <Folder Name="/tests/"><Project Path="tests/TestApp.Core.Tests/TestApp.Core.Tests.csproj" /><Project Path="tests/TestApp.Domain.Tests/TestApp.Domain.Tests.csproj" /><Project Path="tests/TestApp.Application.Tests/TestApp.Application.Tests.csproj" /><Project Path="tests/TestApp.IntegrationTests/TestApp.IntegrationTests.csproj" /></Folder>
 </Solution>

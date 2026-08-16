@@ -86,7 +86,9 @@ public sealed class Test : AggregateRoot<TestId>
         if (points <= 0) return DomainError.Validation("test.question.points", "Question points must be greater than zero.");
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
         return NormalizeQuestionText(text).Match<Result<Test, DomainError>>(
-            normalizedText => { question.Update(normalizedText, type, points); MarkChanged(); return this; },
+            normalizedText => question.Update(normalizedText, type, points).Match<Result<Test, DomainError>>(
+                _ => { MarkChanged(); return this; },
+                updateError => updateError),
             error => error);
     }
 
@@ -103,8 +105,8 @@ public sealed class Test : AggregateRoot<TestId>
         var editable = EnsureEditable();
         if (editable.TryGetError(out var error)) return error;
         if (order < 0) return DomainError.Validation("test.question.order", "Question order cannot be negative.");
-        if (_questions.Any(q => q.Id != questionId && q.Order == order)) return DomainError.Conflict("test.question.order_duplicate", "Question order must be unique within a test.");
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
+        if (_questions.Any(q => q.Id != questionId && q.Order == order)) return DomainError.Conflict("test.question.order_duplicate", "Question order must be unique within a test.");
         question.SetOrder(order); MarkChanged(); return this;
     }
 
@@ -193,7 +195,17 @@ public sealed class Question : Entity<QuestionId>
     public decimal Points { get; private set; }
     public int Order { get; private set; }
     public IReadOnlyCollection<AnswerOption> Options => _options.AsReadOnly();
-    internal void Update(string text, QuestionType type, decimal points) { Text = text; Type = type; Points = points; }
+    internal Result<Question, DomainError> Update(string text, QuestionType type, decimal points)
+    {
+        // Switching to SingleChoice must not leave behind the multiple correct
+        // options that AddAnswerOption/UpdateAnswerOption already refuse to create.
+        if (type == QuestionType.SingleChoice && _options.Count(o => o.IsCorrect) > 1)
+            return DomainError.Conflict(
+                "test.single_choice.multiple_correct",
+                "A single-choice question can have only one correct option. Remove the extra correct options before changing the question type.");
+        Text = text; Type = type; Points = points;
+        return this;
+    }
     internal void SetOrder(int order) => Order = order;
     internal Result<AnswerOptionId, DomainError> AddAnswerOption(string text, bool isCorrect, int order) =>
         NormalizeAnswerOptionText(text).Match<Result<AnswerOptionId, DomainError>>(
@@ -225,8 +237,9 @@ public sealed class Question : Entity<QuestionId>
     internal Result<Question, DomainError> ReorderAnswerOption(AnswerOptionId optionId, int order)
     {
         if (order < 0) return DomainError.Validation("test.answer_option.order", "Answer option order cannot be negative.");
+        var option = _options.SingleOrDefault(o => o.Id == optionId); if (option is null) return DomainError.NotFound("test.answer_option.not_found", "Answer option was not found in this question.");
         if (_options.Any(o => o.Id != optionId && o.Order == order)) return DomainError.Conflict("test.answer_option.order_duplicate", "Answer option order must be unique within a question.");
-        var option = _options.SingleOrDefault(o => o.Id == optionId); if (option is null) return DomainError.NotFound("test.answer_option.not_found", "Answer option was not found in this question."); option.SetOrder(order); return this;
+        option.SetOrder(order); return this;
     }
     internal Result<Question, DomainError> ValidateForPublication()
     {

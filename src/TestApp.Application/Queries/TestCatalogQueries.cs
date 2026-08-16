@@ -1,4 +1,5 @@
 using TestApp.Application.Abstractions;
+using TestApp.Application.Common;
 using TestApp.Domain.Identity;
 using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
@@ -60,8 +61,7 @@ public sealed class GetTestsQueryHandler(ITestCatalogQueries queries, ICurrentAc
         return queries.GetTestsAsync(OwnerFilter(actor), page, pageSize, query.Status, search, ct);
     }
 
-    private static ExternalUserId? OwnerFilter(ICurrentActor actor) => IsAdmin(actor) ? null : actor.UserId;
-    private static bool IsAdmin(ICurrentActor actor) => actor.Roles.Any(x => string.Equals(x, "test-admin", StringComparison.OrdinalIgnoreCase));
+    private static ExternalUserId? OwnerFilter(ICurrentActor actor) => ActorScope.OwnerFilter(actor);
 }
 
 public sealed class GetTestRevisionsQueryHandler(ITestCatalogQueries queries, ICurrentActor actor)
@@ -70,6 +70,5 @@ public sealed class GetTestRevisionsQueryHandler(ITestCatalogQueries queries, IC
     public Task<IReadOnlyList<PublishedRevisionSummary>> Handle(GetTestRevisionsQuery query, CancellationToken ct) =>
         queries.GetRevisionsAsync(query.TestId, OwnerFilter(actor), ct);
 
-    private static ExternalUserId? OwnerFilter(ICurrentActor actor) =>
-        actor.Roles.Any(x => string.Equals(x, "test-admin", StringComparison.OrdinalIgnoreCase)) ? null : actor.UserId;
+    private static ExternalUserId? OwnerFilter(ICurrentActor actor) => ActorScope.OwnerFilter(actor);
 }
