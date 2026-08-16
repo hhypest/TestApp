@@ -39,7 +39,7 @@ public sealed class Test : AggregateRoot<TestId>
     public Result<Test, DomainError> Rename(string title)
     {
         var editable = EnsureEditable();
-        if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        if (editable.TryGetError(out var error)) return error;
         Title = Normalize(title, nameof(title), TestLimits.TitleMaxLength);
         MarkChanged();
         return this;
@@ -48,7 +48,7 @@ public sealed class Test : AggregateRoot<TestId>
     public Result<Test, DomainError> ChangeSettings(decimal passingPercentage, int? timeLimitMinutes)
     {
         var editable = EnsureEditable();
-        if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        if (editable.TryGetError(out var error)) return error;
         var settings = TestSettings.Create(passingPercentage, timeLimitMinutes);
         return settings.Match<Result<Test, DomainError>>(
             value => { Settings = value; MarkChanged(); return this; },
@@ -58,7 +58,7 @@ public sealed class Test : AggregateRoot<TestId>
     public Result<QuestionId, DomainError> AddQuestion(string text, QuestionType type, decimal points, int order)
     {
         var editable = EnsureEditable();
-        if (editable.Match(_ => false, _ => true)) return editable.Match<Result<QuestionId, DomainError>>(_ => QuestionId.New(), error => error);
+        if (editable.TryGetError(out var error)) return error;
         if (!Enum.IsDefined(typeof(QuestionType), type)) return DomainError.Validation("test.question.type", "Question type is not supported.");
         if (points <= 0) return DomainError.Validation("test.question.points", "Question points must be greater than zero.");
         if (order < 0) return DomainError.Validation("test.question.order", "Question order cannot be negative.");
@@ -69,7 +69,8 @@ public sealed class Test : AggregateRoot<TestId>
 
     public Result<Test, DomainError> UpdateQuestion(QuestionId questionId, string text, QuestionType type, decimal points)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         if (!Enum.IsDefined(typeof(QuestionType), type)) return DomainError.Validation("test.question.type", "Question type is not supported.");
         if (points <= 0) return DomainError.Validation("test.question.points", "Question points must be greater than zero.");
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
@@ -78,14 +79,16 @@ public sealed class Test : AggregateRoot<TestId>
 
     public Result<Test, DomainError> RemoveQuestion(QuestionId questionId)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
         _questions.Remove(question); MarkChanged(); return this;
     }
 
     public Result<Test, DomainError> ReorderQuestion(QuestionId questionId, int order)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         if (order < 0) return DomainError.Validation("test.question.order", "Question order cannot be negative.");
         if (_questions.Any(q => q.Id != questionId && q.Order == order)) return DomainError.Conflict("test.question.order_duplicate", "Question order must be unique within a test.");
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
@@ -94,7 +97,8 @@ public sealed class Test : AggregateRoot<TestId>
 
     public Result<AnswerOptionId, DomainError> AddAnswerOption(QuestionId questionId, string text, bool isCorrect, int order)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<AnswerOptionId, DomainError>>(_ => AnswerOptionId.New(), error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
         var result = question.AddAnswerOption(text, isCorrect, order);
         return result.Match<Result<AnswerOptionId, DomainError>>(id => { MarkChanged(); return id; }, error => error);
@@ -102,7 +106,8 @@ public sealed class Test : AggregateRoot<TestId>
 
     public Result<Test, DomainError> UpdateAnswerOption(QuestionId questionId, AnswerOptionId optionId, string text, bool isCorrect)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
         var result = question.UpdateAnswerOption(optionId, text, isCorrect);
         return result.Match<Result<Test, DomainError>>(_ => { MarkChanged(); return this; }, error => error);
@@ -110,7 +115,8 @@ public sealed class Test : AggregateRoot<TestId>
 
     public Result<Test, DomainError> RemoveAnswerOption(QuestionId questionId, AnswerOptionId optionId)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
         var result = question.RemoveAnswerOption(optionId);
         return result.Match<Result<Test, DomainError>>(_ => { MarkChanged(); return this; }, error => error);
@@ -118,7 +124,8 @@ public sealed class Test : AggregateRoot<TestId>
 
     public Result<Test, DomainError> ReorderAnswerOption(QuestionId questionId, AnswerOptionId optionId, int order)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
         var result = question.ReorderAnswerOption(optionId, order);
         return result.Match<Result<Test, DomainError>>(_ => { MarkChanged(); return this; }, error => error);
@@ -126,12 +133,13 @@ public sealed class Test : AggregateRoot<TestId>
 
     public Result<Test, DomainError> Publish(DateTimeOffset occurredAt)
     {
-        var editable = EnsureEditable(); if (editable.Match(_ => false, _ => true)) return editable.Match<Result<Test, DomainError>>(_ => this, error => error);
+        var editable = EnsureEditable();
+        if (editable.TryGetError(out var error)) return error;
         if (_questions.Count == 0) return DomainError.Validation("test.publish.questions_required", "A test without questions cannot be published.");
         foreach (var question in _questions)
         {
             var validation = question.ValidateForPublication();
-            if (validation.Match(_ => false, _ => true)) return validation.Match<Result<Test, DomainError>>(_ => this, error => error);
+            if (validation.TryGetError(out var validationError)) return validationError;
         }
         Status = TestStatus.Published; Touch(); Raise(new TestPublished(Id, occurredAt)); return this;
     }

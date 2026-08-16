@@ -8,8 +8,8 @@ public readonly struct Result<TSuccess, TFailure>
     private readonly TFailure _failure;
     private readonly bool _state;
 
-    private bool IsSuccess => _state;
-    private bool IsFailure => !_state;
+    public bool IsSuccess => _state;
+    public bool IsFailure => !_state;
 
     private Result(TSuccess success)
     {
@@ -31,6 +31,12 @@ public readonly struct Result<TSuccess, TFailure>
     public static implicit operator Result<TSuccess, TFailure>(TSuccess success) => Success(success);
 
     public static implicit operator Result<TSuccess, TFailure>(TFailure failure) => Failure(failure);
+
+    public bool TryGetError(out TFailure error)
+    {
+        error = _failure;
+        return IsFailure;
+    }
 
     public Result<TNewSuccess, TFailure> Map<TNewSuccess>(Func<TSuccess, TNewSuccess> mapFunc)
         where TNewSuccess : notnull
