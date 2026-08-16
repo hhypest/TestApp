@@ -181,6 +181,13 @@ Regression test immutable revision JSON round-trip.
 
 Это защищает от EF converter/backing-field materialization regressions.
 
+### `AdminReadModelQueryTests.cs`
+
+Проверяет `AssignmentAdminQueries`/`ReviewerReadModelQueries` (STAB-006/STAB-007) напрямую против `AppDbContext`:
+
+- deterministic pagination — обход всех страниц через записи с одинаковым `AssignedAt`/`StartedAt` возвращает каждую запись ровно один раз, без дублей/пропусков;
+- testId/revisionId scoping — filters через correlated `EXISTS` subquery/прямое FK-сравнение изолируют записи разных tests корректно (regression guard для SQL-join rewrite, заменившего pre-fetch revision-ID materialization).
+
 ### `OverdueAttemptExpirationTests.cs`
 
 Проверяет automatic expiration:
@@ -396,8 +403,7 @@ GitHub Actions `dotnet` workflow:
 - application handler suite beyond StartAttempt;
 - concurrency test submit vs background timeout;
 - multiple API replicas idempotency scenario;
-- deterministic pagination при одинаковых timestamps;
-- high-cardinality reviewer/admin query regression + query-plan evidence;
+- query-plan/EXPLAIN evidence для reviewer/admin hot queries под production-scale data (функциональная корректность SQL join/tie-breaker rewrite уже покрыта `AdminReadModelQueryTests.cs`);
 - strong-ID/AttemptScore/error mapping invariants;
 - real Keycloak smoke integration.
 

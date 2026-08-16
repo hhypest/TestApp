@@ -83,8 +83,8 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | STAB-003 | P0 | DONE | cycle-level Outbox/expiration worker recovery |
 | STAB-004 | P0 | DONE | RabbitMQ 4.3-compatible diagnostic probe + green D6 on `9916b98` |
 | STAB-005 | P0 | DONE | database-only `--migrate` configuration path |
-| STAB-006 | P1 | PLANNED | deterministic timestamp + ID pagination order |
-| STAB-007 | P1 | PLANNED | SQL joins/aggregates for reviewer/admin hot queries |
+| STAB-006 | P1 | DONE | deterministic timestamp + ID pagination order |
+| STAB-007 | P1 | DONE | SQL joins/aggregates for reviewer/admin hot queries |
 
 `STAB-002` закрыт перестановкой middleware boundary: correlation/audit выполняется снаружи exception handler и наблюдает уже обработанный response. Regression suite проверяет равенство response/audit status для binding `400`, concurrency `409`, precondition `412` и unhandled `500`.
 
@@ -93,6 +93,10 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 `STAB-005` закрыт: composition root (`Program.cs`) при `--migrate` загружает только `RuntimeConfiguration.LoadDatabase` и пропускает Keycloak/RabbitMQ/attempt-expiration/rate-limiting/OpenAPI/CORS/transport-security/reverse-proxy loaders и связанные DI-регистрации. `compose.yaml` сервис `migrate` и CI-шаг "Apply migrations from production image" передают только `ConnectionStrings:Database`/`Database:ApplyMigrationsOnStartup`. Проверено локально: production build запускает `--migrate` (exit 0, миграция применяется) без единой Keycloak/RabbitMQ/CORS переменной; полный `dotnet test` (18 unit + 69 integration) green.
 
 `STAB-003` закрыт: `OutboxProcessor`/`OverdueAttemptProcessor` оборачивают каждый poll cycle в try/catch (`RunCycleAsync`) — cycle-level failure (напр. transient DB outage при открытии scope) логируется и worker продолжает на следующий `PeriodicTimer` tick вместо fault хостового `BackgroundService` (default `BackgroundServiceExceptionBehavior.StopHost` иначе останавливает весь API process). `WorkerCycleResilienceTests.cs` симулирует однократный сбой `IServiceScopeFactory.CreateScope()` и проверяет: (1) recovery — сообщение/attempt обрабатывается на следующем cycle; (2) `ExecuteTask.IsFaulted == false`. Оба теста подтверждённо red без fix (revert проверен вручную) и green с ним; прямые вызовы `ProcessBatchAsync`/`DrainAvailableAsync` (existing tests) продолжают бросать исключения как раньше — swallow только на уровне hosted-service cycle.
+
+`STAB-006` закрыт: все paged read models с offset pagination (`AssignmentAdminQueries.GetAssignmentsAsync`/`GetAssignmentAttemptsAsync`, `AssignmentReadModelQueries.GetAssignmentsAsync`, `AttemptReadModelQueries.GetAttemptsAsync`, `ReviewerReadModelQueries.GetReviewerResultsAsync`) добавили `.ThenByDescending(x => x.Id)` вслед за primary timestamp order — та же схема, что уже применялась в `TestCatalogQueries.GetTestsAsync` (`.ThenBy(x => x.Id)`). `AdminReadModelQueryTests.cs` проверяет, что полный обход страниц через записи с одинаковым `AssignedAt`/`StartedAt` возвращает каждую запись ровно один раз без дублей/пропусков.
+
+`STAB-007` закрыт: `AssignmentAdminQueries.GetAssignmentsAsync` и `ReviewerReadModelQueries.GetReviewerResultsAsync` больше не материализуют весь matching revision-ID set в память перед основным запросом (`revisionIds = await ...ToArrayAsync()` + `.Where(x => revisionIds.Contains(...))`) — testId/ownerId filters теперь выражены как correlated `Any()` subquery (SQL `EXISTS`) прямо в основном LINQ-запросе, а revisionId filter сравнивается напрямую с уже существующей FK-колонкой на самой таблице без обращения к `Revisions`. Post-page lookups (revision/attempt-stats/score aggregation, ограниченные текущей страницей) не менялись — они уже были bounded by `pageSize`. `AdminReadModelQueryTests.cs` проверяет testId/revisionId isolation через несколько тестов; owner isolation уже покрыт `TestOwnershipTests.cs`. Замечание: тесты подтверждают корректность результата после рефакторинга (все 91 существующих + 4 новых теста green до и после), но не воспроизводят надёжный red-before-fix сценарий — маленькая тестовая БД в одной транзакции не демонстрирует high-cardinality/scale проблему исходного подхода так же явно, как STAB-003/API-009.
 
 ---
 
@@ -1063,7 +1067,7 @@ Automate Domain-no-EF/API and layer reference constraints.
 Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
 
 ```text
-1  STAB-006/007 + error/value-object invariant normalization (STAB-001/002/003/004/005, API-009 and PERF-001/D6 are DONE)
+1  error/value-object invariant normalization (STAB-001/002/003/004/005/006/007, API-009 and PERF-001/D6 are DONE)
 2  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze
 3  ATT-010/011 + UX-001 student presentation/resume
 4  AUTHOR-001/002/003 + selected tags/catalog + versioned JSON import/export

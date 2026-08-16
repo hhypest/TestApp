@@ -326,8 +326,6 @@ Aggregate может поднимать `IDomainEvent`. `AppDbContext.SaveChange
 
 - `Test.OwnerId` и owner-scoped writes/reads реализованы; tenant/workspace boundary сознательно отсутствует до business requirement;
 - handlers регистрируются напрямую в API, общего command/query dispatcher pipeline нет; это допустимо, пока cross-cutting duplication остаётся управляемым;
-- paged read models не везде имеют deterministic timestamp + ID tie-breaker;
-- reviewer/admin queries materialize большие revision-ID/score sets вместо SQL joins/aggregates;
 - student-safe attempt presentation DTO с question/option text ещё отсутствует;
 - migrations поддерживаются explicit files и актуальным EF model snapshot;
 - Outbox transport готов, но production integration event catalog ещё не определён;

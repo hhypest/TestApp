@@ -244,7 +244,7 @@ GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ s
 Ближайший порядок работ:
 
 ```text
-1. deterministic pagination, SQL reporting queries, domain error/value-object cleanup
+1. domain error/value-object invariant cleanup
 2. 1.0 release rehearsal: restore, alerts, rollback/API freeze
 3. student presentation/resume, затем authoring/reporting и выбранные advanced features
 ```

@@ -18,25 +18,23 @@ public sealed partial class ReadModelQueries
         int pageSize,
         CancellationToken ct)
     {
-        var revisionQuery = _db.Revisions.AsNoTracking().AsQueryable();
-        if (ownerId is { } owner)
-            revisionQuery = revisionQuery.Where(revision =>
-                _db.Tests.Any(test => test.Id == revision.TestId && test.OwnerId == owner));
-        if (testId is { } testValue)
-            revisionQuery = revisionQuery.Where(revision => revision.TestId == testValue);
+        var attemptsQuery = _db.Attempts.AsNoTracking().AsQueryable();
         if (revisionId is { } revisionValue)
-            revisionQuery = revisionQuery.Where(revision => revision.Id == revisionValue);
-
-        var revisionIds = await revisionQuery.Select(revision => revision.Id).ToArrayAsync(ct);
-        var attemptsQuery = _db.Attempts
-            .AsNoTracking()
-            .Where(attempt => revisionIds.Contains(attempt.RevisionId));
+            attemptsQuery = attemptsQuery.Where(attempt => attempt.RevisionId == revisionValue);
+        if (testId is { } testValue)
+            attemptsQuery = attemptsQuery.Where(attempt => _db.Revisions.Any(revision =>
+                revision.Id == attempt.RevisionId && revision.TestId == testValue));
+        if (ownerId is { } owner)
+            attemptsQuery = attemptsQuery.Where(attempt => _db.Revisions.Any(revision =>
+                revision.Id == attempt.RevisionId &&
+                _db.Tests.Any(test => test.Id == revision.TestId && test.OwnerId == owner)));
         if (outcome is { } outcomeValue)
             attemptsQuery = attemptsQuery.Where(attempt => attempt.Outcome == outcomeValue);
 
         var totalCount = await attemptsQuery.CountAsync(ct);
         var attempts = await attemptsQuery
             .OrderByDescending(attempt => attempt.StartedAt)
+            .ThenByDescending(attempt => attempt.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);

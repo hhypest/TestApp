@@ -295,8 +295,8 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 10. release notes + rollback/forward-fix runbook;
 11. dependency/container/SBOM evidence attached to release process;
 12. SLO dashboards/alerts exercised against staging;
-13. deterministic pagination order (`timestamp + ID`) на всех paged read models;
-14. reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;
+13. **DONE:** deterministic pagination order (`timestamp + ID`) на всех paged read models;
+14. **DONE:** reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;
 15. domain/application error и value-object invariants имеют единый ожидаемый failure contract.
 
 **1.0 definition:** production-safe core assessment workflow, а не максимальное число типов вопросов.

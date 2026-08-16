@@ -19,15 +19,12 @@ public sealed class AssignmentAdminQueries(AppDbContext db) : IAssignmentAdminQu
         int pageSize,
         CancellationToken ct)
     {
-        var revisions = db.Revisions.AsNoTracking();
+        var query = db.Assignments.AsNoTracking().AsQueryable();
         if (testId is { } testValue)
-            revisions = revisions.Where(x => x.TestId == testValue);
+            query = query.Where(x => db.Revisions.Any(revision =>
+                revision.Id == x.RevisionId && revision.TestId == testValue));
         if (revisionId is { } revisionValue)
-            revisions = revisions.Where(x => x.Id == revisionValue);
-
-        var revisionIds = await revisions.Select(x => x.Id).ToArrayAsync(ct);
-        var query = db.Assignments.AsNoTracking().Where(x => revisionIds.Contains(x.RevisionId));
-
+            query = query.Where(x => x.RevisionId == revisionValue);
         if (targetType is { } targetTypeValue)
             query = query.Where(x => x.TargetType == targetTypeValue);
         if (!string.IsNullOrWhiteSpace(targetId))
@@ -38,6 +35,7 @@ public sealed class AssignmentAdminQueries(AppDbContext db) : IAssignmentAdminQu
         var totalCount = await query.CountAsync(ct);
         var assignments = await query
             .OrderByDescending(x => x.AssignedAt)
+            .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -172,6 +170,7 @@ public sealed class AssignmentAdminQueries(AppDbContext db) : IAssignmentAdminQu
         var totalCount = await query.CountAsync(ct);
         var rows = await query
             .OrderByDescending(x => x.StartedAt)
+            .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);

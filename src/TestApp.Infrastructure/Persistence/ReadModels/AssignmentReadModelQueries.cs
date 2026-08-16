@@ -25,6 +25,7 @@ public sealed partial class ReadModelQueries
         var totalCount = await query.CountAsync(ct);
         var pageItems = await query
             .OrderByDescending(assignment => assignment.AssignedAt)
+            .ThenByDescending(assignment => assignment.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);

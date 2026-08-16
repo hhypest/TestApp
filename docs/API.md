@@ -242,7 +242,7 @@ pageSize default 20; clamp 1..100
 }
 ```
 
-Текущий offset paging не во всех read models имеет secondary ID ordering при одинаковом timestamp. До 1.0 ordering должен стать deterministic (`timestamp`, затем `Id`); cursor pagination требуется только при измеренном concurrent-churn use case.
+Offset paging во всех read models упорядочен deterministically (`timestamp`, затем `Id`); cursor pagination потребуется только при измеренном concurrent-churn use case.
 
 ## 10. Rate limiting
 
@@ -599,8 +599,6 @@ GET /health/ready
 
 Ближайший stabilization scope:
 
-- deterministic paging tie-breakers;
-- SQL-scalable reviewer/admin read queries;
 - student-safe attempt presentation/resume DTO без correctness leakage.
 
 Legacy body `idempotencyKey` и `/api/*` rewrite удаляются только через объявленное compatibility window и lifecycle telemetry.

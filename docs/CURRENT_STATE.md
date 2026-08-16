@@ -272,8 +272,6 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 До 1.0 необходимо закрыть:
 
-- deterministic tie-breaker для offset pagination;
-- SQL joins/aggregates вместо high-cardinality ID/score materialization;
 - унификацию ожидаемых domain errors/value-object invariants.
 
 ### Operational reliability
