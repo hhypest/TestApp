@@ -452,17 +452,17 @@ CI восстанавливает каждую созданную резервн
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО
 
-Retention must exceed maximum retry window/client guarantees.
+Срок хранения должен превышать максимальное окно повторов и клиентские гарантии.
 
-## OPS-014 — Processed Outbox retention
+## OPS-014 — Срок хранения обработанных записей Outbox
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО
 
-Do not delete pending/dead-letter rows blindly.
+Не удалять необработанные и dead-letter записи вслепую.
 
-## OPS-015 — Dead-letter requeue API
+## OPS-015 — API повторной постановки dead-letter
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
@@ -472,32 +472,32 @@ Do not delete pending/dead-letter rows blindly.
 
 - admin-only;
 - audit;
-- only dead-letter rows;
-- reset attempt schedule explicitly;
+- только записи dead-letter;
+- явный сброс расписания попыток;
 - concurrency-safe;
-- no payload edit.
+- редактирование payload запрещено.
 
-## OPS-016 — Dead-letter acknowledge/drop
+## OPS-016 — Подтверждение и отбрасывание dead-letter
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО — explicit audited `discard` terminal state selected
 
-Needed only if operations requires permanent suppression state.
+Нужно только если эксплуатации требуется постоянное состояние подавления.
 
-## OBS-010 — Metrics for Outbox lag
+## OBS-010 — Метрики отставания Outbox
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ГОТОВО
 
-## OBS-011 — Attempt expiration lag metric
+## OBS-011 — Метрика отставания истечения попыток
 
 - **Приоритет:** P1
 - **Трудоёмкость:** S/M
 - **Статус:** ГОТОВО
 
-## OBS-012 — API SLO dashboard
+## OBS-012 — Дашборд SLO для API
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
@@ -510,26 +510,26 @@ Needed only if operations requires permanent suppression state.
 - **Зависимости:** OBS-010..012
 - **Статус:** ГОТОВО — rule expressions implemented for every `docs/SLO_ALERTS.md` §4 rule expressible from existing metrics (`deploy/prometheus/alerts.yml`, 6 page + 6 warning rules, CI-validated); routing to an actionable destination and the staging drill remain open (`docs/SLO_ALERTS.md` §7)
 
-Alert on:
+Алерты по:
 
-- readiness — **not implemented**: needs an active HTTP prober (e.g. `blackbox_exporter`), the metrics pipeline alone cannot express this;
+- readiness — **не реализовано**: требуется активный HTTP-пробер (например `blackbox_exporter`), одним metrics pipeline это не выражается;
 - 5xx — done;
 - latency — done (p95/p99);
-- dead letters — done;
-- Outbox lag — done;
-- DB/RMQ connectivity — covered indirectly via readiness once the prober above exists.
+- dead letter — готово;
+- отставание Outbox — готово;
+- доступность БД/RabbitMQ — покрывается косвенно через readiness, как только появится указанный выше пробер.
 
-## PERF-001 — Load test baseline
+## PERF-001 — Базовые нагрузочные тесты
 
 - **Приоритет:** P0 before sized production launch
 - **Трудоёмкость:** L
 - **Статус:** ГОТОВО — full PostgreSQL/RabbitMQ D6 gate green on `9916b98`
 
-Scenarios documented in `TESTING.md`.
+Сценарии описаны в `TESTING.md`.
 
 ---
 
-# F. Integration event catalog
+# F. Каталог интеграционных событий
 
 ## EVT-001 — `TestRevisionPublishedV1`
 
@@ -537,7 +537,7 @@ Scenarios documented in `TESTING.md`.
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-Must be explicit `IIntegrationEvent`; no raw aggregate serialization.
+Должно быть явным `IIntegrationEvent`; сырая сериализация агрегата запрещена.
 
 ## EVT-002 — `TestAssignedV1`
 
@@ -551,15 +551,15 @@ Must be explicit `IIntegrationEvent`; no raw aggregate serialization.
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-Prefer stable external completion contract rather than exposing internal submitted/timed-out event classes.
+Предпочтителен стабильный внешний контракт завершения, а не публикация внутренних классов событий отправки и таймаута.
 
-## EVT-004 — Integration event schema version policy
+## EVT-004 — Политика версионирования схемы интеграционных событий
 
 - **Приоритет:** P1 before first external consumer
 - **Трудоёмкость:** S/M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-## EVT-005 — Consumer dedup reference implementation/test harness
+## EVT-005 — Эталонная реализация дедупликации у потребителя и тестовый стенд
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M
@@ -567,31 +567,31 @@ Prefer stable external completion contract rather than exposing internal submitt
 
 ---
 
-# G. Authoring productivity
+# G. Продуктивность авторинга
 
-## AUTHOR-001 — Draft validation endpoint
-
-- **Приоритет:** P1
-- **Трудоёмкость:** M
-- **Статус:** ЗАПЛАНИРОВАНО
-
-Returns publication problems without changing status.
-
-## AUTHOR-002 — Clone test
+## AUTHOR-001 — Эндпоинт валидации черновика
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Creates new Draft with copied content and new IDs according to explicit policy.
+Возвращает проблемы публикации, не меняя статус.
 
-## AUTHOR-003 — Create draft from published revision
+## AUTHOR-002 — Клонирование теста
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Useful for branching/copying historical version.
+Создаёт новый черновик со скопированным содержимым и новыми ID согласно явной политике.
+
+## AUTHOR-003 — Создание черновика из опубликованной ревизии
+
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** ЗАПЛАНИРОВАНО
+
+Полезно для ветвления и копирования исторической версии.
 
 ## AUTHOR-004 — Tags
 
@@ -599,7 +599,7 @@ Useful for branching/copying historical version.
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ/PLANNED
 
-Need normalized tag storage/index/filtering.
+Требуется нормализованное хранение тегов, индекс и фильтрация.
 
 ## AUTHOR-005 — Category/subject
 
@@ -607,117 +607,117 @@ Need normalized tag storage/index/filtering.
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-## AUTHOR-006 — Rich catalog filters/sort
+## AUTHOR-006 — Расширенные фильтры и сортировка каталога
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Зависимости:** AUTHOR-004/005 as selected
 
-## AUTHOR-007 — Versioned JSON export
+## AUTHOR-007 — Версионированный экспорт в JSON
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** ЗАПЛАНИРОВАНО
 
-Do not export internal EF entity schema directly.
+Не экспортировать напрямую внутреннюю схему сущностей EF.
 
-## AUTHOR-008 — Versioned JSON import
+## AUTHOR-008 — Версионированный импорт из JSON
 
 - **Приоритет:** P1
 - **Трудоёмкость:** L
 - **Зависимости:** AUTHOR-007
 
-Full validation before persistence; no partial import.
+Полная валидация до сохранения; частичный импорт не допускается.
 
-## AUTHOR-009 — CSV import/export simple-choice
+## AUTHOR-009 — Импорт и экспорт CSV для вопросов с выбором
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-Only if business users need spreadsheet workflow.
+Только если бизнес-пользователям нужен сценарий работы с таблицами.
 
-## AUTHOR-010 — Question bank
+## AUTHOR-010 — Банк вопросов
 
 - **Приоритет:** P1/P2
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Key decision: copy vs live reference. Recommendation: authoring may reference/copy, published revision always snapshots.
+Ключевое решение: копия или живая ссылка. Рекомендация: авторинг может ссылаться или копировать, опубликованная ревизия всегда делает снимок.
 
 ---
 
-# H. Assessment behavior
+# H. Поведение оценивания
 
-## ASMT-001 — Shuffle answer options
-
-- **Приоритет:** P1
-- **Трудоёмкость:** M
-- **Статус:** РЕШЕНИЕ
-
-Presentation order should be deterministic/stored per attempt if result review must reproduce UI.
-
-## ASMT-002 — Shuffle questions
+## ASMT-001 — Перемешивание вариантов ответа
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-## ASMT-003 — Question pools
+Порядок предъявления должен быть детерминированным и сохраняться для попытки, если разбор результата обязан воспроизводить интерфейс.
+
+## ASMT-002 — Перемешивание вопросов
+
+- **Приоритет:** P1
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
+
+## ASMT-003 — Пулы вопросов
 
 - **Приоритет:** P1/P2
 - **Трудоёмкость:** L/XL
 - **Статус:** РЕШЕНИЕ
 
-Attempt must snapshot selected question IDs.
+Попытка обязана сохранять снимок выбранных ID вопросов.
 
-## ASMT-004 — Partial scoring strategy
+## ASMT-004 — Стратегия частичного оценивания
 
 - **Приоритет:** P1
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-Revision snapshots scoring strategy/version.
+Ревизия сохраняет снимок стратегии и версии оценивания.
 
-## ASMT-005 — Negative marking
+## ASMT-005 — Отрицательные баллы
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M/L
 - **Статус:** РЕШЕНИЕ
 
-Requires explicit minimum score/rounding policy.
+Требует явной политики минимального балла и округления.
 
-## ASMT-006 — Numeric answer
+## ASMT-006 — Числовой ответ
 
 - **Приоритет:** P1
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-Need tolerance/normalization rules.
+Нужны правила допуска и нормализации.
 
-## ASMT-007 — Short text auto-match
+## ASMT-007 — Автосопоставление короткого текста
 
 - **Приоритет:** P2
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-Normalization/localization complexity.
+Сложность нормализации и локализации.
 
-## ASMT-008 — FreeText manual grading
+## ASMT-008 — Ручная проверка свободного текста
 
 - **Приоритет:** P1/P2
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Requires new attempt grading lifecycle and reviewer write permissions.
+Требует нового жизненного цикла проверки попытки и прав записи для рецензента.
 
-## ASMT-009 — Ordering question
+## ASMT-009 — Вопрос на упорядочивание
 
 - **Приоритет:** P2
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-## ASMT-010 — Matching question
+## ASMT-010 — Вопрос на сопоставление
 
 - **Приоритет:** P2
 - **Трудоёмкость:** XL
@@ -729,21 +729,21 @@ Requires new attempt grading lifecycle and reviewer write permissions.
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Requires object storage, scanning, signed access, content security.
+Требует объектного хранилища, сканирования, подписанного доступа и контроля безопасности контента.
 
-## ASMT-012 — Rich text/Markdown
+## ASMT-012 — Форматированный текст и Markdown
 
 - **Приоритет:** P1/P2
 - **Трудоёмкость:** M/L
 - **Статус:** РЕШЕНИЕ
 
-Requires rendering/sanitization policy in frontend.
+Требует политики рендеринга и санитизации во фронтенде.
 
 ---
 
-# I. Attempt UX/lifecycle
+# I. Интерфейс и жизненный цикл попытки
 
-## ATT-010 — Attempt presentation DTO
+## ATT-010 — DTO представления попытки
 
 - **Приоритет:** P1 when frontend starts
 - **Трудоёмкость:** M
@@ -751,7 +751,7 @@ Requires rendering/sanitization policy in frontend.
 
 `GET /api/v1/attempts/{id}/presentation` возвращает `AttemptPresentationView`: вопросы/варианты из immutable revision привязанной попытки, сохранённые ответы студента, `status`/`deadlineAt`/`serverTime`. Признака корректности нет ни на одном уровне DTO — граница закреплена тестом на сериализованном HTTP-ответе, а не только по полям (ADR-028). Существующий `GET /attempts/{id}` не менялся, чтобы не ломать v1 contract.
 
-## ATT-011 — Resume active attempt
+## ATT-011 — Возобновление активной попытки
 
 - **Приоритет:** P1
 - **Трудоёмкость:** M
@@ -759,59 +759,59 @@ Requires rendering/sanitization policy in frontend.
 
 `GET /api/v1/assignments/{id}/attempts/active` отдаёт попытку студента в статусе `InProgress` для этого assignment или `404`, если возобновлять нечего. Клиент, потерявший `attemptId`, возобновляет работу вместо старта новой попытки (что израсходовало бы attempt limit). Завершённые попытки через resume не отдаются — они читаются через `/result`.
 
-## ATT-012 — Explicit attempt start metadata
+## ATT-012 — Явные метаданные старта попытки
 
 - **Приоритет:** P2
 - **Трудоёмкость:** S/M
 - **Статус:** РЕШЕНИЕ
 
-Client/device metadata only if privacy/business need.
+Метаданные клиента и устройства — только при наличии требований приватности или бизнеса.
 
-## ATT-013 — Pause/resume clock
+## ATT-013 — Пауза и возобновление отсчёта
 
 - **Приоритет:** P3
 - **Трудоёмкость:** XL
 - **Статус:** РЕШЕНИЕ
 
-Not compatible with current simple deadline semantics without domain redesign.
+Несовместимо с текущей простой семантикой дедлайна без перепроектирования домена.
 
-## ATT-014 — Autosave batching
-
-- **Приоритет:** P2
-- **Трудоёмкость:** M
-- **Статус:** РЕШЕНИЕ
-
-Current per-question PUT is already retryable via aggregate concurrency but not idempotency-keyed.
-
-## ATT-015 — Attempt abandon
+## ATT-014 — Пакетное автосохранение
 
 - **Приоритет:** P2
 - **Трудоёмкость:** M
 - **Статус:** РЕШЕНИЕ
 
-Need clear impact on attempt limit/result statistics.
+Текущий PUT на каждый вопрос уже допускает повтор за счёт параллельного доступа к агрегату, но не имеет ключа идемпотентности.
+
+## ATT-015 — Отказ от попытки
+
+- **Приоритет:** P2
+- **Трудоёмкость:** M
+- **Статус:** РЕШЕНИЕ
+
+Нужно явно определить влияние на лимит попыток и статистику результатов.
 
 ---
 
-# J. Assignment features
+# J. Возможности назначений
 
-## ASN-010 — Assignment template
+## ASN-010 — Шаблон назначения
 
 - **Приоритет:** P1
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-Reusable config for revision/window/limit/targets.
+Переиспользуемая конфигурация ревизии, окна, лимита и целей.
 
-## ASN-011 — Campaign/batch entity
+## ASN-011 — Сущность кампании или пакета
 
 - **Приоритет:** P1/P2
 - **Трудоёмкость:** L
 - **Статус:** РЕШЕНИЕ
 
-Useful if bulk assignments need lifecycle/report as one unit.
+Полезно, если массовым назначениям нужен единый жизненный цикл и отчётность.
 
-## ASN-012 — Scheduled future assignments
+## ASN-012 — Отложенные назначения на будущее
 
 - **Приоритет:** P1
 - **Трудоёмкость:** S/M
