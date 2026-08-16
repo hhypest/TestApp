@@ -1,6 +1,6 @@
 # Дорожная карта развития TestApp
 
-> Baseline: `beta-ddd`, 2026-08-13. Roadmap задаёт последовательность и acceptance gates, а exact-head evidence определяется GitHub Actions ветки.
+> Baseline: `beta-ddd`, 2026-08-16. Roadmap задаёт последовательность и acceptance gates, а exact-head evidence определяется GitHub Actions ветки.
 
 ## 0. Принцип развития
 
@@ -260,9 +260,9 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 # 6. `0.9.4` — Phase D7: Correctness/stabilization fixes
 
 **Priority: P0**
-**Status: IN PROGRESS**
+**Status: DONE**
 
-Перед 1.0 RC необходимо закрыть findings текущего exact-head review:
+Перед 1.0 RC необходимо было закрыть findings текущего exact-head review:
 
 1. **DONE:** actor-scoped `StartAttempt` replay до повторной проверки mutable assignment availability/group membership, с regression tests для cancellation/expiry/group change и нового key;
 2. **DONE:** audit сохраняет итоговый HTTP status после exception mapping, включая handled `400/409`, а не промежуточный `500`;
@@ -270,16 +270,18 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 4. **DONE:** publish/start/submit принимают настоящий zero-length body при валидном `Idempotency-Key` header;
 5. **DONE:** `--migrate` загружает только database-required configuration;
 6. **DONE:** RabbitMQ 4.3-compatible diagnostic capacity probe и полный green D6 run;
-7. documentation source of truth должна оставаться синхронизированной с code/tests/CI.
+7. documentation source of truth синхронизирована с code/tests/CI и должна оставаться такой (ongoing discipline, не одноразовый gate).
 
-**Exit gate:** regression tests для пунктов 1–5, полный `dotnet`/`security`/`performance` green на одном implementation HEAD, сохранённый D6 artifact и отсутствие открытых P0 correctness findings.
+Дополнительно за рамками исходного findings review закрыт STAB-006/007/008 (deterministic pagination, SQL-side reviewer/admin queries, unified domain/application failure contract — см. `docs/DECISIONS.md` ADR-026).
+
+**Exit gate: PASSED.** Regression tests для пунктов 1–6 существуют, `dotnet`/`security`/`performance` green на HEAD `aa0752f`, D6 artifact пересобран на этом же head, открытых P0 correctness findings нет.
 
 ---
 
 # 7. `1.0.0` — Phase E: Stabilization / production release candidate
 
 **Priority: P0**  
-**Status: NEXT AFTER PHASE D**
+**Status: IN PROGRESS — Phase D7 closed, items 13–15 done, 1–12 open**
 
 До freeze 1.0 требуется:
 

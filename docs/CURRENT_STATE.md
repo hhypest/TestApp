@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-14. Phase A–D, STAB-001, STAB-002, STAB-004, PostgreSQL migration и EF Core 10 upgrade реализованы. Exact-head evidence определяется последними GitHub Actions runs ветки.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-16. Phase A–D7 полностью реализованы (STAB-001..008, API-009, PostgreSQL migration, EF Core 10 upgrade). Exact-head evidence определяется последними GitHub Actions runs ветки.
 
 ## 1. Назначение системы
 
@@ -300,4 +300,4 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 Проект уже является production-oriented modular monolith core, а не CRUD prototype: domain invariants, immutable revisions, owner isolation, HTTP/DB concurrency, distributed idempotency, real infrastructure tests, durable Outbox и deployment path реализованы.
 
-До 1.0 остаются прежде всего **точечные correctness/stability fixes и deployment rehearsal**. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.
+Точечные correctness/stability fixes (Phase D7, `STAB-001..008`) закрыты. До 1.0 остаётся прежде всего **deployment rehearsal**: staging restore drill с измеренным RTO, реальные alert routes/drill, rollback/forward-fix repetition, release notes/changelog. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.
