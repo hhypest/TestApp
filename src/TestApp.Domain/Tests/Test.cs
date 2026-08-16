@@ -17,12 +17,12 @@ public sealed class Test : AggregateRoot<TestId>
     private readonly List<Question> _questions = [];
 
     private Test() { Title = string.Empty; Settings = TestSettings.Default(); }
-    private Test(TestId id, string title, ExternalUserId ownerId) : base(id)
+    private Test(TestId id, string normalizedTitle, ExternalUserId ownerId) : base(id)
     {
-        Title = Normalize(title, nameof(title), TestLimits.TitleMaxLength);
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerId.Value, nameof(ownerId));
         if (ownerId.Value.Length > ExternalIdentityLimits.MaxIdentifierLength)
             throw new ArgumentException($"Owner identifier cannot exceed {ExternalIdentityLimits.MaxIdentifierLength} characters.", nameof(ownerId));
+        Title = normalizedTitle;
         OwnerId = ownerId;
         Settings = TestSettings.Default();
     }
@@ -33,16 +33,20 @@ public sealed class Test : AggregateRoot<TestId>
     public TestSettings Settings { get; private set; }
     public IReadOnlyCollection<Question> Questions => _questions.AsReadOnly();
 
-    public static Test Create(string title, ExternalUserId ownerId) => new(TestId.New(), title, ownerId);
+    public static Result<Test, DomainError> Create(string title, ExternalUserId ownerId) =>
+        NormalizeTitle(title).Match<Result<Test, DomainError>>(
+            normalizedTitle => new Test(TestId.New(), normalizedTitle, ownerId),
+            error => error);
+
     public bool IsOwnedBy(ExternalUserId userId) => OwnerId == userId;
 
     public Result<Test, DomainError> Rename(string title)
     {
         var editable = EnsureEditable();
         if (editable.TryGetError(out var error)) return error;
-        Title = Normalize(title, nameof(title), TestLimits.TitleMaxLength);
-        MarkChanged();
-        return this;
+        return NormalizeTitle(title).Match<Result<Test, DomainError>>(
+            normalizedTitle => { Title = normalizedTitle; MarkChanged(); return this; },
+            titleError => titleError);
     }
 
     public Result<Test, DomainError> ChangeSettings(decimal passingPercentage, int? timeLimitMinutes)
@@ -63,8 +67,15 @@ public sealed class Test : AggregateRoot<TestId>
         if (points <= 0) return DomainError.Validation("test.question.points", "Question points must be greater than zero.");
         if (order < 0) return DomainError.Validation("test.question.order", "Question order cannot be negative.");
         if (_questions.Any(q => q.Order == order)) return DomainError.Conflict("test.question.order_duplicate", "Question order must be unique within a test.");
-        var question = new Question(QuestionId.New(), Normalize(text, nameof(text), TestLimits.QuestionTextMaxLength), type, points, order);
-        _questions.Add(question); MarkChanged(); return question.Id;
+        return NormalizeQuestionText(text).Match<Result<QuestionId, DomainError>>(
+            normalizedText =>
+            {
+                var question = new Question(QuestionId.New(), normalizedText, type, points, order);
+                _questions.Add(question);
+                MarkChanged();
+                return question.Id;
+            },
+            error => error);
     }
 
     public Result<Test, DomainError> UpdateQuestion(QuestionId questionId, string text, QuestionType type, decimal points)
@@ -74,7 +85,9 @@ public sealed class Test : AggregateRoot<TestId>
         if (!Enum.IsDefined(typeof(QuestionType), type)) return DomainError.Validation("test.question.type", "Question type is not supported.");
         if (points <= 0) return DomainError.Validation("test.question.points", "Question points must be greater than zero.");
         var question = FindQuestion(questionId); if (question is null) return DomainError.NotFound("test.question.not_found", "Question was not found in this test.");
-        question.Update(Normalize(text, nameof(text), TestLimits.QuestionTextMaxLength), type, points); MarkChanged(); return this;
+        return NormalizeQuestionText(text).Match<Result<Test, DomainError>>(
+            normalizedText => { question.Update(normalizedText, type, points); MarkChanged(); return this; },
+            error => error);
     }
 
     public Result<Test, DomainError> RemoveQuestion(QuestionId questionId)
@@ -153,13 +166,20 @@ public sealed class Test : AggregateRoot<TestId>
     private Result<Test, DomainError> EnsureEditable() => Status == TestStatus.Archived ? DomainError.Conflict("test.archived", "Archived tests cannot be modified.") : this;
     private Question? FindQuestion(QuestionId questionId) => _questions.SingleOrDefault(q => q.Id == questionId);
     private void MarkChanged() { if (Status == TestStatus.Published) Status = TestStatus.Draft; Touch(); }
-    private static string Normalize(string value, string parameter, int maxLength)
+    private static Result<string, DomainError> NormalizeTitle(string title) =>
+        Normalize(title, "test.title", "Title", TestLimits.TitleMaxLength);
+
+    private static Result<string, DomainError> NormalizeQuestionText(string text) =>
+        Normalize(text, "test.question.text", "Question text", TestLimits.QuestionTextMaxLength);
+
+    private static Result<string, DomainError> Normalize(string value, string errorCode, string fieldName, int maxLength)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameter);
+        if (string.IsNullOrWhiteSpace(value))
+            return DomainError.Validation(errorCode, $"{fieldName} is required.");
         var normalized = value.Trim();
-        if (normalized.Length > maxLength)
-            throw new ArgumentException($"{parameter} cannot exceed {maxLength} characters.", parameter);
-        return normalized;
+        return normalized.Length > maxLength
+            ? DomainError.Validation(errorCode, $"{fieldName} cannot exceed {maxLength} characters.")
+            : normalized;
     }
 }
 
@@ -175,23 +195,32 @@ public sealed class Question : Entity<QuestionId>
     public IReadOnlyCollection<AnswerOption> Options => _options.AsReadOnly();
     internal void Update(string text, QuestionType type, decimal points) { Text = text; Type = type; Points = points; }
     internal void SetOrder(int order) => Order = order;
-    internal Result<AnswerOptionId, DomainError> AddAnswerOption(string text, bool isCorrect, int order)
-    {
-        var normalizedText = NormalizeAnswerOptionText(text);
-        if (order < 0) return DomainError.Validation("test.answer_option.order", "Answer option order cannot be negative.");
-        if (_options.Any(o => o.Order == order)) return DomainError.Conflict("test.answer_option.order_duplicate", "Answer option order must be unique within a question.");
-        if (_options.Any(o => string.Equals(o.Text, normalizedText, StringComparison.OrdinalIgnoreCase))) return DomainError.Conflict("test.answer_option.text_duplicate", "Answer option text must be unique within a question.");
-        if (Type == QuestionType.SingleChoice && isCorrect && _options.Any(o => o.IsCorrect)) return DomainError.Conflict("test.single_choice.multiple_correct", "A single-choice question can have only one correct option.");
-        var option = new AnswerOption(AnswerOptionId.New(), normalizedText, isCorrect, order); _options.Add(option); return option.Id;
-    }
-    internal Result<Question, DomainError> UpdateAnswerOption(AnswerOptionId optionId, string text, bool isCorrect)
-    {
-        var normalizedText = NormalizeAnswerOptionText(text);
-        var option = _options.SingleOrDefault(o => o.Id == optionId); if (option is null) return DomainError.NotFound("test.answer_option.not_found", "Answer option was not found in this question.");
-        if (_options.Any(o => o.Id != optionId && string.Equals(o.Text, normalizedText, StringComparison.OrdinalIgnoreCase))) return DomainError.Conflict("test.answer_option.text_duplicate", "Answer option text must be unique within a question.");
-        if (Type == QuestionType.SingleChoice && isCorrect && _options.Any(o => o.Id != optionId && o.IsCorrect)) return DomainError.Conflict("test.single_choice.multiple_correct", "A single-choice question can have only one correct option.");
-        option.Update(normalizedText, isCorrect); return this;
-    }
+    internal Result<AnswerOptionId, DomainError> AddAnswerOption(string text, bool isCorrect, int order) =>
+        NormalizeAnswerOptionText(text).Match<Result<AnswerOptionId, DomainError>>(
+            normalizedText =>
+            {
+                if (order < 0) return DomainError.Validation("test.answer_option.order", "Answer option order cannot be negative.");
+                if (_options.Any(o => o.Order == order)) return DomainError.Conflict("test.answer_option.order_duplicate", "Answer option order must be unique within a question.");
+                if (_options.Any(o => string.Equals(o.Text, normalizedText, StringComparison.OrdinalIgnoreCase))) return DomainError.Conflict("test.answer_option.text_duplicate", "Answer option text must be unique within a question.");
+                if (Type == QuestionType.SingleChoice && isCorrect && _options.Any(o => o.IsCorrect)) return DomainError.Conflict("test.single_choice.multiple_correct", "A single-choice question can have only one correct option.");
+                var option = new AnswerOption(AnswerOptionId.New(), normalizedText, isCorrect, order);
+                _options.Add(option);
+                return option.Id;
+            },
+            error => error);
+
+    internal Result<Question, DomainError> UpdateAnswerOption(AnswerOptionId optionId, string text, bool isCorrect) =>
+        NormalizeAnswerOptionText(text).Match<Result<Question, DomainError>>(
+            normalizedText =>
+            {
+                var option = _options.SingleOrDefault(o => o.Id == optionId);
+                if (option is null) return DomainError.NotFound("test.answer_option.not_found", "Answer option was not found in this question.");
+                if (_options.Any(o => o.Id != optionId && string.Equals(o.Text, normalizedText, StringComparison.OrdinalIgnoreCase))) return DomainError.Conflict("test.answer_option.text_duplicate", "Answer option text must be unique within a question.");
+                if (Type == QuestionType.SingleChoice && isCorrect && _options.Any(o => o.Id != optionId && o.IsCorrect)) return DomainError.Conflict("test.single_choice.multiple_correct", "A single-choice question can have only one correct option.");
+                option.Update(normalizedText, isCorrect);
+                return this;
+            },
+            error => error);
     internal Result<Question, DomainError> RemoveAnswerOption(AnswerOptionId optionId) { var option = _options.SingleOrDefault(o => o.Id == optionId); if (option is null) return DomainError.NotFound("test.answer_option.not_found", "Answer option was not found in this question."); _options.Remove(option); return this; }
     internal Result<Question, DomainError> ReorderAnswerOption(AnswerOptionId optionId, int order)
     {
@@ -209,13 +238,14 @@ public sealed class Question : Entity<QuestionId>
         return this;
     }
 
-    private static string NormalizeAnswerOptionText(string text)
+    private static Result<string, DomainError> NormalizeAnswerOptionText(string text)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        if (string.IsNullOrWhiteSpace(text))
+            return DomainError.Validation("test.answer_option.text", "Answer option text is required.");
         var normalized = text.Trim();
-        if (normalized.Length > TestLimits.AnswerOptionTextMaxLength)
-            throw new ArgumentException($"Answer option text cannot exceed {TestLimits.AnswerOptionTextMaxLength} characters.", nameof(text));
-        return normalized;
+        return normalized.Length > TestLimits.AnswerOptionTextMaxLength
+            ? DomainError.Validation("test.answer_option.text", $"Answer option text cannot exceed {TestLimits.AnswerOptionTextMaxLength} characters.")
+            : normalized;
     }
 }
 

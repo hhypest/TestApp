@@ -297,7 +297,7 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 12. SLO dashboards/alerts exercised against staging;
 13. **DONE:** deterministic pagination order (`timestamp + ID`) на всех paged read models;
 14. **DONE:** reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;
-15. domain/application error и value-object invariants имеют единый ожидаемый failure contract.
+15. **DONE:** domain/application error и value-object invariants имеют единый ожидаемый failure contract (STAB-008, ADR-026).
 
 **1.0 definition:** production-safe core assessment workflow, а не максимальное число типов вопросов.
 

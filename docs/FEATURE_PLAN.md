@@ -85,6 +85,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | STAB-005 | P0 | DONE | database-only `--migrate` configuration path |
 | STAB-006 | P1 | DONE | deterministic timestamp + ID pagination order |
 | STAB-007 | P1 | DONE | SQL joins/aggregates for reviewer/admin hot queries |
+| STAB-008 | P1 | DONE | unified domain/application failure contract: `Result<T, DomainError>` for reachable business rules instead of raw exceptions |
 
 `STAB-002` закрыт перестановкой middleware boundary: correlation/audit выполняется снаружи exception handler и наблюдает уже обработанный response. Regression suite проверяет равенство response/audit status для binding `400`, concurrency `409`, precondition `412` и unhandled `500`.
 
@@ -97,6 +98,8 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 `STAB-006` закрыт: все paged read models с offset pagination (`AssignmentAdminQueries.GetAssignmentsAsync`/`GetAssignmentAttemptsAsync`, `AssignmentReadModelQueries.GetAssignmentsAsync`, `AttemptReadModelQueries.GetAttemptsAsync`, `ReviewerReadModelQueries.GetReviewerResultsAsync`) добавили `.ThenByDescending(x => x.Id)` вслед за primary timestamp order — та же схема, что уже применялась в `TestCatalogQueries.GetTestsAsync` (`.ThenBy(x => x.Id)`). `AdminReadModelQueryTests.cs` проверяет, что полный обход страниц через записи с одинаковым `AssignedAt`/`StartedAt` возвращает каждую запись ровно один раз без дублей/пропусков.
 
 `STAB-007` закрыт: `AssignmentAdminQueries.GetAssignmentsAsync` и `ReviewerReadModelQueries.GetReviewerResultsAsync` больше не материализуют весь matching revision-ID set в память перед основным запросом (`revisionIds = await ...ToArrayAsync()` + `.Where(x => revisionIds.Contains(...))`) — testId/ownerId filters теперь выражены как correlated `Any()` subquery (SQL `EXISTS`) прямо в основном LINQ-запросе, а revisionId filter сравнивается напрямую с уже существующей FK-колонкой на самой таблице без обращения к `Revisions`. Post-page lookups (revision/attempt-stats/score aggregation, ограниченные текущей страницей) не менялись — они уже были bounded by `pageSize`. `AdminReadModelQueryTests.cs` проверяет testId/revisionId isolation через несколько тестов; owner isolation уже покрыт `TestOwnershipTests.cs`. Замечание: тесты подтверждают корректность результата после рефакторинга (все 91 существующих + 4 новых теста green до и после), но не воспроизводят надёжный red-before-fix сценарий — маленькая тестовая БД в одной транзакции не демонстрирует high-cardinality/scale проблему исходного подхода так же явно, как STAB-003/API-009.
+
+`STAB-008` закрыт (см. `docs/DECISIONS.md` ADR-026 для полного rationale): `Test.Normalize`/`NormalizeAnswerOptionText` и приватный конструктор `TestAssignment` больше не кидают `ArgumentException`/`ArgumentOutOfRangeException` для business-rule invariants, достижимых через application use case — title/question-text/answer-option-text length и assignment availability-window/attempt-limit теперь возвращаются как `Result<T, DomainError>` с теми же error codes, что были у duplicated Application-level проверок (`test.title`, `test.question.text`, `test.answer_option.text`, `assignment.window`, `assignment.attempt_limit`). Убраны 6 `try/catch (ArgumentException ex) { return Error.Validation(code, ex.Message); }` в `TestLifecycleCommands.cs`/`QuestionCommands.cs`/`AnswerOptionCommands.cs` (эти try/catch утекали CLR-суффикс `" (Parameter 'x')"` в `ProblemDetails.detail` — подтверждено эмпирически) и дублированные availability-window/attempt-limit проверки в `AssignTestCommandHandler`/`BulkAssignTestsCommandHandler`. Domain-инварианты, недостижимые через correct API caller (value-object length checks, unreachable switch defaults, null Id guard) намеренно оставлены exceptions — критерий отбора см. в ADR-026. Regression tests: `TestAggregateTests.cs` (`DoesNotContain("Parameter", ...)` assertions — подтверждено сработавшими на намеренно реинтродуцированной утечке, затем откачено) и новый HTTP-level тест `RequestValidationContractTests.Assignment_business_rule_violations_return_domain_error_without_leaking_clr_exception_text`. Полный `dotnet test` (12 domain + 8 application + 78 integration) green.
 
 ---
 
@@ -1067,14 +1070,13 @@ Automate Domain-no-EF/API and layer reference constraints.
 Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
 
 ```text
-1  error/value-object invariant normalization (STAB-001/002/003/004/005/006/007, API-009 and PERF-001/D6 are DONE)
-2  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze
-3  ATT-010/011 + UX-001 student presentation/resume
-4  AUTHOR-001/002/003 + selected tags/catalog + versioned JSON import/export
-5  reporting hot paths REP-010/014 after SQL scalability work
-6  EVT catalog only when first real consumer appears
-7  assignment orchestration/notifications selected by product need
-8  advanced assessment features one versioned vertical slice at a time
+1  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze (all STAB-001..008, API-009 and PERF-001/D6 are DONE)
+2  ATT-010/011 + UX-001 student presentation/resume
+3  AUTHOR-001/002/003 + selected tags/catalog + versioned JSON import/export
+4  reporting hot paths REP-010/014 after SQL scalability work
+5  EVT catalog only when first real consumer appears
+6  assignment orchestration/notifications selected by product need
+7  advanced assessment features one versioned vertical slice at a time
 ```
 
 ## Почему так

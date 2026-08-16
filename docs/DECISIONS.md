@@ -276,4 +276,20 @@ Kafka/другой transport не добавляется «для универс
 
 **Status:** Accepted с созданием `docs/`.
 
+## ADR-026 — Business-rule invariants surface as `Result<T, DomainError>`, never raw exceptions (STAB-008)
+
+**Status:** Accepted.
+
+**Decision:** если invariant реально достижим через application-level use case (создание/изменение aggregate по command, вызванному из HTTP API), нарушение должно возвращаться как `Result<T, DomainError>` — как и остальные business rules того же метода — а не как брошенное `ArgumentException`/`ArgumentOutOfRangeException`.
+
+**Почему это стало отдельным решением:** до STAB-008 `Test.Normalize`/`NormalizeAnswerOptionText` и приватный конструктор `TestAssignment` кидали исключения для длины текста и порядка availability window/attempt limit — при этом те же самые правила уже были правильно реализованы как `Result`-возвращающие проверки в соседних методах того же агрегата (`TestAssignment.ChangeAvailability`/`ChangeAttemptLimit`). Это привело к трём наблюдаемым проблемам:
+
+1. `ex.Message` встроенного `ArgumentException` содержит CLR-сгенерированный суффикс `" (Parameter 'x')"`, который утекал напрямую в `ProblemDetails.detail` через `Error.Validation(code, ex.Message)` в шести Application handler'ах (`CreateTest`, `RenameTest`, `AddQuestion`, `UpdateQuestion`, `AddAnswerOption`, `UpdateAnswerOption`) — leaky abstraction в публичном HTTP contract.
+2. `AssignTestCommandHandler`/`BulkAssignTestsCommandHandler` дублировали bespoke availability-window/attempt-limit проверки только для того, чтобы никогда не дойти до кидающего конструктора `TestAssignment.Create` — реальный business rule существовал в двух местах одновременно.
+3. Один и тот же метод (`Test.AddQuestion` и др.) возвращал `Result` для одних invariants и кидал исключение для других — несогласованный contract внутри одной сигнатуры.
+
+**Что осталось exceptions (сознательно, не рефакторится):** guard-инварианты, недостижимые при корректно сформированном caller — `ArgumentNullException` для `null` Id (`Entity.cs`), unreachable switch-default для exhaustive enum (`TestAssignment.cs`), length-проверки `ExternalUserId`/`ExternalGroupId`/`ValidateTargetId`, уже полностью покрытые `[Required]`/`[StringLength]` на HTTP DTO и не имеющие workaround-кода (try/catch или дублированной проверки) в вызывающем Application-коде. Критерий — не «достижимо ли сегодня через конкретный DTO», а «существует ли уже bridging-код (try/catch/дублированная проверка) вокруг этого throw», что и является надёжным сигналом накопленного technical debt.
+
+**Reference:** источник этого пункта — `docs/ROADMAP.md` Phase E, пункт 15 («domain/application error и value-object invariants имеют единый ожидаемый failure contract»), заведён как `STAB-008` в `docs/FEATURE_PLAN.md`.
+
 Изменение public API/domain/schema/security/runtime semantics обязано обновлять соответствующий документ в том же change set.

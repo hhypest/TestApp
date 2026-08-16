@@ -158,7 +158,8 @@ public sealed class StartAttemptTests
         var now = DateTimeOffset.Parse("2026-08-10T12:00:00Z");
         var group = ExternalGroupId.FromExternalId("students");
         var userId = ExternalUserId.FromSubject("user-1");
-        var test = Test.Create("DDD", ExternalUserId.FromSubject("author-1"));
+        var test = Test.Create("DDD", ExternalUserId.FromSubject("author-1"))
+            .Match(t => t, error => throw new Xunit.Sdk.XunitException(error.Message));
         var question = test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
         test.AddAnswerOption(question, "Consistency boundary", true, 1);
@@ -167,7 +168,8 @@ public sealed class StartAttemptTests
         var revision = PublishedTestRevision.From(test, PublishedTestRevisionId.New(), 1, now);
         var assignment = TestAssignment.Create(
             TestAssignmentId.New(), revision.Id, new AssignmentTarget.Group(group), userId,
-            now, now.AddHours(-1), now.AddHours(1), 1);
+            now, now.AddHours(-1), now.AddHours(1), 1)
+            .Match(a => a, error => throw new Xunit.Sdk.XunitException(error.Message));
         return new Fixture(
             assignment,
             revision,

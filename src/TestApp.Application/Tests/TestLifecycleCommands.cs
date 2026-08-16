@@ -28,17 +28,15 @@ public sealed class CreateTestCommandHandler(ITestRepository tests, ICurrentActo
 {
     public async Task<Result<TestId, Error>> Handle(CreateTestCommand command, CancellationToken ct)
     {
-        try
-        {
-            var test = Test.Create(command.Title, actor.UserId);
-            await tests.AddAsync(test, ct);
-            await unitOfWork.SaveChangesAsync(ct);
-            return test.Id;
-        }
-        catch (ArgumentException ex)
-        {
-            return Error.Validation("test.title", ex.Message);
-        }
+        var created = Test.Create(command.Title, actor.UserId);
+        return await created.Match(
+            async test =>
+            {
+                await tests.AddAsync(test, ct);
+                await unitOfWork.SaveChangesAsync(ct);
+                return Result<TestId, Error>.Success(test.Id);
+            },
+            error => Task.FromResult(Result<TestId, Error>.Failure(error.ToApplicationError())));
     }
 }
 
@@ -52,14 +50,7 @@ public sealed class RenameTestCommandHandler(ITestRepository tests, ICurrentActo
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
 
-        try
-        {
-            return await TestCommandResult.Save(test.Rename(command.Title), test.Id, unitOfWork, ct);
-        }
-        catch (ArgumentException ex)
-        {
-            return Error.Validation("test.title", ex.Message);
-        }
+        return await TestCommandResult.Save(test.Rename(command.Title), test.Id, unitOfWork, ct);
     }
 }
 

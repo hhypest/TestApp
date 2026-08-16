@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using TestApp.Api;
 using TestApp.Application.Queries;
+using TestApp.Domain.Revisions;
 using TestApp.Domain.Tests;
 using Xunit;
 
@@ -87,6 +88,70 @@ public sealed class RequestValidationContractTests
         };
         using var invalidQuestion = await client.SendAsync(invalidQuestionRequest, ct);
         await AssertValidationProblem(invalidQuestion, ct);
+    }
+
+    [Fact]
+    public async Task Assignment_business_rule_violations_return_domain_error_without_leaking_clr_exception_text()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
+        await using var factory = CreateFactory(database.ConnectionString);
+        using var client = factory.CreateClient();
+
+        Authenticate(client, "author-assignment-validation", "test-author");
+        var testId = await PostValue<TestId>(client, "/api/v1/tests", new CreateTestRequest("Assignment validation"), ct);
+        var questionId = await PostTestValue<QuestionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions",
+            new QuestionWriteRequest("Pick one", QuestionType.SingleChoice, 1m, 1), ct);
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
+            new AnswerOptionWriteRequest("Correct", true, 1), ct);
+        _ = await PostTestValue<AnswerOptionId>(client, testId, $"/api/v1/tests/{testId.Value}/questions/{questionId.Value}/options",
+            new AnswerOptionWriteRequest("Wrong", false, 2), ct);
+        var revisionId = await PostTestValue<PublishedTestRevisionId>(client, testId, $"/api/v1/tests/{testId.Value}/publish",
+            new PublishRequest(Guid.NewGuid()), ct);
+
+        Authenticate(client, "admin-assignment-validation", "test-admin");
+        var now = DateTimeOffset.UtcNow;
+
+        using var invalidWindow = await client.PostAsJsonAsync("/api/v1/assignments", new AssignRequest(
+            revisionId.Value, "student-1", null, now, now.AddMinutes(-1), null, Guid.NewGuid()), ct);
+        await AssertDomainValidationProblem(invalidWindow, "assignment.window", ct);
+
+        using var invalidAttemptLimit = await client.PostAsJsonAsync("/api/v1/assignments", new AssignRequest(
+            revisionId.Value, "student-1", null, now, null, 0, Guid.NewGuid()), ct);
+        await AssertDomainValidationProblem(invalidAttemptLimit, "assignment.attempt_limit", ct);
+    }
+
+    private static async Task AssertDomainValidationProblem(HttpResponseMessage response, string expectedCode, CancellationToken ct)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        Assert.Equal(expectedCode, document.RootElement.GetProperty("title").GetString());
+        var detail = document.RootElement.GetProperty("detail").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(detail));
+        Assert.DoesNotContain("Parameter", detail, StringComparison.Ordinal);
+    }
+
+    private static async Task<T> PostValue<T>(HttpClient client, string uri, object body, CancellationToken ct)
+    {
+        using var response = await client.PostAsJsonAsync(uri, body, ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct);
+        return Assert.IsType<T>(value);
+    }
+
+    private static async Task<T> PostTestValue<T>(HttpClient client, TestId testId, string uri, object body, CancellationToken ct)
+    {
+        using var etagResponse = await client.GetAsync($"/api/v1/tests/{testId.Value}/editor", ct);
+        Assert.Equal(HttpStatusCode.OK, etagResponse.StatusCode);
+        var etag = etagResponse.Headers.ETag?.ToString()
+            ?? throw new Xunit.Sdk.XunitException("Test editor response did not contain ETag.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, uri) { Content = JsonContent.Create(body) };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+        using var response = await client.SendAsync(request, ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct);
+        return Assert.IsType<T>(value);
     }
 
     private static async Task AssertValidationProblem(HttpResponseMessage response, CancellationToken ct)

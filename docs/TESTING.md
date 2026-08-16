@@ -147,7 +147,7 @@ admin operations
 - `ConcurrencyHttpContractTests.cs` — ETag/If-Match/428/412/409;
 - `IdempotencyHttpContractTests.cs` — header/body compatibility, mismatch и fingerprint reuse;
 - `EmptyBodyIdempotencyTests.cs` — настоящий zero-length body (без `Content-Type`/payload) с header-only `Idempotency-Key` для publish/start attempt/submit (API-009);
-- `RequestValidationContractTests.cs` — malformed binding/DataAnnotations/enum normalization;
+- `RequestValidationContractTests.cs` — malformed binding/DataAnnotations/enum normalization, plus assignment window/attempt-limit domain validation without CLR exception-message leakage into `ProblemDetails.detail` (STAB-008);
 - `OpenApiContractTests.cs` — serialized enriched document;
 - `EdgeSecurityTests.cs` — forwarded headers, CORS, transport headers, rate limits и OpenAPI exposure;
 - `TestOwnershipTests.cs` — cross-author write/read/reviewer isolation.

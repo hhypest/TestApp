@@ -45,25 +45,18 @@ public sealed class AddAnswerOptionCommandHandler(ITestRepository tests, ICurren
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
 
-        try
-        {
-            var result = test.AddAnswerOption(
-                command.QuestionId,
-                command.Text,
-                command.IsCorrect,
-                command.Order);
-            return await result.Match(
-                async id =>
-                {
-                    await unitOfWork.SaveChangesAsync(ct);
-                    return Result<AnswerOptionId, Error>.Success(id);
-                },
-                error => Task.FromResult(Result<AnswerOptionId, Error>.Failure(error.ToApplicationError())));
-        }
-        catch (ArgumentException ex)
-        {
-            return Error.Validation("test.answer_option.text", ex.Message);
-        }
+        var result = test.AddAnswerOption(
+            command.QuestionId,
+            command.Text,
+            command.IsCorrect,
+            command.Order);
+        return await result.Match(
+            async id =>
+            {
+                await unitOfWork.SaveChangesAsync(ct);
+                return Result<AnswerOptionId, Error>.Success(id);
+            },
+            error => Task.FromResult(Result<AnswerOptionId, Error>.Failure(error.ToApplicationError())));
     }
 }
 
@@ -77,18 +70,11 @@ public sealed class UpdateAnswerOptionCommandHandler(ITestRepository tests, ICur
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
 
-        try
-        {
-            return await TestCommandResult.Save(
-                test.UpdateAnswerOption(command.QuestionId, command.OptionId, command.Text, command.IsCorrect),
-                test.Id,
-                unitOfWork,
-                ct);
-        }
-        catch (ArgumentException ex)
-        {
-            return Error.Validation("test.answer_option.text", ex.Message);
-        }
+        return await TestCommandResult.Save(
+            test.UpdateAnswerOption(command.QuestionId, command.OptionId, command.Text, command.IsCorrect),
+            test.Id,
+            unitOfWork,
+            ct);
     }
 }
 

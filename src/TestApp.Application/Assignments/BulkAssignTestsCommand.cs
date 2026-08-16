@@ -62,10 +62,6 @@ public sealed class BulkAssignTestsCommandHandler(
             return Error.Validation("assignment.targets_required", "At least one assignment target is required.");
         if (command.Targets.Count > MaxBatchSize)
             return Error.Validation("assignment.targets_limit", $"A bulk assignment cannot contain more than {MaxBatchSize} targets.");
-        if (command.AvailableUntil is not null && command.AvailableUntil <= command.AvailableFrom)
-            return Error.Validation("assignment.window", "AvailableUntil must be later than AvailableFrom.");
-        if (command.AttemptLimit is <= 0)
-            return Error.Validation("assignment.attempt_limit", "Attempt limit must be greater than zero.");
 
         var revision = await revisions.GetAsync(command.RevisionId, ct);
         if (revision is null)
@@ -100,6 +96,7 @@ public sealed class BulkAssignTestsCommandHandler(
 
         var now = clock.UtcNow;
         var ids = new TestAssignmentId[domainTargets.Count];
+        var created = new List<TestAssignment>(domainTargets.Count);
         for (var i = 0; i < domainTargets.Count; i++)
         {
             var id = TestAssignmentId.New();
@@ -113,8 +110,12 @@ public sealed class BulkAssignTestsCommandHandler(
                 command.AvailableFrom,
                 command.AvailableUntil,
                 command.AttemptLimit);
-            await assignments.AddAsync(assignment, ct);
+            if (assignment.TryGetError(out var creationError)) return creationError.ToApplicationError();
+            assignment.Tap(created.Add);
         }
+
+        foreach (var assignment in created)
+            await assignments.AddAsync(assignment, ct);
 
         var result = new BulkAssignTestsResult(ids.Length, ids);
         await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, fingerprint, result, now, ct);

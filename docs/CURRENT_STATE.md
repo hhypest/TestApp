@@ -270,9 +270,7 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 ### Stabilization/correctness
 
-До 1.0 необходимо закрыть:
-
-- унификацию ожидаемых domain errors/value-object invariants.
+Все P0/P1 stabilization findings текущего backlog (STAB-001..008) закрыты; domain/application errors и value-object invariants имеют единый `Result<T, DomainError>` failure contract (ADR-026).
 
 ### Operational reliability
 

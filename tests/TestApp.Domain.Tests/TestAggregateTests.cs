@@ -14,7 +14,7 @@ public sealed class TestAggregateTests
     [Fact]
     public void Created_test_has_immutable_owner()
     {
-        var test = Test.Create("DDD", Owner);
+        var test = CreateTest("DDD");
         Assert.Equal(Owner, test.OwnerId);
         Assert.True(test.IsOwnedBy(Owner));
         Assert.False(test.IsOwnedBy(ExternalUserId.FromSubject("author-2")));
@@ -23,8 +23,51 @@ public sealed class TestAggregateTests
     [Fact]
     public void Create_rejects_title_longer_than_persistence_limit()
     {
-        Assert.Throws<ArgumentException>(() =>
-            Test.Create(new string('x', TestLimits.TitleMaxLength + 1), Owner));
+        var result = Test.Create(new string('x', TestLimits.TitleMaxLength + 1), Owner);
+
+        Assert.True(result.TryGetError(out var error));
+        Assert.Equal("test.title", error.Code);
+        Assert.DoesNotContain("Parameter", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Assignment_create_rejects_availability_window_ending_before_it_starts()
+    {
+        var now = DateTimeOffset.Parse("2026-08-16T10:00:00Z");
+
+        var result = TestAssignment.Create(
+            TestAssignmentId.New(),
+            PublishedTestRevisionId.New(),
+            new AssignmentTarget.User(ExternalUserId.FromSubject("student-1")),
+            ExternalUserId.FromSubject("admin-1"),
+            now,
+            now,
+            now.AddMinutes(-1),
+            null);
+
+        Assert.True(result.TryGetError(out var error));
+        Assert.Equal("assignment.window", error.Code);
+        Assert.DoesNotContain("Parameter", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Assignment_create_rejects_non_positive_attempt_limit()
+    {
+        var now = DateTimeOffset.Parse("2026-08-16T10:00:00Z");
+
+        var result = TestAssignment.Create(
+            TestAssignmentId.New(),
+            PublishedTestRevisionId.New(),
+            new AssignmentTarget.User(ExternalUserId.FromSubject("student-1")),
+            ExternalUserId.FromSubject("admin-1"),
+            now,
+            now,
+            null,
+            0);
+
+        Assert.True(result.TryGetError(out var error));
+        Assert.Equal("assignment.attempt_limit", error.Code);
+        Assert.DoesNotContain("Parameter", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -39,7 +82,7 @@ public sealed class TestAggregateTests
     [Fact]
     public void Question_rejects_unknown_type()
     {
-        var test = Test.Create("DDD", Owner);
+        var test = CreateTest("DDD");
 
         var result = test.AddQuestion("Unknown type", (QuestionType)999, 1m, 1);
 
@@ -50,7 +93,7 @@ public sealed class TestAggregateTests
     [Fact]
     public void Publish_requires_questions()
     {
-        var test = Test.Create("DDD", Owner);
+        var test = CreateTest("DDD");
         var result = test.Publish(DateTimeOffset.UtcNow);
         Assert.False(result.Match(_ => true, _ => false));
         Assert.Equal(TestStatus.Draft, test.Status);
@@ -73,7 +116,7 @@ public sealed class TestAggregateTests
     [Fact]
     public void Single_choice_requires_exactly_one_correct_answer()
     {
-        var test = Test.Create("DDD", Owner);
+        var test = CreateTest("DDD");
         var question = test.AddQuestion("Choose", QuestionType.SingleChoice, 1, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
         test.AddAnswerOption(question, "A", false, 1);
@@ -86,7 +129,7 @@ public sealed class TestAggregateTests
     [Fact]
     public void Archived_test_cannot_be_edited()
     {
-        var test = Test.Create("DDD", Owner);
+        var test = CreateTest("DDD");
         Assert.True(test.Archive().Match(_ => true, _ => false));
         var result = test.Rename("New title");
         Assert.False(result.Match(_ => true, _ => false));
@@ -136,9 +179,12 @@ public sealed class TestAggregateTests
         Assert.NotNull(attempt.Score);
     }
 
+    private static Test CreateTest(string title) =>
+        Test.Create(title, Owner).Match(t => t, error => throw new Xunit.Sdk.XunitException(error.Message));
+
     private static Test CreatePublishableTest()
     {
-        var test = Test.Create("DDD", Owner);
+        var test = CreateTest("DDD");
         var question = test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
         test.AddAnswerOption(question, "Consistency boundary", true, 1);

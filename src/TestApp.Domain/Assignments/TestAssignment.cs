@@ -99,14 +99,6 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         DateTimeOffset? availableUntil,
         int? attemptLimit) : base(id)
     {
-        assignedAt = assignedAt.ToUniversalTime();
-        availableFrom = availableFrom.ToUniversalTime();
-        availableUntil = availableUntil?.ToUniversalTime();
-        if (availableUntil is not null && availableUntil <= availableFrom)
-            throw new ArgumentException("Availability end must be later than availability start.", nameof(availableUntil));
-        if (attemptLimit is <= 0)
-            throw new ArgumentOutOfRangeException(nameof(attemptLimit));
-
         RevisionId = revisionId;
         (TargetType, TargetId) = target switch
         {
@@ -122,7 +114,7 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         Status = AssignmentStatus.Active;
     }
 
-    public static TestAssignment Create(
+    public static Result<TestAssignment, DomainError> Create(
         TestAssignmentId id,
         PublishedTestRevisionId revisionId,
         AssignmentTarget target,
@@ -133,6 +125,14 @@ public sealed class TestAssignment : AggregateRoot<TestAssignmentId>
         int? attemptLimit)
     {
         ArgumentNullException.ThrowIfNull(target);
+        assignedAt = assignedAt.ToUniversalTime();
+        availableFrom = availableFrom.ToUniversalTime();
+        availableUntil = availableUntil?.ToUniversalTime();
+        if (availableUntil is not null && availableUntil <= availableFrom)
+            return DomainError.Validation("assignment.window", "AvailableUntil must be later than AvailableFrom.");
+        if (attemptLimit is <= 0)
+            return DomainError.Validation("assignment.attempt_limit", "Attempt limit must be greater than zero.");
+
         var assignment = new TestAssignment(id, revisionId, target, assignedBy, assignedAt, availableFrom, availableUntil, attemptLimit);
         assignment.Raise(new TestAssigned(id, revisionId, target, assignedBy, assignment.AssignedAt));
         return assignment;

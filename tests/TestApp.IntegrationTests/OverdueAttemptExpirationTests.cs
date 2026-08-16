@@ -24,7 +24,8 @@ public sealed class OverdueAttemptExpirationTests
         await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var now = DateTimeOffset.Parse("2026-08-12T14:00:00Z");
 
-        var test = Test.Create("Expiration test", ExternalUserId.FromSubject("author-1"));
+        var test = Test.Create("Expiration test", ExternalUserId.FromSubject("author-1"))
+            .Match(t => t, error => throw new Xunit.Sdk.XunitException(error.Message));
         _ = test.ChangeSettings(50m, 1);
         var revision = PublishedTestRevision.From(test, PublishedTestRevisionId.New(), 1, now.AddMinutes(-10));
         var userId = ExternalUserId.FromSubject("student-expired");
@@ -36,7 +37,7 @@ public sealed class OverdueAttemptExpirationTests
             now.AddMinutes(-5),
             now.AddMinutes(-5),
             now.AddHours(1),
-            1);
+            1).Match(a => a, error => throw new Xunit.Sdk.XunitException(error.Message));
         var attempt = TestAttempt.Start(
             TestAttemptId.New(),
             assignment.Id,

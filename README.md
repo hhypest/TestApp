@@ -244,9 +244,8 @@ GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ s
 Ближайший порядок работ:
 
 ```text
-1. domain error/value-object invariant cleanup
-2. 1.0 release rehearsal: restore, alerts, rollback/API freeze
-3. student presentation/resume, затем authoring/reporting и выбранные advanced features
+1. 1.0 release rehearsal: restore, alerts, rollback/API freeze
+2. student presentation/resume, затем authoring/reporting и выбранные advanced features
 ```
 
 Подробно: [docs/ROADMAP.md](docs/ROADMAP.md) и [docs/FEATURE_PLAN.md](docs/FEATURE_PLAN.md).

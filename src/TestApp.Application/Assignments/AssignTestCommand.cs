@@ -53,10 +53,6 @@ public sealed class AssignTestCommandHandler(
 
         if ((command.UserId is null) == (command.GroupId is null))
             return Error.Validation("assignment.target", "Specify exactly one assignment target: user or group.");
-        if (command.AvailableUntil is not null && command.AvailableUntil <= command.AvailableFrom)
-            return Error.Validation("assignment.window", "AvailableUntil must be later than AvailableFrom.");
-        if (command.AttemptLimit is <= 0)
-            return Error.Validation("assignment.attempt_limit", "Attempt limit must be greater than zero.");
 
         var revision = await revisions.GetAsync(command.RevisionId, ct);
         if (revision is null)
@@ -68,11 +64,15 @@ public sealed class AssignTestCommandHandler(
 
         var now = clock.UtcNow;
         var id = TestAssignmentId.New();
-        var assignment = TestAssignment.Create(id, revision.Id, target, actor.UserId, now, command.AvailableFrom, command.AvailableUntil, command.AttemptLimit);
-
-        await assignments.AddAsync(assignment, ct);
-        await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, fingerprint, id, now, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-        return id;
+        var created = TestAssignment.Create(id, revision.Id, target, actor.UserId, now, command.AvailableFrom, command.AvailableUntil, command.AttemptLimit);
+        return await created.Match(
+            async assignment =>
+            {
+                await assignments.AddAsync(assignment, ct);
+                await idempotency.AddResultAsync(Operation, actor.UserId, command.RequestId, fingerprint, id, now, ct);
+                await unitOfWork.SaveChangesAsync(ct);
+                return Result<TestAssignmentId, Error>.Success(id);
+            },
+            error => Task.FromResult(Result<TestAssignmentId, Error>.Failure(error.ToApplicationError())));
     }
 }

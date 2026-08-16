@@ -43,21 +43,14 @@ public sealed class AddQuestionCommandHandler(ITestRepository tests, ICurrentAct
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
 
-        try
-        {
-            var result = test.AddQuestion(command.Text, command.Type, command.Points, command.Order);
-            return await result.Match(
-                async id =>
-                {
-                    await unitOfWork.SaveChangesAsync(ct);
-                    return Result<QuestionId, Error>.Success(id);
-                },
-                error => Task.FromResult(Result<QuestionId, Error>.Failure(error.ToApplicationError())));
-        }
-        catch (ArgumentException ex)
-        {
-            return Error.Validation("test.question.text", ex.Message);
-        }
+        var result = test.AddQuestion(command.Text, command.Type, command.Points, command.Order);
+        return await result.Match(
+            async id =>
+            {
+                await unitOfWork.SaveChangesAsync(ct);
+                return Result<QuestionId, Error>.Success(id);
+            },
+            error => Task.FromResult(Result<QuestionId, Error>.Failure(error.ToApplicationError())));
     }
 }
 
@@ -71,18 +64,11 @@ public sealed class UpdateQuestionCommandHandler(ITestRepository tests, ICurrent
         if (TestAccess.EnsureCanManage(test, actor) is { } accessError) return accessError;
         if (TestAccess.EnsureExpectedVersion(test, command.ExpectedVersion) is { } versionError) return versionError;
 
-        try
-        {
-            return await TestCommandResult.Save(
-                test.UpdateQuestion(command.QuestionId, command.Text, command.Type, command.Points),
-                test.Id,
-                unitOfWork,
-                ct);
-        }
-        catch (ArgumentException ex)
-        {
-            return Error.Validation("test.question.text", ex.Message);
-        }
+        return await TestCommandResult.Save(
+            test.UpdateQuestion(command.QuestionId, command.Text, command.Type, command.Points),
+            test.Id,
+            unitOfWork,
+            ct);
     }
 }
 

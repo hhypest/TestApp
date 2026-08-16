@@ -14,7 +14,8 @@ public sealed class PublishedRevisionPersistenceTests
         await using var database = await PostgreSqlTestDatabase.CreateAsync(TestContext.Current.CancellationToken);
         var ct = TestContext.Current.CancellationToken;
         var now = DateTimeOffset.UtcNow;
-        var test = Test.Create("DDD fundamentals", ExternalUserId.FromSubject("author-1"));
+        var test = Test.Create("DDD fundamentals", ExternalUserId.FromSubject("author-1"))
+            .Match(t => t, error => throw new Xunit.Sdk.XunitException(error.Message));
         var questionId = test.AddQuestion("What is an aggregate?", QuestionType.SingleChoice, 1m, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));
         test.AddAnswerOption(questionId, "Consistency boundary", true, 1);

@@ -36,7 +36,7 @@ public sealed class AdminReadModelQueryTests
                     assignedAt,
                     assignedAt,
                     assignedAt.AddHours(1),
-                    null);
+                    null).Match(a => a, error => throw new Xunit.Sdk.XunitException(error.Message));
                 assignmentIds.Add(assignment.Id);
                 setup.Assignments.Add(assignment);
             }
@@ -68,13 +68,16 @@ public sealed class AdminReadModelQueryTests
         var (testB, revisionB) = CreatePublishedTest("Filter test B");
         var assignmentA = TestAssignment.Create(
             TestAssignmentId.New(), revisionA.Id, new AssignmentTarget.User(ExternalUserId.FromSubject("student-a")),
-            ExternalUserId.FromSubject("admin-1"), assignedAt, assignedAt, assignedAt.AddHours(1), null);
+            ExternalUserId.FromSubject("admin-1"), assignedAt, assignedAt, assignedAt.AddHours(1), null)
+            .Match(a => a, error => throw new Xunit.Sdk.XunitException(error.Message));
         var assignmentB1 = TestAssignment.Create(
             TestAssignmentId.New(), revisionB.Id, new AssignmentTarget.User(ExternalUserId.FromSubject("student-b1")),
-            ExternalUserId.FromSubject("admin-1"), assignedAt, assignedAt, assignedAt.AddHours(1), null);
+            ExternalUserId.FromSubject("admin-1"), assignedAt, assignedAt, assignedAt.AddHours(1), null)
+            .Match(a => a, error => throw new Xunit.Sdk.XunitException(error.Message));
         var assignmentB2 = TestAssignment.Create(
             TestAssignmentId.New(), revisionB.Id, new AssignmentTarget.User(ExternalUserId.FromSubject("student-b2")),
-            ExternalUserId.FromSubject("admin-1"), assignedAt, assignedAt, assignedAt.AddHours(1), null);
+            ExternalUserId.FromSubject("admin-1"), assignedAt, assignedAt, assignedAt.AddHours(1), null)
+            .Match(a => a, error => throw new Xunit.Sdk.XunitException(error.Message));
 
         await using (var setup = database.CreateContext())
         {
@@ -188,7 +191,8 @@ public sealed class AdminReadModelQueryTests
 
     private static (Test Test, PublishedTestRevision Revision) CreatePublishedTest(string title)
     {
-        var test = Test.Create(title, ExternalUserId.FromSubject("author-1"));
+        var test = Test.Create(title, ExternalUserId.FromSubject("author-1"))
+            .Match(t => t, error => throw new Xunit.Sdk.XunitException(error.Message));
         _ = test.ChangeSettings(50m, null);
         var questionId = test.AddQuestion("Pick one", QuestionType.SingleChoice, 1m, 1)
             .Match(id => id, error => throw new Xunit.Sdk.XunitException(error.Message));

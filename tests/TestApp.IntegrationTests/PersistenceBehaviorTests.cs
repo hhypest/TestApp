@@ -28,7 +28,8 @@ public sealed class PersistenceBehaviorTests
         var ct = TestContext.Current.CancellationToken;
         await using var database = await PostgreSqlTestDatabase.CreateAsync(ct);
         var owner = ExternalUserId.FromSubject("author-owner");
-        var test = Test.Create("Owned test", owner);
+        var test = Test.Create("Owned test", owner)
+            .Match(t => t, error => throw new Xunit.Sdk.XunitException(error.Message));
 
         await using (var write = database.CreateContext())
         {
@@ -58,7 +59,7 @@ public sealed class PersistenceBehaviorTests
             now,
             now.AddMinutes(-1),
             now.AddHours(1),
-            1);
+            1).Match(a => a, error => throw new Xunit.Sdk.XunitException(error.Message));
 
         db.Assignments.Add(assignment);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -80,7 +81,8 @@ public sealed class PersistenceBehaviorTests
         await using (var setup = database.CreateContext())
         {
             await setup.Database.MigrateAsync(ct);
-            setup.Tests.Add(Test.Create("Original", ExternalUserId.FromSubject("author-1")));
+            setup.Tests.Add(Test.Create("Original", ExternalUserId.FromSubject("author-1"))
+                .Match(t => t, error => throw new Xunit.Sdk.XunitException(error.Message)));
             await setup.SaveChangesAsync(ct);
         }
 
