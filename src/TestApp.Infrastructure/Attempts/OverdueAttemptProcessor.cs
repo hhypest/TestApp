@@ -33,11 +33,29 @@ public sealed class OverdueAttemptProcessor(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _options.Validate();
-        await ProcessBatchAsync(stoppingToken);
+        await RunCycleAsync(stoppingToken);
 
         using var timer = new PeriodicTimer(_options.PollInterval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
-            await ProcessBatchAsync(stoppingToken);
+            await RunCycleAsync(stoppingToken);
+    }
+
+    // A cycle-level failure (e.g. a transient DB outage) must not fault the host's
+    // BackgroundService and take the whole API down; log it and retry next poll tick.
+    private async Task RunCycleAsync(CancellationToken ct)
+    {
+        try
+        {
+            await ProcessBatchAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Attempt expiration processing cycle failed; will retry on next poll interval");
+        }
     }
 
     public async Task<int> ProcessBatchAsync(CancellationToken ct)

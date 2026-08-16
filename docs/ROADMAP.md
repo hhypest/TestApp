@@ -102,7 +102,7 @@ Test.OwnerId = Keycloak sub создавшего автора
 - distributed PostgreSQL advisory lock;
 - publish/single assignment/bulk assignment/submit covered.
 
-Phase C завершила header resolution/fingerprint contract. Настоящий zero-length body для no-payload publish/start/submit выделен в `0.9.4`: сейчас при key только в header требуется JSON `{}` из-за Minimal API binding.
+Phase C завершила header resolution/fingerprint contract. Настоящий zero-length body для no-payload publish/start/submit закрыт в `0.9.4` (API-009): request DTO параметр nullable, key только в header достаточен.
 
 ## C2. HTTP optimistic concurrency — DONE
 
@@ -266,9 +266,9 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 
 1. **DONE:** actor-scoped `StartAttempt` replay до повторной проверки mutable assignment availability/group membership, с regression tests для cancellation/expiry/group change и нового key;
 2. **DONE:** audit сохраняет итоговый HTTP status после exception mapping, включая handled `400/409`, а не промежуточный `500`;
-3. Outbox/expiration hosted workers должны переживать transient cycle-level DB/query/lock failures;
-4. publish/start/submit должны принимать настоящий zero-length body при валидном `Idempotency-Key` header;
-5. `--migrate` должен загружать только database-required configuration;
+3. **DONE:** Outbox/expiration hosted workers переживают transient cycle-level DB/query/lock failures;
+4. **DONE:** publish/start/submit принимают настоящий zero-length body при валидном `Idempotency-Key` header;
+5. **DONE:** `--migrate` загружает только database-required configuration;
 6. **DONE:** RabbitMQ 4.3-compatible diagnostic capacity probe и полный green D6 run;
 7. documentation source of truth должна оставаться синхронизированной с code/tests/CI.
 

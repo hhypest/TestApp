@@ -146,7 +146,7 @@ Persistent idempotency rows содержат SHA-256 fingerprint логичес�
 
 Fingerprint используется publish/single assignment/bulk assignment/submit. Start attempt дополнительно защищён DB unique key `(AssignmentId, UserId, StartRequestId)` и PostgreSQL advisory lease на `(AssignmentId, UserId)` вокруг replay/count/insert transaction.
 
-Текущий transport resolver принимает key из header и legacy body. Для publish/start/submit Minimal API всё ещё требует JSON body (`{}` достаточно), даже когда key находится только в header; zero-length body является stabilization gap.
+Текущий transport resolver принимает key из header и legacy body. Publish/start/submit принимают настоящий zero-length body (Minimal API request DTO параметр nullable), когда key находится только в header.
 
 Actor-scoped lookup уже созданного start attempt выполняется до загрузки assignment и mutable availability/group-membership checks. Поэтому retry того же пользователя с тем же key возвращает прежний attempt ID после cancellation, expiry или изменения group claim. Новый key по-прежнему проходит все актуальные eligibility checks; транзакционная повторная проверка в repository сохраняет race safety.
 
@@ -176,7 +176,7 @@ Outside Development:
 - attempt expiration/outbox/rate limits валидируются;
 - HTTPS redirect/HSTS deployment decision должен быть явным.
 
-Migration-only `--migrate` не требует Keycloak и transport-security configuration, но composition root пока всё равно загружает и валидирует RabbitMQ/worker/CORS/rate-limit/OpenAPI/proxy options. Для независимого production migration job это известный stabilization gap: целевой режим должен требовать только database configuration.
+Migration-only `--migrate` загружает только database configuration (`RuntimeConfiguration.LoadDatabase`); Keycloak/RabbitMQ/worker/CORS/rate-limit/OpenAPI/transport-security/reverse-proxy loaders и связанные DI-регистрации пропускаются, так что независимый production migration job не должен получать эти secrets/config.
 
 ### Reverse proxy
 
@@ -244,7 +244,7 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 **Ограничение:** production business integration-event catalog ещё не определён. Готовность transport не означает автоматическую публикацию всех domain events.
 
-**Известное ограничение:** per-message publish failures обрабатываются, но failure batch query/advisory lock/failure-state persistence может выйти из `BackgroundService` cycle. Аналогичный риск есть у initial/batch scan expiration worker; до 1.0 нужен recovery loop с backoff и health/metric signal.
+Per-message publish failures обрабатываются, и cycle-level failures (batch query/advisory lock/failure-state persistence) больше не могут вывести `BackgroundService` из `PeriodicTimer` loop: `OutboxProcessor`/`OverdueAttemptProcessor` логируют cycle failure и продолжают на следующий poll tick (`RunCycleAsync`).
 
 ## 10. Deployment / CI
 
@@ -272,9 +272,6 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 
 До 1.0 необходимо закрыть:
 
-- cycle-level resilience Outbox/expiration workers;
-- настоящий zero-body header-only contract для no-payload commands;
-- database-only composition для `--migrate`;
 - deterministic tie-breaker для offset pagination;
 - SQL joins/aggregates вместо high-cardinality ID/score materialization;
 - унификацию ожидаемых domain errors/value-object invariants.

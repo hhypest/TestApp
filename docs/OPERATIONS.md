@@ -213,9 +213,9 @@ AdvisoryLockTimeoutSeconds = 5
 
 Options загружаются/валидируются из секции `Outbox`. При invalid range startup завершается fail-fast.
 
-### Migration-only caveat
+### Migration-only composition
 
-`--migrate` не требует Keycloak, но composition root пока загружает unrelated RabbitMQ/worker/CORS/rate-limit/OpenAPI/proxy options. До 1.0 migration container должен перейти на database-only composition, чтобы deployment не выдавал ему ненужные runtime secrets/config.
+`--migrate` загружает только `RuntimeConfiguration.LoadDatabase`; Keycloak/RabbitMQ/worker/CORS/rate-limit/OpenAPI/reverse-proxy configuration не загружается и соответствующие DI-регистрации пропускаются. Migration job/container может получать только `ConnectionStrings:Database` (и опционально `Database:ApplyMigrationsOnStartup`) без остальных runtime secrets/config — см. `compose.yaml` сервис `migrate`.
 
 ## 7. Health endpoints
 
@@ -397,9 +397,9 @@ role: test-admin
 
 Worker batch-based и eventual: изменение не обязано произойти ровно в момент deadline; default scan cadence около 30 секунд.
 
-### Current worker recovery gap
+### Worker cycle-level recovery
 
-Per-attempt processing exceptions логируются, но initial/batch DB scan не имеет cycle-level recovery boundary. Аналогичный gap есть у Outbox batch query/lock/failure-state persistence. Transient dependency failure может завершить hosted worker/process; до 1.0 нужны bounded backoff, cancellation-safe retry и worker last-success/consecutive-failure signal.
+Per-attempt processing exceptions логируются; initial/batch DB scan также покрыт cycle-level recovery boundary (`RunCycleAsync`) — как у expiration worker, так и у Outbox batch query/lock/failure-state persistence. Transient dependency failure логируется и worker продолжает на следующий poll tick вместо завершения hosted worker/process.
 
 ## 14. PostgreSQL 18 operational policy
 
@@ -490,8 +490,6 @@ Background attempt expiration может выполняться на неско�
 
 До production 1.0 закрыть:
 
-- cycle-level worker resilience;
-- database-only migration composition;
 - staging backup/restore drill с measured RTO;
 - deployed secret manager/injection и encrypted backup schedule/PITR policy;
 - реальные dashboard/alert routes и alert drill;

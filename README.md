@@ -172,7 +172,7 @@ API replicas в Production не должны конкурировать за sch
 - start attempt защищён unique DB request key + PostgreSQL advisory lease на assignment/user + короткая transaction для replay/count/insert;
 - publish/assign/bulk-assign/submit используют persistent idempotency records + session-level PostgreSQL advisory lease (`pg_try_advisory_lock` / `pg_advisory_unlock`).
 
-Основной HTTP contract использует standard `Idempotency-Key` header; legacy body field временно поддерживается с mismatch validation и request fingerprint. Для publish/start/submit JSON body (`{}`) пока всё ещё обязателен даже при key только в header — настоящий zero-length-body вариант входит в stabilization backlog.
+Основной HTTP contract использует standard `Idempotency-Key` header; legacy body field временно поддерживается с mismatch validation и request fingerprint. Publish/start/submit принимают настоящий zero-length body, когда key передан только в header.
 
 ## Events / Outbox
 
@@ -244,12 +244,9 @@ GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ s
 Ближайший порядок работ:
 
 ```text
-1. correctness stabilization: audit final status and resilient workers
-2. true empty-body Idempotency-Key commands + database-only migrate mode
-3. green performance/Outbox D6 evidence on exact implementation head
-4. deterministic pagination, SQL reporting queries, domain error/value-object cleanup
-5. 1.0 release rehearsal: restore, alerts, rollback/API freeze
-6. student presentation/resume, затем authoring/reporting и выбранные advanced features
+1. deterministic pagination, SQL reporting queries, domain error/value-object cleanup
+2. 1.0 release rehearsal: restore, alerts, rollback/API freeze
+3. student presentation/resume, затем authoring/reporting и выбранные advanced features
 ```
 
 Подробно: [docs/ROADMAP.md](docs/ROADMAP.md) и [docs/FEATURE_PLAN.md](docs/FEATURE_PLAN.md).

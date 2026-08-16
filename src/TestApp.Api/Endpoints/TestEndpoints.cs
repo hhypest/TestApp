@@ -102,13 +102,13 @@ internal static class TestEndpoints
                 : version.Error!;
         }).RequireAuthorization(Permissions.TestsWrite);
 
-        tests.MapPost("/{id}/publish", async (Guid id, HttpRequest http, PublishRequest request, PublishTestCommandHandler handler, CancellationToken ct) =>
+        tests.MapPost("/{id}/publish", async (Guid id, HttpRequest http, PublishRequest? request, PublishTestCommandHandler handler, CancellationToken ct) =>
         {
             var version = TestEtags.ResolveRequiredIfMatch(http);
             if (!version.IsSuccess)
                 return version.Error!;
 
-            var key = IdempotencyKeyResolver.Resolve(http, request.IdempotencyKey);
+            var key = IdempotencyKeyResolver.Resolve(http, request?.IdempotencyKey ?? Guid.Empty);
             return key.IsSuccess
                 ? ApiResultMapper.ToHttp(await handler.Handle(new PublishTestCommand(new TestId(id), key.Value, version.Value), ct))
                 : key.Error!;

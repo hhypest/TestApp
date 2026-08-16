@@ -238,7 +238,7 @@ Compose использует простые credentials `testapp/testapp` и dev
 - HTTPS metadata требуется по умолчанию;
 - secrets не логируются и должны поступать через environment/deployment secret store.
 
-Оставшийся gap: `--migrate` уже не требует Keycloak, но пока загружает unrelated RabbitMQ/CORS/rate-limit/proxy options. Migration job должен быть изолирован до database-only configuration.
+`--migrate` изолирован до database-only configuration: composition root загружает только `RuntimeConfiguration.LoadDatabase`, Keycloak/RabbitMQ/CORS/rate-limit/proxy options не загружаются.
 
 ## 14. TLS / reverse proxy
 
@@ -295,11 +295,9 @@ Actor-scoped `StartAttempt` replay также реализован: lookup вк�
 
 P0/P1 до 1.0:
 
-1. добавить настоящий zero-length-body `Idempotency-Key` contract и regression tests;
-2. изолировать migration-only mode от unrelated secrets/config;
-3. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
-4. pin GitHub Actions/container dependencies immutable SHA/digest;
-5. выполнить staging alert/restore/rollback security rehearsal.
+1. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
+2. pin GitHub Actions/container dependencies immutable SHA/digest;
+3. выполнить staging alert/restore/rollback security rehearsal.
 
 Business-triggered/после 1.0:
 

@@ -126,9 +126,9 @@ internal static class AssignmentEndpoints
                 request.Reason), ct)))
             .RequireAuthorization(Permissions.TestsAssign);
 
-        assignments.MapPost("/{id}/attempts", async (Guid id, HttpRequest http, StartAttemptRequest request, StartAttemptCommandHandler handler, CancellationToken ct) =>
+        assignments.MapPost("/{id}/attempts", async (Guid id, HttpRequest http, StartAttemptRequest? request, StartAttemptCommandHandler handler, CancellationToken ct) =>
         {
-            var key = IdempotencyKeyResolver.Resolve(http, request.IdempotencyKey);
+            var key = IdempotencyKeyResolver.Resolve(http, request?.IdempotencyKey ?? Guid.Empty);
             return key.IsSuccess
                 ? ApiResultMapper.ToHttp(await handler.Handle(new StartAttemptCommand(new TestAssignmentId(id), key.Value), ct))
                 : key.Error!;

@@ -146,6 +146,7 @@ admin operations
 - `ApiLifecycleContractTests.cs` — legacy enable/deprecation/sunset/retirement;
 - `ConcurrencyHttpContractTests.cs` — ETag/If-Match/428/412/409;
 - `IdempotencyHttpContractTests.cs` — header/body compatibility, mismatch и fingerprint reuse;
+- `EmptyBodyIdempotencyTests.cs` — настоящий zero-length body (без `Content-Type`/payload) с header-only `Idempotency-Key` для publish/start attempt/submit (API-009);
 - `RequestValidationContractTests.cs` — malformed binding/DataAnnotations/enum normalization;
 - `OpenApiContractTests.cs` — serialized enriched document;
 - `EdgeSecurityTests.cs` — forwarded headers, CORS, transport headers, rate limits и OpenAPI exposure;
@@ -193,6 +194,10 @@ expired InProgress -> TimedOut
 ### `OutboxDeliveryTests.cs`
 
 Проверяет retry/dead-letter/success semantics Outbox processor.
+
+### `WorkerCycleResilienceTests.cs`
+
+Проверяет cycle-level resilience `OutboxProcessor`/`OverdueAttemptProcessor` (STAB-003): симулирует однократный сбой `IServiceScopeFactory.CreateScope()` на первом poll cycle и проверяет, что worker логирует ошибку, продолжает работу на следующем `PeriodicTimer` tick и не fault-ит хостовой `BackgroundService.ExecuteTask`.
 
 ### `RabbitMqOutboxPublisherTests.cs`
 
@@ -384,12 +389,6 @@ GitHub Actions `dotnet` workflow:
 ## 13. Current coverage gaps
 
 До 1.0 необходимо расширить:
-
-### P0
-
-- Outbox/expiration cycle recovery после DB/query/lock failure;
-- настоящий zero-length-body `Idempotency-Key` contract;
-- migration-only startup с database-only configuration;
 
 ### P1
 

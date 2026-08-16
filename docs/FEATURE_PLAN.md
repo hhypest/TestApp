@@ -67,7 +67,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | OBS-003 | OpenTelemetry | DONE | ASP.NET/HttpClient/runtime |
 | OPS-001 | Docker image | DONE | multi-stage/non-root |
 | OPS-002 | Compose stack | DONE | DB/RMQ/Keycloak/OTEL/migrate/API |
-| OPS-003 | Migration-only mode | DONE | `--migrate`; DB-only composition остаётся STAB-005 |
+| OPS-003 | Migration-only mode | DONE | `--migrate`; database-only composition (STAB-005) |
 | TEST-001 | PostgreSQL integration suite | DONE | real provider |
 | TEST-002 | RabbitMQ integration suite | DONE | real broker |
 | TEST-003 | production image migration CI | DONE | release-path gate |
@@ -80,15 +80,19 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 |---|---:|---|---|
 | STAB-001 | P0 | DONE | actor-scoped StartAttempt replay before mutable assignment checks + cancellation/expiry/group regression tests |
 | STAB-002 | P0 | DONE | audit wraps exception mapping + response/audit equality tests for 400/409/412/500 |
-| STAB-003 | P0 | PLANNED | cycle-level Outbox/expiration worker recovery |
+| STAB-003 | P0 | DONE | cycle-level Outbox/expiration worker recovery |
 | STAB-004 | P0 | DONE | RabbitMQ 4.3-compatible diagnostic probe + green D6 on `9916b98` |
-| STAB-005 | P0 | PLANNED | database-only `--migrate` configuration path |
+| STAB-005 | P0 | DONE | database-only `--migrate` configuration path |
 | STAB-006 | P1 | PLANNED | deterministic timestamp + ID pagination order |
 | STAB-007 | P1 | PLANNED | SQL joins/aggregates for reviewer/admin hot queries |
 
 `STAB-002` закрыт перестановкой middleware boundary: correlation/audit выполняется снаружи exception handler и наблюдает уже обработанный response. Regression suite проверяет равенство response/audit status для binding `400`, concurrency `409`, precondition `412` и unhandled `500`.
 
 `STAB-004` закрыт: полный HTTP/expiration/Outbox gate прошёл на PostgreSQL implementation commit `9916b98`; exact-head `dotnet` и `security` также green.
+
+`STAB-005` закрыт: composition root (`Program.cs`) при `--migrate` загружает только `RuntimeConfiguration.LoadDatabase` и пропускает Keycloak/RabbitMQ/attempt-expiration/rate-limiting/OpenAPI/CORS/transport-security/reverse-proxy loaders и связанные DI-регистрации. `compose.yaml` сервис `migrate` и CI-шаг "Apply migrations from production image" передают только `ConnectionStrings:Database`/`Database:ApplyMigrationsOnStartup`. Проверено локально: production build запускает `--migrate` (exit 0, миграция применяется) без единой Keycloak/RabbitMQ/CORS переменной; полный `dotnet test` (18 unit + 69 integration) green.
+
+`STAB-003` закрыт: `OutboxProcessor`/`OverdueAttemptProcessor` оборачивают каждый poll cycle в try/catch (`RunCycleAsync`) — cycle-level failure (напр. transient DB outage при открытии scope) логируется и worker продолжает на следующий `PeriodicTimer` tick вместо fault хостового `BackgroundService` (default `BackgroundServiceExceptionBehavior.StopHost` иначе останавливает весь API process). `WorkerCycleResilienceTests.cs` симулирует однократный сбой `IServiceScopeFactory.CreateScope()` и проверяет: (1) recovery — сообщение/attempt обрабатывается на следующем cycle; (2) `ExecuteTask.IsFaulted == false`. Оба теста подтверждённо red без fix (revert проверен вручную) и green с ним; прямые вызовы `ProcessBatchAsync`/`DrainAvailableAsync` (existing tests) продолжают бросать исключения как раньше — swallow только на уровне hosted-service cycle.
 
 ---
 
@@ -300,7 +304,7 @@ Decision: current `test-admin` scope is global. Workspace admin is reconsidered 
 
 - **Priority:** P0/P1
 - **Effort:** M
-- **Status:** DONE — header resolver/fingerprint compatibility; see API-009 for zero-length body
+- **Status:** DONE — header resolver/fingerprint compatibility, including true zero-length body (API-009)
 
 ### Scope
 
@@ -317,7 +321,7 @@ Decision: current `test-admin` scope is global. Workspace admin is reconsidered 
 - generated OpenAPI;
 - stable validation error.
 
-Current transport limitation: publish/start/submit still require a JSON body (`{}` is sufficient) because their Minimal API body parameter is non-nullable. The key may live only in the header, but a truly empty body is tracked separately as API-009.
+Publish/start/submit accept a true zero-length body (nullable Minimal API body parameter); the key may live only in the `Idempotency-Key` header (API-009).
 
 ## API-002 — Idempotency request fingerprint
 
@@ -400,10 +404,10 @@ Needed before richer catalogs/reporting.
 
 - **Priority:** P0/P1
 - **Effort:** S/M
-- **Status:** PLANNED
+- **Status:** DONE
 - **Dependencies:** API-001
 
-Publish/start/submit должны принимать zero-length body при валидном `Idempotency-Key` header. Нужны реальные empty-body HTTP tests и соответствующий OpenAPI contract.
+Publish/start/submit endpoint handlers принимают nullable request DTO (`PublishRequest?`/`StartAttemptRequest?`/`SubmitAttemptRequest?`); zero-length body binds to `null` and `IdempotencyKeyResolver.Resolve` falls back to `Guid.Empty` for the legacy body key, requiring the `Idempotency-Key` header. Covered by `EmptyBodyIdempotencyTests.cs` (real zero-length HTTP requests, no `Content`/payload). OpenAPI request body `required` flag is derived automatically from the now-nullable parameter type.
 
 ---
 
@@ -1059,15 +1063,14 @@ Automate Domain-no-EF/API and layer reference constraints.
 Следующие фичи выполнять именно в этом порядке, если business priority не меняется:
 
 ```text
-1  STAB-003/005 + API-009 (STAB-001/002/004 and PERF-001/D6 are DONE)
-2  STAB-006/007 + error/value-object invariant normalization
-3  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze
-4  ATT-010/011 + UX-001 student presentation/resume
-5  AUTHOR-001/002/003 + selected tags/catalog + versioned JSON import/export
-6  reporting hot paths REP-010/014 after SQL scalability work
-7  EVT catalog only when first real consumer appears
-8  assignment orchestration/notifications selected by product need
-9  advanced assessment features one versioned vertical slice at a time
+1  STAB-006/007 + error/value-object invariant normalization (STAB-001/002/003/004/005, API-009 and PERF-001/D6 are DONE)
+2  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze
+3  ATT-010/011 + UX-001 student presentation/resume
+4  AUTHOR-001/002/003 + selected tags/catalog + versioned JSON import/export
+5  reporting hot paths REP-010/014 after SQL scalability work
+6  EVT catalog only when first real consumer appears
+7  assignment orchestration/notifications selected by product need
+8  advanced assessment features one versioned vertical slice at a time
 ```
 
 ## Почему так

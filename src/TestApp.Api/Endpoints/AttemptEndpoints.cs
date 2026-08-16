@@ -49,11 +49,11 @@ internal static class AttemptEndpoints
         attempts.MapPost("/{id}/submit", async (
             Guid id,
             HttpRequest http,
-            SubmitAttemptRequest request,
+            SubmitAttemptRequest? request,
             SubmitAttemptCommandHandler handler,
             CancellationToken ct) =>
         {
-            var key = IdempotencyKeyResolver.Resolve(http, request.IdempotencyKey);
+            var key = IdempotencyKeyResolver.Resolve(http, request?.IdempotencyKey ?? Guid.Empty);
             return key.IsSuccess
                 ? ApiResultMapper.ToHttp(await handler.Handle(new SubmitAttemptCommand(new TestAttemptId(id), key.Value), ct))
                 : key.Error!;

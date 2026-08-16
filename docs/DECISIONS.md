@@ -208,7 +208,7 @@ Mechanisms:
 
 **Consequences:** deployment pipeline содержит explicit migration gate.
 
-**Current limitation:** migrate-only composition пока загружает часть unrelated RabbitMQ/CORS/rate-limit/proxy options. Это implementation gap, а не изменение решения: целевой job остаётся database-only.
+Migrate-only composition загружает только database configuration; Keycloak/RabbitMQ/CORS/rate-limit/proxy options не загружаются, так что job остаётся database-only.
 
 ## ADR-018 — Canonical API path `/api/v1`
 
@@ -234,7 +234,7 @@ Legacy `/api/*` rewrite сохранён временно.
 
 **Historical decision:** commands первоначально принимали `idempotencyKey` в JSON request body.
 
-**Current decision:** primary contract — `Idempotency-Key` header; legacy body field временно поддерживается, header/body mismatch валидируется, common operations используют request fingerprint. Для publish/start/submit JSON body (`{}`) пока обязателен из-за endpoint binding; zero-length body остаётся отдельным implementation gap.
+**Current decision:** primary contract — `Idempotency-Key` header; legacy body field временно поддерживается, header/body mismatch валидируется, common operations используют request fingerprint. Publish/start/submit принимают настоящий zero-length body, когда key передан только в header.
 
 ## ADR-021 — Role authorization не заменяет resource ownership
 

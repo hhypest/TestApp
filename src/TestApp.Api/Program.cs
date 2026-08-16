@@ -13,20 +13,23 @@ var migrateOnly = args.Any(x => string.Equals(x, "--migrate", StringComparison.O
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
+// --migrate only ever needs LoadDatabase: the rest of runtime configuration is left
+// unloaded so a migration job's environment doesn't have to carry unrelated secrets/config.
 var databaseOptions = RuntimeConfiguration.LoadDatabase(builder.Configuration, builder.Environment);
 var keycloakOptions = migrateOnly ? null : RuntimeConfiguration.LoadKeycloak(builder.Configuration, builder.Environment);
-var rabbitMqOptions = RuntimeConfiguration.LoadRabbitMq(builder.Configuration);
-var expirationOptions = RuntimeConfiguration.LoadAttemptExpiration(builder.Configuration);
-var rateLimitingOptions = RuntimeConfiguration.LoadRateLimiting(builder.Configuration);
-var openApiOptions = RuntimeConfiguration.LoadOpenApi(builder.Configuration, builder.Environment);
-var corsOptions = RuntimeConfiguration.LoadCors(builder.Configuration);
+var rabbitMqOptions = migrateOnly ? null : RuntimeConfiguration.LoadRabbitMq(builder.Configuration);
+var expirationOptions = migrateOnly ? null : RuntimeConfiguration.LoadAttemptExpiration(builder.Configuration);
+var rateLimitingOptions = migrateOnly ? null : RuntimeConfiguration.LoadRateLimiting(builder.Configuration);
+var openApiOptions = migrateOnly ? null : RuntimeConfiguration.LoadOpenApi(builder.Configuration, builder.Environment);
+var corsOptions = migrateOnly ? null : RuntimeConfiguration.LoadCors(builder.Configuration);
 var transportSecurityOptions = migrateOnly
     ? null
     : RuntimeConfiguration.LoadTransportSecurity(builder.Configuration, builder.Environment);
-var reverseProxyOptions = RuntimeConfiguration.LoadReverseProxy(builder.Configuration);
-var apiLifecycleOptions = ApiLifecycleConfiguration.Load(builder.Configuration);
+var reverseProxyOptions = migrateOnly ? null : RuntimeConfiguration.LoadReverseProxy(builder.Configuration);
+var apiLifecycleOptions = migrateOnly ? null : ApiLifecycleConfiguration.Load(builder.Configuration);
 
-RuntimeConfiguration.ConfigureForwardedHeaders(builder.Services, reverseProxyOptions);
+if (!migrateOnly)
+    RuntimeConfiguration.ConfigureForwardedHeaders(builder.Services, reverseProxyOptions!);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
@@ -66,16 +69,16 @@ if (!migrateOnly)
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions.General));
+            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions!.General));
         options.AddPolicy(RatePolicies.StudentWrite, context =>
-            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions.StudentWrite));
+            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions!.StudentWrite));
         options.AddPolicy(RatePolicies.PrivilegedRead, context =>
-            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions.PrivilegedRead));
+            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions!.PrivilegedRead));
         options.AddPolicy(RatePolicies.Operations, context =>
-            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions.Operations));
+            RateLimitPartitioning.FixedWindow(context, rateLimitingOptions!.Operations));
     });
 
-    if (corsOptions.Enabled)
+    if (corsOptions!.Enabled)
     {
         builder.Services.AddCors(options => options.AddPolicy(CorsPolicies.Api, policy =>
         {
@@ -100,32 +103,36 @@ if (!migrateOnly)
 
 builder.Services.AddInfrastructure(options =>
     options.UseNpgsql(databaseOptions.ConnectionString));
-builder.Services.Configure<AttemptExpirationOptions>(options =>
-{
-    options.BatchSize = expirationOptions.BatchSize;
-    options.PollInterval = TimeSpan.FromSeconds(expirationOptions.PollIntervalSeconds);
-});
 
-if (!migrateOnly && rabbitMqOptions.Enabled)
+if (!migrateOnly)
 {
-    builder.Services.AddRabbitMqOutboxDelivery(
-        options =>
-        {
-            options.Enabled = true;
-            options.ConnectionString = rabbitMqOptions.ConnectionString;
-            options.Exchange = rabbitMqOptions.Exchange;
-            options.RoutingKeyPrefix = rabbitMqOptions.RoutingKeyPrefix;
-            options.ClientProvidedName = rabbitMqOptions.ClientProvidedName;
-        },
-        options =>
-        {
-            options.BatchSize = rabbitMqOptions.BatchSize;
-            options.MaxAttempts = rabbitMqOptions.MaxAttempts;
-            options.PollInterval = TimeSpan.FromSeconds(rabbitMqOptions.PollIntervalSeconds);
-            options.BaseRetryDelay = TimeSpan.FromSeconds(rabbitMqOptions.BaseRetryDelaySeconds);
-            options.MaxRetryDelay = TimeSpan.FromSeconds(rabbitMqOptions.MaxRetryDelaySeconds);
-            options.AdvisoryLockTimeoutSeconds = rabbitMqOptions.AdvisoryLockTimeoutSeconds;
-        });
+    builder.Services.Configure<AttemptExpirationOptions>(options =>
+    {
+        options.BatchSize = expirationOptions!.BatchSize;
+        options.PollInterval = TimeSpan.FromSeconds(expirationOptions.PollIntervalSeconds);
+    });
+
+    if (rabbitMqOptions!.Enabled)
+    {
+        builder.Services.AddRabbitMqOutboxDelivery(
+            options =>
+            {
+                options.Enabled = true;
+                options.ConnectionString = rabbitMqOptions.ConnectionString;
+                options.Exchange = rabbitMqOptions.Exchange;
+                options.RoutingKeyPrefix = rabbitMqOptions.RoutingKeyPrefix;
+                options.ClientProvidedName = rabbitMqOptions.ClientProvidedName;
+            },
+            options =>
+            {
+                options.BatchSize = rabbitMqOptions.BatchSize;
+                options.MaxAttempts = rabbitMqOptions.MaxAttempts;
+                options.PollInterval = TimeSpan.FromSeconds(rabbitMqOptions.PollIntervalSeconds);
+                options.BaseRetryDelay = TimeSpan.FromSeconds(rabbitMqOptions.BaseRetryDelaySeconds);
+                options.MaxRetryDelay = TimeSpan.FromSeconds(rabbitMqOptions.MaxRetryDelaySeconds);
+                options.AdvisoryLockTimeoutSeconds = rabbitMqOptions.AdvisoryLockTimeoutSeconds;
+            });
+    }
 }
 
 builder.Services.AddApplicationHandlers();
@@ -142,7 +149,7 @@ if (migrateOnly || databaseOptions.ApplyMigrationsOnStartup)
 if (migrateOnly)
     return;
 
-if (reverseProxyOptions.Enabled)
+if (reverseProxyOptions!.Enabled)
     app.UseForwardedHeaders();
 if (transportSecurityOptions!.HstsEnabled)
     app.UseHsts();
@@ -151,10 +158,10 @@ if (transportSecurityOptions.HttpsRedirectionEnabled)
 if (transportSecurityOptions.SecurityHeadersEnabled)
     app.UseMiddleware<SecurityHeadersMiddleware>();
 
-app.UseMiddleware<LegacyApiCompatibilityMiddleware>(apiLifecycleOptions);
+app.UseMiddleware<LegacyApiCompatibilityMiddleware>(apiLifecycleOptions!);
 
 app.UseRouting();
-if (corsOptions.Enabled)
+if (corsOptions!.Enabled)
     app.UseCors(CorsPolicies.Api);
 app.UseMiddleware<RequestTelemetryMiddleware>();
 // Audit must wrap exception mapping so it observes the final handled response status.
@@ -164,7 +171,7 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 
-if (openApiOptions.Enabled)
+if (openApiOptions!.Enabled)
 {
     var openApiEndpoint = app.MapOpenApi("/openapi/v1.json");
     if (openApiOptions.AllowAnonymous)

@@ -206,7 +206,7 @@ Legacy JSON field:
 - оба непустые, но разные -> `400 idempotency.key_mismatch`;
 - invalid/empty required key -> `400 idempotency.key`.
 
-Для publish/start/submit key может находиться только в header, но endpoint binding пока всё равно требует JSON body (`{}` или legacy DTO с empty GUID). HTTP request с zero-length body сейчас получает binding `400`; это tracked stabilization gap API-009, поэтому «header-only» не следует трактовать как «body отсутствует» на текущем baseline.
+Для publish/start/submit key может находиться только в header: endpoint binding принимает настоящий zero-length body (request DTO параметр nullable) при валидном `Idempotency-Key` header — JSON body с legacy `idempotencyKey` остаётся поддержанным, но больше не обязателен.
 
 ### Request fingerprint
 
@@ -599,7 +599,6 @@ GET /health/ready
 
 Ближайший stabilization scope:
 
-- настоящий zero-length-body header-only publish/start/submit;
 - deterministic paging tie-breakers;
 - SQL-scalable reviewer/admin read queries;
 - student-safe attempt presentation/resume DTO без correctness leakage.

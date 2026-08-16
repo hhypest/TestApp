@@ -162,9 +162,9 @@ BaseRetryDelay * 2^(attempt-1)
 
 с cap `MaxRetryDelay`.
 
-### 6.4 Current worker resilience gap
+### 6.4 Worker cycle-level resilience
 
-Per-message publish exceptions переходят в retry/dead-letter state. Но exception во время batch query, advisory-lock acquisition или сохранения failure state может выйти из `BackgroundService` loop. До 1.0 нужен cycle-level recovery boundary с bounded backoff, cancellation passthrough и health/metric signal.
+Per-message publish exceptions переходят в retry/dead-letter state. Exception во время batch query, advisory-lock acquisition или сохранения failure state также не выводит `OutboxProcessor` из `BackgroundService` loop: каждый poll cycle обёрнут в try/catch (`RunCycleAsync`), cycle failure логируется и worker продолжает на следующий `PeriodicTimer` tick вместо fault-а хостового process.
 
 ## 7. Delivery guarantee
 

@@ -65,8 +65,6 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Database: Host=postgres;Port=5432;Database=testapp;Username=testapp;Password=testapp;
       Database__ApplyMigrationsOnStartup: "false"
-      Keycloak__Authority: http://keycloak:8080/realms/testapp
-      Keycloak__Audience: testapp-api
     depends_on:
       postgres:
         condition: service_healthy

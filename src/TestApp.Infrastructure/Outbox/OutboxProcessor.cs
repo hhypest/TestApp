@@ -45,11 +45,29 @@ public sealed class OutboxProcessor(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _options.Validate();
-        await DrainAvailableAsync(stoppingToken);
+        await RunCycleAsync(stoppingToken);
 
         using var timer = new PeriodicTimer(_options.PollInterval, time);
         while (await timer.WaitForNextTickAsync(stoppingToken))
-            await DrainAvailableAsync(stoppingToken);
+            await RunCycleAsync(stoppingToken);
+    }
+
+    // A cycle-level failure (e.g. a transient DB outage) must not fault the host's
+    // BackgroundService and take the whole API down; log it and retry next poll tick.
+    private async Task RunCycleAsync(CancellationToken ct)
+    {
+        try
+        {
+            await DrainAvailableAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Outbox processing cycle failed; will retry on next poll interval");
+        }
     }
 
     public async Task<int> DrainAvailableAsync(CancellationToken ct)

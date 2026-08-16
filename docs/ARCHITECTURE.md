@@ -238,7 +238,7 @@ Legacy compatibility меняет `Request.Path`, поэтому canonical route
 - application handler повторно проверяет state/deadline;
 - optimistic concurrency безопасно разрешает гонку с submit.
 
-Per-attempt exceptions обрабатываются, но initial/batch DB scan выполняется без cycle-level recovery boundary. Transient query failure способен завершить `BackgroundService`; это stabilization gap.
+Per-attempt exceptions обрабатываются; initial/batch DB scan также обёрнут cycle-level recovery boundary (`RunCycleAsync`) — transient query failure логируется и worker продолжает на следующий poll tick вместо fault-а `BackgroundService`.
 
 ### 7.2 OutboxProcessor
 
@@ -326,9 +326,6 @@ Aggregate может поднимать `IDomainEvent`. `AppDbContext.SaveChange
 
 - `Test.OwnerId` и owner-scoped writes/reads реализованы; tenant/workspace boundary сознательно отсутствует до business requirement;
 - handlers регистрируются напрямую в API, общего command/query dispatcher pipeline нет; это допустимо, пока cross-cutting duplication остаётся управляемым;
-- standard `Idempotency-Key` resolver/fingerprint реализован, но no-payload publish/start/submit всё ещё требуют JSON body (`{}`), а не настоящий zero-length body;
-- Outbox/expiration workers не имеют cycle-level recovery для DB/query/lock failures;
-- migration-only composition всё ещё загружает unrelated RabbitMQ/CORS/rate-limit/proxy options;
 - paged read models не везде имеют deterministic timestamp + ID tie-breaker;
 - reviewer/admin queries materialize большие revision-ID/score sets вместо SQL joins/aggregates;
 - student-safe attempt presentation DTO с question/option text ещё отсутствует;

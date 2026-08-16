@@ -67,14 +67,12 @@ jobs:
         run: docker compose -f compose.yaml config --quiet
       - name: Build production API image
         run: docker build --tag testapp-api:ci .
-      - name: Apply migrations from production image
+      - name: Apply migrations from production image (database-only configuration)
         run: >-
           docker run --rm --network host
           -e ASPNETCORE_ENVIRONMENT=Production
           -e 'ConnectionStrings__Database=${{ env.ConnectionStrings__Database }}'
           -e Database__ApplyMigrationsOnStartup=false
-          -e Keycloak__Authority=http://127.0.0.1:8081/realms/testapp
-          -e Keycloak__Audience=testapp-api
           testapp-api:ci --migrate
       - name: Seed backup restore probe
         run: |
