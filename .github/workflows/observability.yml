@@ -1,0 +1,92 @@
+name: observability
+
+on:
+  push:
+    branches:
+      - beta-ddd
+    paths:
+      - "deploy/otel-collector-config.yaml"
+      - "deploy/prometheus/**"
+      - "deploy/grafana/**"
+      - "src/TestApp.Infrastructure/Observability/**"
+      - "compose.yaml"
+      - "scripts/validate-observability-stack.sh"
+      - ".github/workflows/observability.yml"
+  pull_request:
+    branches:
+      - beta-ddd
+    paths:
+      - "deploy/otel-collector-config.yaml"
+      - "deploy/prometheus/**"
+      - "deploy/grafana/**"
+      - "src/TestApp.Infrastructure/Observability/**"
+      - "compose.yaml"
+      - "scripts/validate-observability-stack.sh"
+      - ".github/workflows/observability.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose configuration
+        run: docker compose -f compose.yaml config --quiet
+
+      - name: Build and start full stack
+        run: docker compose -f compose.yaml up -d --build
+
+      - name: Wait for Keycloak and API readiness
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://localhost:8081/realms/testapp/.well-known/openid-configuration >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Keycloak did not become ready" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://localhost:8080/health/ready >/dev/null; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "API did not become ready" >&2
+              docker compose -f compose.yaml logs api
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Generate a little request traffic
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 5); do
+            curl --fail --silent --show-error http://localhost:8080/health/ready >/dev/null
+            curl --fail --silent --show-error http://localhost:8080/health/live >/dev/null
+          done
+
+      - name: Validate Prometheus/Grafana observability stack
+        env:
+          TIMEOUT_SECONDS: "180"
+        run: bash scripts/validate-observability-stack.sh
+
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -f compose.yaml logs --no-color --tail=1000
+
+      - name: Stop stack
+        if: always()
+        run: docker compose -f compose.yaml down -v --remove-orphans

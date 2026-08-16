@@ -221,6 +221,7 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - OpenTelemetry ASP.NET Core/HttpClient/runtime;
 - custom `TestApp.Operations` metrics для Outbox, expiration, retention и bounded API exception categories;
 - optional OTLP exporter;
+- Prometheus + Grafana в `compose.yaml` как local/CI metrics backend позади OTel Collector: dashboard (`TestApp Overview`) и alert rule expressions (`deploy/prometheus/alerts.yml`, все технически выразимые правила `docs/SLO_ALERTS.md` §4) provisioned и CI-validated (ADR-027, `OBS-012`/`OBS-013`);
 - `/health/live`;
 - `/health/ready` PostgreSQL + RabbitMQ при enabled transport.
 
@@ -274,12 +275,13 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 ### Operational reliability
 
-Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s.
+Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s. Дополнительно реализован и CI-validated local/CI observability backend — Prometheus + Grafana в `compose.yaml` (dashboard + alert rule expressions, `OBS-012`/`OBS-013`, ADR-027).
 
 Не завершены:
 
 - staging/platform restore drill с измеренным RTO;
-- реальные dashboards/alert routes и alert drill;
+- alert routes (Alertmanager + pager/chat receiver) и alert drill против staging — rule expressions сами по себе уже реализованы и оцениваются в Prometheus, но никуда не маршрутизируются;
+- активный readiness prober (`blackbox_exporter` или аналог) для `/health/ready` — сейчас есть только metrics-pipeline health check;
 - deployment-owned secret store, backup scheduling/PITR/offsite policy;
 - rollback/forward-fix release rehearsal.
 
@@ -300,4 +302,4 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 Проект уже является production-oriented modular monolith core, а не CRUD prototype: domain invariants, immutable revisions, owner isolation, HTTP/DB concurrency, distributed idempotency, real infrastructure tests, durable Outbox и deployment path реализованы.
 
-Точечные correctness/stability fixes (Phase D7, `STAB-001..008`) закрыты. До 1.0 остаётся прежде всего **deployment rehearsal**: staging restore drill с измеренным RTO, реальные alert routes/drill, rollback/forward-fix repetition, release notes/changelog. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.
+Точечные correctness/stability fixes (Phase D7, `STAB-001..008`) закрыты; release notes/changelog (`DEV-005`) и local/CI dashboard+alert rule expressions (`OBS-012`/`OBS-013`) тоже. До 1.0 остаётся прежде всего **deployment rehearsal**: staging restore drill с измеренным RTO, маршрутизация алертов в actionable destination + alert drill против staging, rollback/forward-fix repetition. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.

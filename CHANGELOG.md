@@ -11,7 +11,8 @@
 Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта — см. запись ниже. Открытые пункты 1.0 release gate (`docs/ROADMAP.md` Phase E) вне этой ветки кода:
 
 - staging restore drill с измеренным RTO;
-- реальные alert routes и alert drill против staging;
+- маршрутизация алертов в actionable destination (Alertmanager + pager/chat) и alert drill против staging;
+- активный readiness prober для `/health/ready` (например `blackbox_exporter`);
 - rollback/forward-fix release rehearsal;
 - staging capacity target;
 - формальная фиксация API v1 contract freeze.
@@ -19,6 +20,7 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта 
 ### Added
 
 - `CHANGELOG.md` (этот файл) — `DEV-005`.
+- Prometheus + Grafana в `compose.yaml` как local/CI observability backend позади OTel Collector: provisioned dashboard (`TestApp Overview`) и alert rule expressions, реализующие весь технически выразимый контракт `docs/SLO_ALERTS.md` §4/§6 — `OBS-012`, `OBS-013`, ADR-027. Новый CI workflow `observability` и `scripts/validate-observability-stack.sh` держат стек в проверенном состоянии.
 
 ## [0.9.4] — Phase D7: Correctness/stabilization fixes
 

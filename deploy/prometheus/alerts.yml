@@ -1,0 +1,140 @@
+# Implements the thresholds documented in docs/SLO_ALERTS.md §4.
+# Metric names below were verified empirically against the actual
+# OTel Collector Prometheus exporter output (dots -> underscores,
+# `s`-unit histograms/gauges get a `_seconds` suffix, monotonic sums
+# get a `_total` suffix) — see docs/SLO_ALERTS.md for the source
+# `TestApp.Operations` metric contract.
+#
+# Not implemented here: docs/SLO_ALERTS.md §4 page-rule 1
+# ("/health/ready fails for 3 consecutive probes") requires an active
+# HTTP probe (e.g. blackbox_exporter) against /health/ready, which is
+# a separate component from "add Prometheus/Grafana" and is tracked
+# as a follow-up rather than silently approximated.
+#
+# These rules only evaluate inside Prometheus (visible under
+# Alerts in the Prometheus/Grafana UI). Routing them to an actionable
+# destination (Alertmanager + pager/chat integration) is explicitly
+# still open — see docs/SLO_ALERTS.md §7 and docs/ROADMAP.md Phase E
+# item 12.
+
+groups:
+  - name: testapp-page
+    rules:
+      - alert: TestAppMetricsPipelineDown
+        expr: up{job="testapp"} == 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Prometheus cannot scrape the TestApp OTel Collector metrics endpoint"
+          description: "up{{ $labels.instance }} has been 0 for 5 minutes. This does not by itself mean the API is unhealthy — /health/ready still needs a dedicated probe (see file header)."
+
+      - alert: TestAppHighServerErrorRate
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+            /
+          sum(rate(http_server_request_duration_seconds_count[5m])) > 0.02
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "API 5xx rate above 2% for 5 minutes"
+          description: "docs/SLO_ALERTS.md §4 page-rule 2."
+
+      - alert: TestAppOutboxDeadLetters
+        expr: testapp_outbox_dead_letters > 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Outbox has active dead letters"
+          description: "docs/SLO_ALERTS.md §4 page-rule 3. Triage via /api/v1/operations/outbox."
+
+      - alert: TestAppOutboxBacklogCritical
+        expr: testapp_outbox_oldest_pending_age_seconds > 300
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Oldest pending Outbox message is older than 300s"
+          description: "docs/SLO_ALERTS.md §4 page-rule 4. Only meaningful while RabbitMQ transport is enabled."
+
+      - alert: TestAppAttemptExpirationLagCritical
+        expr: testapp_attempt_oldest_overdue_lag_seconds > 300
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Oldest overdue attempt has been waiting more than 300s for background expiration"
+          description: "docs/SLO_ALERTS.md §4 page-rule 5."
+
+      - alert: TestAppUnhandledExceptionsRepeating
+        expr: increase(testapp_api_exception_total{kind="unhandled"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Repeated unhandled API exceptions, not a single isolated request"
+          description: "docs/SLO_ALERTS.md §4 page-rule 6."
+
+  - name: testapp-warning
+    rules:
+      - alert: TestAppLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le) (
+            rate(http_server_request_duration_seconds_bucket{http_route!~"/health.*"}[15m])
+          )) > 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 request duration above 500ms for 15 minutes"
+          description: "docs/SLO_ALERTS.md §4 warning-rule 1."
+
+      - alert: TestAppLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum by (le) (
+            rate(http_server_request_duration_seconds_bucket{http_route!~"/health.*"}[15m])
+          )) > 1.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p99 request duration above 1.5s for 15 minutes"
+          description: "docs/SLO_ALERTS.md §4 warning-rule 2."
+
+      - alert: TestAppOutboxBacklogWarning
+        expr: testapp_outbox_oldest_pending_age_seconds > 60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest pending Outbox message is older than 60s"
+          description: "docs/SLO_ALERTS.md §4 warning-rule 3."
+
+      - alert: TestAppOutboxPendingCountHigh
+        expr: testapp_outbox_pending > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 1000 Outbox messages pending"
+          description: "docs/SLO_ALERTS.md §4 warning-rule 4."
+
+      - alert: TestAppAttemptExpirationLagWarning
+        expr: testapp_attempt_oldest_overdue_lag_seconds > 60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest overdue attempt has been waiting more than 60s for background expiration"
+          description: "docs/SLO_ALERTS.md §4 warning-rule 5."
+
+      - alert: TestAppAttemptExpirationFailing
+        expr: increase(testapp_attempt_expiration_total{outcome="failure"}[2m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Background attempt expiration failed on at least one recent worker cycle"
+          description: "docs/SLO_ALERTS.md §4 warning-rule 6. Window approximates two cycles at the default 30s AttemptExpiration poll interval; retune per deployment."

@@ -13,7 +13,14 @@ The application exports:
 - custom `TestApp.Operations` metrics for Outbox, expiration, retention and important API exception categories;
 - `/health/live` and `/health/ready` for platform probes.
 
-`OTEL_EXPORTER_OTLP_ENDPOINT` enables OTLP export. The actual query syntax depends on the selected observability backend; this document defines signals and thresholds rather than binding the application to Prometheus/Grafana-specific code.
+`OTEL_EXPORTER_OTLP_ENDPOINT` enables OTLP export. This document defines the signals and thresholds independent of any single backend, but the local/CI backend is now selected and implemented: Prometheus + Grafana behind the OTel Collector (`compose.yaml`, see ADR-027 in `docs/DECISIONS.md`). Concrete artifacts:
+
+- `deploy/prometheus/prometheus.yml` — scrape config;
+- `deploy/prometheus/alerts.yml` — the page/warning rules from §4 below, expressed in PromQL against verified metric names;
+- `deploy/grafana/dashboards/testapp-overview.json` — the §6 dashboard minimum, provisioned automatically;
+- `scripts/validate-observability-stack.sh` (CI workflow `observability`) — keeps all of the above in a verified-working state.
+
+A production deployment is not required to reuse this exact stack (a managed Prometheus/Grafana, or a different OTLP-compatible backend, can consume the same signals), but the rule/dashboard definitions below are no longer purely aspirational — they run.
 
 ## 2. Initial service objectives
 
@@ -130,10 +137,16 @@ A production dashboard should contain at least:
 
 ## 7. Pre-1.0 verification gate
 
-Before 1.0:
+Done (see ADR-027):
 
-- run a staging alert drill for readiness, Outbox dead-letter/backlog and expiration lag;
-- verify each alert routes to an actionable destination;
+- alert rule expressions implemented and CI-validated for every §4 rule expressible from existing metrics (all 6 page + 6 warning rules, `deploy/prometheus/alerts.yml`);
+- dashboard implemented and CI-validated for the §6 minimum (`deploy/grafana/dashboards/testapp-overview.json`);
+- dashboards do not expose high-cardinality identifiers or correctness/payload data (labels are limited to `kind`/`outcome`/`action`/`gc_heap_generation`/`cpu_mode`/HTTP method-route-status, matching the `TestApp.Operations` contract in §3 and standard HTTP/runtime semconv attributes — never a test/user/attempt/event ID).
+
+Still open before 1.0:
+
+- a readiness probe rule for `/health/ready` (page-rule 1) — needs an active HTTP prober (e.g. `blackbox_exporter`), not just the metrics pipeline;
+- route every alert to an actionable destination (Alertmanager + pager/chat receiver — nothing currently fires outside the Prometheus/Grafana UI);
+- run a staging alert drill for readiness, Outbox dead-letter/backlog and expiration lag against the routed destination;
 - measure normal production-like latency/backlog and recalibrate thresholds;
-- record evidence of the backup/restore drill and actual RTO;
-- ensure dashboards do not expose high-cardinality identifiers or correctness/payload data.
+- record evidence of the backup/restore drill and actual RTO.

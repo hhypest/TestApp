@@ -500,23 +500,23 @@ Needed only if operations requires permanent suppression state.
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED — application metrics/SLO contract done; backend dashboard is deployment-owned
+- **Status:** DONE — Prometheus + Grafana added to `compose.yaml` (ADR-027); `deploy/grafana/dashboards/testapp-overview.json` implements the `docs/SLO_ALERTS.md` §6 dashboard minimum, provisioned automatically and CI-validated (`scripts/validate-observability-stack.sh`, workflow `observability`)
 
 ## OBS-013 — Alerts
 
 - **Priority:** P1
 - **Effort:** M
 - **Dependencies:** OBS-010..012
-- **Status:** PLANNED — thresholds/runbook documented; routes and staging drill remain
+- **Status:** DONE — rule expressions implemented for every `docs/SLO_ALERTS.md` §4 rule expressible from existing metrics (`deploy/prometheus/alerts.yml`, 6 page + 6 warning rules, CI-validated); routing to an actionable destination and the staging drill remain open (`docs/SLO_ALERTS.md` §7)
 
 Alert on:
 
-- readiness;
-- 5xx;
-- latency;
-- dead letters;
-- Outbox lag;
-- DB/RMQ connectivity.
+- readiness — **not implemented**: needs an active HTTP prober (e.g. `blackbox_exporter`), the metrics pipeline alone cannot express this;
+- 5xx — done;
+- latency — done (p95/p99);
+- dead letters — done;
+- Outbox lag — done;
+- DB/RMQ connectivity — covered indirectly via readiness once the prober above exists.
 
 ## PERF-001 — Load test baseline
 

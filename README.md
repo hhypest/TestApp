@@ -11,7 +11,7 @@ Backend-система создания, публикации, назначен�
 | ORM | EF Core 10.0.11 + Npgsql EF provider 10.0.3 |
 | Identity | Keycloak / JWT Bearer |
 | Messaging | Transactional Outbox + RabbitMQ 4.3.x |
-| Observability | OpenTelemetry 1.17.0 |
+| Observability | OpenTelemetry 1.17.0 + Prometheus/Grafana (local/CI, ADR-027) |
 | API | Minimal API, canonical `/api/v1` |
 | Deployment | Docker/Compose + migration-only mode |
 | CI | GitHub Actions + real PostgreSQL/RabbitMQ integration tests |
@@ -201,7 +201,8 @@ RabbitMQ transport реализован:
 - admin operational endpoints для audit и Outbox;
 - retention cleanup для audit/idempotency/processed Outbox;
 - audited dead-letter detail/requeue/discard;
-- operational metrics и SLO/alert contract.
+- operational metrics и SLO/alert contract;
+- Prometheus + Grafana в Compose stack — provisioned dashboard и alert rule expressions для `docs/SLO_ALERTS.md` контракта (ADR-027).
 
 ## Local Docker Compose
 
@@ -219,7 +220,9 @@ docker compose up --build
 - RabbitMQ AMQP — `localhost:5672`;
 - RabbitMQ management — `http://localhost:15672`;
 - OTLP gRPC — `localhost:4317`;
-- OTLP HTTP — `localhost:4318`.
+- OTLP HTTP — `localhost:4318`;
+- Prometheus — `http://localhost:9090`;
+- Grafana — `http://localhost:3000`.
 
 Compose создаёт новый volume `testapp-postgres`. Старый MariaDB volume не удаляется автоматически. Если в нём есть значимые данные, до переключения выполните отдельный [ETL/cutover](docs/PERSISTENCE.md#engine-cutover-и-существующие-mariadb-данные); обычный PostgreSQL backup script MariaDB dump не конвертирует.
 
@@ -234,11 +237,12 @@ dotnet test TestApp.slnx --no-build --configuration Release
 node tests/TestApp.Postman/scripts/validate.mjs
 docker compose -f compose.yaml config --quiet
 docker build -t testapp-api:local .
+bash scripts/validate-observability-stack.sh  # after `docker compose up`
 ```
 
 Импортируемая Postman collection с real Keycloak flow и Newman CI находится в [`tests/TestApp.Postman`](tests/TestApp.Postman/README.md).
 
-GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image, запускает этот же image в `--migrate` режиме, проверяет logical backup/restore, выполняет image/secret scan и формирует SBOM. Отдельные workflows используют production-shaped stack и real Keycloak для Postman/Newman API contract и performance/capacity gates.
+GitHub Actions поднимает настоящие PostgreSQL 18 и RabbitMQ service containers, прогоняет tests, валидирует Compose, строит production image, запускает этот же image в `--migrate` режиме, проверяет logical backup/restore, выполняет image/secret scan и формирует SBOM. Отдельные workflows используют production-shaped stack и real Keycloak для Postman/Newman API contract, performance/capacity gates и Prometheus/Grafana observability stack validation (`observability`, `scripts/validate-observability-stack.sh`).
 
 ## Приоритет дальнейшего развития
 

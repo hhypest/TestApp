@@ -281,7 +281,7 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 # 7. `1.0.0` — Phase E: Stabilization / production release candidate
 
 **Priority: P0**  
-**Status: IN PROGRESS — Phase D7 closed, items 13–15 done, release-notes half of item 10 done (DEV-005), remainder of 1–12 open**
+**Status: IN PROGRESS — Phase D7 closed, items 13–15 done, release-notes half of item 10 done (DEV-005), local/CI half of item 12 done (OBS-012/013, ADR-027), remainder of 1–12 open**
 
 До freeze 1.0 требуется:
 
@@ -296,7 +296,7 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 9. integration-event catalog explicitly documented;
 10. release notes (**DONE:** `CHANGELOG.md`, DEV-005) + rollback/forward-fix runbook (open — requires staging release rehearsal);
 11. dependency/container/SBOM evidence attached to release process;
-12. SLO dashboards/alerts exercised against staging;
+12. SLO dashboards/alerts exercised against staging (**DONE locally/CI:** Prometheus + Grafana added to `compose.yaml`, dashboard + alert rule expressions implemented and CI-validated — OBS-012/OBS-013, ADR-027; still open — alert routing to an actionable destination, a readiness prober, and the staging drill itself, see `docs/SLO_ALERTS.md` §7);
 13. **DONE:** deterministic pagination order (`timestamp + ID`) на всех paged read models;
 14. **DONE:** reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;
 15. **DONE:** domain/application error и value-object invariants имеют единый ожидаемый failure contract (STAB-008, ADR-026).

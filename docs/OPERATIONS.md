@@ -13,6 +13,8 @@ graph TD
     API --> KC[Keycloak 26.7 :8080 internal / :8081 host]
     API --> RMQ[RabbitMQ 4.3.1 :5672]
     API --> OTEL[OTEL Collector :4317]
+    OTEL --> PROM[Prometheus :9090]
+    PROM --> GRAF[Grafana :3000]
     MIG[Migrate job] --> DB
 ```
 
@@ -22,6 +24,8 @@ Compose services:
 - `rabbitmq`;
 - `keycloak`;
 - `otel-collector`;
+- `prometheus`;
+- `grafana`;
 - `migrate`;
 - `api`.
 
@@ -51,12 +55,16 @@ PostgreSQL использует новый volume `testapp-postgres`. Стары
 | RabbitMQ management | `http://localhost:15672` |
 | OTLP gRPC | `localhost:4317` |
 | OTLP HTTP | `localhost:4318` |
+| Prometheus | `http://localhost:9090` |
+| Grafana | `http://localhost:3000` |
 
 ## 3. Development credentials
 
 **Только local development. Не использовать в production.**
 
 PostgreSQL: `testapp / testapp` (локальный Compose superuser; в production application и migration roles должны быть разделены).
+
+Grafana: `admin / admin` (`GF_SECURITY_ADMIN_USER`/`GF_SECURITY_ADMIN_PASSWORD` в `compose.yaml`).
 
 RabbitMQ:
 
@@ -256,19 +264,15 @@ Local collector config:
 deploy/otel-collector-config.yaml
 ```
 
-В local environment collector использует debug exporter.
+Collector пишет traces только в `debug` exporter (нет configured traces backend). Metrics пишутся в `debug` **и** `prometheus` exporter (`0.0.0.0:8889`), который Compose-сервис `prometheus` scrape'ит как target `testapp` (`deploy/prometheus/prometheus.yml`). Prometheus также загружает alert rules из `deploy/prometheus/alerts.yml`, реализующие пороги `docs/SLO_ALERTS.md` §4. Grafana подключена к Prometheus как provisioned datasource (`deploy/grafana/provisioning`) и показывает dashboard `TestApp Overview` (`deploy/grafana/dashboards/testapp-overview.json`), реализующий "dashboard minimum" из `docs/SLO_ALERTS.md` §6. См. ADR-027 в `docs/DECISIONS.md` за обоснованием выбора Prometheus/Grafana вместо Jaeger.
 
-### Production planned
+`scripts/validate-observability-stack.sh` (запускается CI workflow `observability`) проверяет: `promtool check config/rules`, здоровье Prometheus targets, наличие ожидаемых metric families, здоровье Grafana datasource и присутствие dashboard.
 
-Нужно определить backend:
+### Известные ограничения
 
-- Grafana Tempo/Prometheus;
-- Jaeger;
-- Azure Monitor;
-- Datadog;
-- другой OTLP-compatible backend.
-
-Выбор backend не должен менять Domain/Application.
+- Alert rules оцениваются **только внутри Prometheus** (видны на вкладке Alerts в Prometheus/Grafana UI). Alertmanager и маршрутизация в pager/chat не настроены — это отдельный deployment-owned шаг (`docs/SLO_ALERTS.md` §7, `docs/ROADMAP.md` Phase E item 12).
+- Нет активного HTTP-пробинга `/health/ready` (например, `blackbox_exporter`) — правило `TestAppMetricsPipelineDown` проверяет только доступность OTel Collector metrics endpoint, а не реальную readiness API.
+- Трейсы (`traces` pipeline) по-прежнему уходят только в `debug` exporter — выбор backend для трейсинга (Tempo/Jaeger/другой) остаётся открытым и не обязателен, пока нет измеренной потребности в distributed tracing (см. ADR-027).
 
 ## 9. Structured request telemetry
 

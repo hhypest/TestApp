@@ -324,6 +324,8 @@ GitHub Actions `dotnet` workflow:
 
 Отдельный `postman` workflow валидирует importable artifacts, поднимает тот же local stack и запускает полный Postman API contract через Newman. JUnit report сохраняется как Actions artifact.
 
+Отдельный `observability` workflow (path-triggered на `deploy/prometheus/**`, `deploy/grafana/**`, `deploy/otel-collector-config.yaml`, `src/TestApp.Infrastructure/Observability/**`, `compose.yaml`) поднимает полный stack и запускает `scripts/validate-observability-stack.sh`: `promtool check config/rules`, здоровье Prometheus targets, наличие ожидаемых metric families, здоровье Grafana Prometheus datasource и присутствие provisioned dashboard.
+
 ### Merge/release gate
 
 Нельзя считать commit production-capable, если зелёны unit tests, но не прошёл migration-only container step.

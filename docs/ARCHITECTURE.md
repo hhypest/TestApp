@@ -307,6 +307,7 @@ Aggregate может поднимать `IDomainEvent`. `AppDbContext.SaveChange
 - Keycloak — required для нормальной JWT authentication runtime;
 - RabbitMQ — optional, только если `RabbitMq:Enabled=true`;
 - OTLP collector — optional;
+- Prometheus/Grafana — optional, local/CI metrics scrape и dashboard backend позади OTLP collector (`compose.yaml`, см. ADR-027 в `docs/DECISIONS.md`);
 - Docker — не требуется приложению, но используется для стандартного deployment/dev stack.
 
 ## 12. Architectural constraints для новых фич
