@@ -78,7 +78,8 @@ Migration существующих tests использует специальн
 - `Passed`/`Failed`;
 - exact-set scoring;
 - reviewer correctness detail;
-- student-safe result без correct flags.
+- student-safe result без correct flags;
+- student-safe presentation попытки (вопросы/варианты из immutable revision + собственные ответы + `serverTime`) и resume активной попытки — `ATT-010`/`ATT-011`/`UX-001`, ADR-028.
 
 ## 3. Persistence и consistency
 
@@ -293,7 +294,7 @@ Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 
 
 - multi-realm `(Issuer, Subject)`;
 - Workspace/multi-tenant model;
-- frontend application;
+- frontend application (backend presentation/resume contract готов — `ATT-010`/`ATT-011`);
 - non-choice question types;
 - partial/custom scoring;
 - manual grading;
@@ -304,4 +305,4 @@ Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 
 
 Проект уже является production-oriented modular monolith core, а не CRUD prototype: domain invariants, immutable revisions, owner isolation, HTTP/DB concurrency, distributed idempotency, real infrastructure tests, durable Outbox и deployment path реализованы.
 
-Точечные correctness/stability fixes (Phase D7, `STAB-001..008`) закрыты; release notes/changelog (`DEV-005`) и local/CI dashboard+alert rule expressions (`OBS-012`/`OBS-013`) тоже. До 1.0 остаётся прежде всего **deployment rehearsal**: staging restore drill с измеренным RTO, маршрутизация алертов в actionable destination + alert drill против staging, rollback/forward-fix repetition. После них первой продуктовой вертикалью должен стать student-safe attempt presentation/resume contract; расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.
+Точечные correctness/stability fixes (Phase D7, `STAB-001..008`) закрыты; release notes/changelog (`DEV-005`) и local/CI dashboard+alert rule expressions (`OBS-012`/`OBS-013`) тоже. До 1.0 остаётся прежде всего **deployment rehearsal**: staging restore drill с измеренным RTO, маршрутизация алертов в actionable destination + alert drill против staging, rollback/forward-fix repetition. Student-safe attempt presentation/resume contract (первая продуктовая вертикаль) уже реализован досрочно — `ATT-010`/`ATT-011`/`UX-001`, ADR-028. Дальше по плану идут authoring productivity (`AUTHOR-001/002/003`, tags/catalog, versioned import/export); расширенные типы вопросов следует добавлять позже, по одной versioned vertical slice.

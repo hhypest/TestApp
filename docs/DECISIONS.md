@@ -306,4 +306,25 @@ Kafka/другой transport не добавляется «для универс
 
 **Верификация:** метрика-по-метрике naming (dots→underscores, unit suffixes, `_total` для counters) проверена эмпирически — реальный `otel/opentelemetry-collector-contrib:0.157.0` прогнан с synthetic OTLP payloads, зеркалирующими точные instrument definitions из `TestApp.Infrastructure.Observability.OperationalMetrics`, а .NET runtime/ASP.NET Core metric names — реальным `net10.0` пробным приложением через актуальные `OpenTelemetry.Instrumentation.Runtime`/`AspNetCore` 1.17.0 пакеты, а не по памяти. `scripts/validate-observability-stack.sh` (CI workflow `observability`) держит это в проверенном состоянии на каждый релевантный push/PR: `promtool check config/rules`, Prometheus target health, наличие ожидаемых metric families, здоровье Grafana datasource и присутствие provisioned dashboard.
 
+## ADR-028 — Student-safe presentation is a projection boundary, not a storage boundary (ATT-010/011, UX-001)
+
+**Status:** Accepted.
+
+**Decision:** студенческий presentation contract (`GET /api/v1/attempts/{id}/presentation`, `GET /api/v1/assignments/{id}/attempts/active`) строится отдельным DTO-семейством (`AttemptPresentationView`/`AttemptQuestionView`/`AttemptAnswerOptionView`), у которого **нет** члена корректности. Reviewer-контракт (`ReviewerAnswerOptionView` с `IsCorrect`) остаётся отдельным типом; эти два семейства нельзя переиспользовать одно вместо другого.
+
+**Почему это ADR, а не деталь реализации:** `PublishedTestRevision.Questions` хранится как один `jsonb`-столбец `questions_json`, включающий `IsCorrect` каждого варианта. Значит EF материализует **весь answer key** в память при любом чтении revision, и никакая SQL-проекция не может его отфильтровать. Отсутствие корректности в ответе студенту — свойство ровно одного метода (`ReadModelQueries.ProjectAsync`), а не схемы БД и не типа запроса. Это принципиально слабее, чем защита на уровне хранилища: одна невнимательная правка DTO возвращает answer key в публичный ответ, и ничто в инфраструктуре этому не помешает.
+
+**Что из этого следует для тестов:** граница закреплена тестом на **сериализованных байтах HTTP-ответа** (`AttemptPresentationTests.The_serialized_student_payload_contains_no_correctness_information`), а не только assert'ами по полям DTO. Тест проверяет и текстово (нет `isCorrect`/`correctOption`/`answerKey`), и структурно (ни у одного option нет boolean-свойства), при этом требует наличие текста правильного варианта — студент обязан видеть его как вариант выбора. Тест верифицирован красным: временное добавление `IsCorrect` в `AttemptAnswerOptionView` роняет его.
+
+**Сознательные решения контракта:**
+
+- **Источник — immutable revision, не живой `Test`.** Редактирование теста после публикации не меняет попытку в полёте; закреплено отдельным тестом.
+- **Новый ресурс, а не расширение `GET /attempts/{id}`.** Форма существующего v1-ответа не менялась — contract freeze (`docs/ROADMAP.md` Phase E пункт 1) остаётся достижимым без breaking change.
+- **`ServerTime` в ответе.** Отсчёт до дедлайна считается от серверного времени, а не от часов клиента, которые могут быть смещены.
+- **Read side не мутирует.** Между истечением дедлайна и проходом expiration worker студент увидит `Status=InProgress` при `DeadlineAt < ServerTime`; GET не завершает попытку. Любая запись в этом окне отвечает `409 attempt.expired` — это поведение уже существовало.
+- **Resume отдаёт только `InProgress`.** Завершённая попытка — история, она читается через `/result`; предлагать её к возобновлению нельзя.
+- **Ownership строго по студенту.** Admin/author смотрят ту же попытку через reviewer API, который намеренно содержит корректность.
+
+**Что не вошло:** перемешивание вопросов/вариантов, пагинация вопросов внутри попытки, autosave batching (`ATT-014`) и pause/resume clock (`ATT-013`) — отдельные пункты плана со своими решениями.
+
 Изменение public API/domain/schema/security/runtime semantics обязано обновлять соответствующий документ в том же change set.

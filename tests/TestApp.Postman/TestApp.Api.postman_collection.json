@@ -2408,6 +2408,80 @@
           }
         },
         {
+          "name": "Read attempt presentation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const view = pm.response.json();",
+                  "pm.test(\"Presentation carries the revision questions\", () => {",
+                  "  pm.expect(view.questions).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(view.questions[0].options).to.be.an(\"array\").that.is.not.empty;",
+                  "});",
+                  "pm.test(\"Presentation carries countdown timing\", () => {",
+                  "  pm.expect(view.serverTime).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(view).to.have.property(\"deadlineAt\");",
+                  "});",
+                  "pm.test(\"Presentation never leaks the answer key\", () => {",
+                  "  const raw = JSON.stringify(view);",
+                  "  pm.expect(raw).not.to.include(\"isCorrect\");",
+                  "  view.questions.forEach((question) => question.options.forEach((option) => {",
+                  "    Object.values(option).forEach((value) => pm.expect(value).not.to.be.a(\"boolean\"));",
+                  "  }));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/attempts/{{attemptId}}/presentation"
+          }
+        },
+        {
+          "name": "Resume active attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const view = pm.response.json();",
+                  "pm.test(\"Resume returns the in-progress attempt just started\", () => {",
+                  "  pm.expect(view.attemptId).to.eql(pm.collectionVariables.get(\"attemptId\"));",
+                  "  pm.expect(view.status).to.eql(1);",
+                  "});",
+                  "pm.test(\"Resume payload never leaks the answer key\", () => {",
+                  "  pm.expect(JSON.stringify(view)).not.to.include(\"isCorrect\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{studentToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/assignments/{{assignmentId}}/attempts/active"
+          }
+        },
+        {
           "name": "Answer question",
           "event": [
             {

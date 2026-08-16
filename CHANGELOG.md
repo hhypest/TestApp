@@ -8,7 +8,7 @@
 
 ## [Unreleased] — на пути к `1.0.0` (Phase E)
 
-Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта, `0.9.5` закрыл coverage/review pass. Открытые пункты 1.0 release gate (`docs/ROADMAP.md` Phase E) вне этой ветки кода:
+Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта, `0.9.5` закрыл coverage/review pass, `0.9.6` — student presentation/resume (Phase F0 досрочно). Открытые пункты 1.0 release gate (`docs/ROADMAP.md` Phase E) вне этой ветки кода:
 
 - staging restore drill с измеренным RTO;
 - маршрутизация алертов в actionable destination (Alertmanager + pager/chat) и alert drill против staging;
@@ -21,6 +21,22 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 
 - `CHANGELOG.md` (этот файл) — `DEV-005`.
 - Prometheus + Grafana в `compose.yaml` как local/CI observability backend позади OTel Collector: provisioned dashboard (`TestApp Overview`) и alert rule expressions, реализующие весь технически выразимый контракт `docs/SLO_ALERTS.md` §4/§6 — `OBS-012`, `OBS-013`, ADR-027. Новый CI workflow `observability` и `scripts/validate-observability-stack.sh` держат стек в проверенном состоянии.
+
+## [0.9.6] — Student-safe attempt presentation и resume
+
+### Added
+
+- `GET /api/v1/attempts/{id}/presentation` — всё, что нужно студенту для прохождения попытки: вопросы и варианты из **immutable revision**, к которой привязана попытка, собственные сохранённые ответы, `status`/`deadlineAt`/`completedAt`, `passingPercentage`/`timeLimitMinutes` и `serverTime` для обратного отсчёта без зависимости от часов клиента (`ATT-010`, `UX-001`).
+- `GET /api/v1/assignments/{id}/attempts/active` — попытка студента в статусе `InProgress` для этого assignment или `404`. Клиент, потерявший `attemptId`, возобновляет работу вместо старта новой попытки, которая израсходовала бы attempt limit (`ATT-011`).
+
+Оба endpoint'а — новые ресурсы; форма существующего `GET /api/v1/attempts/{id}` не менялась, чтобы не ломать v1 contract перед его заморозкой.
+
+### Security
+
+- Presentation DTO не содержит признака правильности ни на одном уровне. Это **свойство проекции, а не хранилища**: revision хранит `IsCorrect` в том же `jsonb`-столбце, который читается для presentation, поэтому граница закреплена тестом на сериализованных байтах HTTP-ответа (текстовая и структурная проверка), а не только assert'ами по полям DTO. Тест верифицирован красным — временное добавление `IsCorrect` в student DTO его роняет. См. ADR-028.
+- Presentation и resume доступны только владельцу попытки; чужая попытка отвечает `404`, а не `403`, чтобы не подтверждать её существование.
+
+Документация: `docs/API.md` §14, `docs/USER_GUIDE.md` §4.3/§4.3.1 (раздел «ограничение реализации» заменён рабочей инструкцией), ADR-028.
 
 ## [0.9.5] — Test coverage and review pass before 1.0 RC
 

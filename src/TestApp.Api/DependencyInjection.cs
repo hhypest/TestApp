@@ -42,6 +42,8 @@ internal static class DependencyInjection
         services.AddScoped<GetMyAttemptsQueryHandler>();
         services.AddScoped<GetAttemptQueryHandler>();
         services.AddScoped<GetAttemptResultQueryHandler>();
+        services.AddScoped<GetAttemptPresentationQueryHandler>();
+        services.AddScoped<GetActiveAttemptPresentationQueryHandler>();
         services.AddScoped<GetReviewerResultsQueryHandler>();
         services.AddScoped<GetReviewerAttemptResultQueryHandler>();
 

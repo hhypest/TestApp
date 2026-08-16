@@ -40,7 +40,7 @@ Baseline `2026-08-16`, `dotnet test --collect:"XPlat Code Coverage"` (line cover
 | TestApp.Api | 86.7% |
 | **Всего** | **90.3%** |
 
-Всего 267 тестов: 26 Core, 106 Domain, 45 Application, 90 Integration.
+Всего 282 теста: 26 Core, 106 Domain, 45 Application, 105 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); presentation/resume добавил 15 интеграционных тестов сверх этого замера.
 
 Покрытие воспроизводится локально: `coverlet.collector` подключён во всех четырёх test projects.
 
@@ -171,7 +171,8 @@ admin operations
 - `RequestValidationContractTests.cs` — malformed binding/DataAnnotations/enum normalization, plus assignment window/attempt-limit domain validation without CLR exception-message leakage into `ProblemDetails.detail` (STAB-008);
 - `OpenApiContractTests.cs` — serialized enriched document;
 - `EdgeSecurityTests.cs` — forwarded headers, CORS, transport headers, rate limits и OpenAPI exposure;
-- `TestOwnershipTests.cs` — cross-author write/read/reviewer isolation.
+- `TestOwnershipTests.cs` — cross-author write/read/reviewer isolation;
+- `AttemptPresentationTests.cs` — student-safe presentation/resume (ATT-010/011, UX-001): содержимое из immutable revision, слияние с собственными ответами, ownership, а также **answer-key leakage regression на сериализованном HTTP-ответе** — единственная проверка, которая реально держит границу, поскольку корректность лежит в том же `jsonb`, что и presentation (ADR-028). Верифицирована красным.
 
 ### Operational suites
 

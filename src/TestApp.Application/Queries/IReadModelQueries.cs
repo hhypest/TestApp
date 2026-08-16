@@ -51,4 +51,28 @@ public interface IReadModelQueries
         TestAttemptId attemptId,
         ExternalUserId userId,
         CancellationToken ct);
+
+    /// <summary>
+    /// Student-safe presentation of one attempt the caller owns, or <c>null</c> when the
+    /// attempt does not exist or belongs to someone else.
+    /// </summary>
+    /// <param name="serverTime">
+    /// Authoritative clock reading stamped onto the response; supplied by the Application
+    /// layer so the read model stays a pure projection.
+    /// </param>
+    Task<AttemptPresentationView?> GetAttemptPresentationAsync(
+        TestAttemptId attemptId,
+        ExternalUserId userId,
+        DateTimeOffset serverTime,
+        CancellationToken ct);
+
+    /// <summary>
+    /// The caller's in-progress attempt for the given assignment, or <c>null</c> when
+    /// there is none to resume.
+    /// </summary>
+    Task<AttemptPresentationView?> GetActiveAttemptPresentationAsync(
+        TestAssignmentId assignmentId,
+        ExternalUserId userId,
+        DateTimeOffset serverTime,
+        CancellationToken ct);
 }

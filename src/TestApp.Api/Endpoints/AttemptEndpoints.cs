@@ -68,6 +68,17 @@ internal static class AttemptEndpoints
                 ? Results.Ok(value)
                 : Results.NotFound());
 
+        // Student-safe question/option presentation for taking or resuming this attempt
+        // (ATT-010/UX-001). Deliberately a separate resource rather than a widened
+        // GET /attempts/{id}, so the existing v1 response shape stays unchanged.
+        attempts.MapGet("/{id}/presentation", async (
+            Guid id,
+            GetAttemptPresentationQueryHandler handler,
+            CancellationToken ct) =>
+            await handler.Handle(new GetAttemptPresentationQuery(new TestAttemptId(id)), ct) is { } value
+                ? Results.Ok(value)
+                : Results.NotFound());
+
         attempts.MapGet("/{id}/result", async (Guid id, GetAttemptResultQueryHandler handler, CancellationToken ct) =>
             await handler.Handle(new GetAttemptResultQuery(new TestAttemptId(id)), ct) is { } value
                 ? Results.Ok(value)

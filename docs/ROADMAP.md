@@ -309,14 +309,15 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 
 **Priority: P1**
 
-## F0. Student-safe attempt presentation/resume
+## F0. Student-safe attempt presentation/resume — **DONE**
 
-Первая product vertical после 1.0:
+Первая product vertical после 1.0, реализована досрочно (ATT-010/ATT-011/UX-001, ADR-028):
 
-- question/option presentation из immutable attempt revision;
-- saved responses, status и deadline;
-- запрет `IsCorrect`/answer-key leakage;
-- ownership/OpenAPI/contract tests.
+- **DONE:** question/option presentation из immutable attempt revision (`GET /api/v1/attempts/{id}/presentation`);
+- **DONE:** saved responses, status, deadline и `serverTime` для клиентского обратного отсчёта;
+- **DONE:** запрет `IsCorrect`/answer-key leakage — закреплён тестом на сериализованном HTTP-ответе, верифицирован красным;
+- **DONE:** resume активной попытки (`GET /api/v1/assignments/{id}/attempts/active`);
+- **DONE:** ownership/contract tests. OpenAPI документ генерируется автоматически и покрыт существующим `OpenApiContractTests`.
 
 ## F1. Clone test / draft from revision
 

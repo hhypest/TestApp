@@ -108,6 +108,8 @@ const requiredRoutes = [
   'POST /api/v1/attempts/{{attemptId}}/submit',
   'POST /api/v1/attempts/{{timeoutAttemptId}}/timeout',
   'GET /api/v1/attempts/{{attemptId}}',
+  'GET /api/v1/attempts/{{attemptId}}/presentation',
+  'GET /api/v1/assignments/{{assignmentId}}/attempts/active',
   'GET /api/v1/attempts/{{attemptId}}/result',
 ];
 

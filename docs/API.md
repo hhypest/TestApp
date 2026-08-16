@@ -515,8 +515,31 @@ PUT    /api/v1/attempts/{attemptId}/answers/{questionId}
 DELETE /api/v1/attempts/{attemptId}/answers/{questionId}
 POST   /api/v1/attempts/{attemptId}/submit
 GET    /api/v1/attempts/{attemptId}
+GET    /api/v1/attempts/{attemptId}/presentation
 GET    /api/v1/attempts/{attemptId}/result
 ```
+
+### Student presentation и resume
+
+```http
+GET /api/v1/attempts/{attemptId}/presentation
+GET /api/v1/assignments/{assignmentId}/attempts/active
+```
+
+Оба возвращают один и тот же `AttemptPresentationView` — всё, что нужно для прохождения или возобновления попытки:
+
+- вопросы и варианты из **immutable revision**, к которой привязана попытка (редактирование working `Test` после публикации не меняет попытку в полёте);
+- сохранённые ответы самого студента (`selectedOptionIds`, `answeredAt`);
+- `status`/`startedAt`/`deadlineAt`/`completedAt`, `passingPercentage`, `timeLimitMinutes`;
+- `serverTime` — авторитетное серверное время, чтобы обратный отсчёт не зависел от часов клиента.
+
+`presentation` доступен только владельцу попытки; чужая попытка возвращает `404` (а не `403`, чтобы не подтверждать существование). Reviewer/admin читают ту же попытку через `/api/v1/results/{attemptId}`, который намеренно содержит корректность.
+
+`attempts/active` возвращает попытку в статусе `InProgress` для данного assignment или `404`, если возобновлять нечего — это сигнал клиенту стартовать новую. Завершённые попытки через resume не отдаются, они читаются через `/result`.
+
+**Answer-key boundary:** presentation DTO не содержит признака правильности ни на одном уровне. Это свойство проекции, а не хранилища — revision хранит корректность в том же `jsonb`, поэтому граница закреплена тестом на сериализованном ответе. См. ADR-028.
+
+**Окно между дедлайном и worker'ом:** GET не завершает попытку. Между истечением `deadlineAt` и проходом expiration worker возможен ответ с `status=InProgress` и `deadlineAt < serverTime`; любая запись в этом окне вернёт `409 attempt.expired`.
 
 Submit использует `Idempotency-Key`.
 

@@ -747,17 +747,17 @@ Requires rendering/sanitization policy in frontend.
 
 - **Priority:** P1 when frontend starts
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
-Current AttemptView focuses on responses, not complete student question presentation. Add student-safe revision/attempt presentation without correctness.
+`GET /api/v1/attempts/{id}/presentation` возвращает `AttemptPresentationView`: вопросы/варианты из immutable revision привязанной попытки, сохранённые ответы студента, `status`/`deadlineAt`/`serverTime`. Признака корректности нет ни на одном уровне DTO — граница закреплена тестом на сериализованном HTTP-ответе, а не только по полям (ADR-028). Существующий `GET /attempts/{id}` не менялся, чтобы не ломать v1 contract.
 
 ## ATT-011 — Resume active attempt
 
 - **Priority:** P1
 - **Effort:** M
-- **Status:** PLANNED
+- **Status:** DONE
 
-Current detail can support basis; define UI/API semantics for finding active attempt.
+`GET /api/v1/assignments/{id}/attempts/active` отдаёт попытку студента в статусе `InProgress` для этого assignment или `404`, если возобновлять нечего. Клиент, потерявший `attemptId`, возобновляет работу вместо старта новой попытки (что израсходовало бы attempt limit). Завершённые попытки через resume не отдаются — они читаются через `/result`.
 
 ## ATT-012 — Explicit attempt start metadata
 
@@ -998,9 +998,9 @@ Every read/write query must become workspace-aware and indexed.
 
 - **Priority:** P1
 - **Effort:** M/L
-- **Status:** PLANNED when frontend begins
+- **Status:** DONE — закрыт вместе с ATT-010/ATT-011
 
-Needs student-safe question/options DTO + current responses/deadline.
+Student-safe question/options DTO + текущие ответы + deadline реализованы; см. ATT-010, ATT-011 и ADR-028.
 
 ## UX-002 — Author editing API ergonomics
 
@@ -1076,7 +1076,7 @@ Automate Domain-no-EF/API and layer reference constraints.
 
 ```text
 1  1.0 release rehearsal: migration/restore/alerts/rollback/API freeze (all STAB-001..008, API-009 and PERF-001/D6 are DONE)
-2  ATT-010/011 + UX-001 student presentation/resume
+2  ATT-010/011 + UX-001 student presentation/resume (DONE)
 3  AUTHOR-001/002/003 + selected tags/catalog + versioned JSON import/export
 4  reporting hot paths REP-010/014 after SQL scalability work
 5  EVT catalog only when first real consumer appears

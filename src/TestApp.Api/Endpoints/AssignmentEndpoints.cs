@@ -134,6 +134,18 @@ internal static class AssignmentEndpoints
                 : key.Error!;
         }).RequireRateLimiting(RatePolicies.StudentWrite);
 
+        // Resume (ATT-011): the caller's still-running attempt for this assignment, so a
+        // client that lost its attempt id can pick the test back up without starting a
+        // new attempt and consuming another slot of the attempt limit. 404 when there is
+        // nothing in progress, which is the signal to start one.
+        assignments.MapGet("/{id}/attempts/active", async (
+            Guid id,
+            GetActiveAttemptPresentationQueryHandler handler,
+            CancellationToken ct) =>
+            await handler.Handle(new GetActiveAttemptPresentationQuery(new TestAssignmentId(id)), ct) is { } value
+                ? Results.Ok(value)
+                : Results.NotFound());
+
         endpoints.MapGet("/api/v1/me/assignments", async (
             int? page,
             int? pageSize,
