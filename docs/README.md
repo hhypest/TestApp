@@ -30,6 +30,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Модульная архитектура, зависимости проектов, CQRS flow, request pipeline и background workers |
 | [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | Aggregates, value objects, lifecycle, инварианты, scoring и state transitions |
 | [API.md](API.md) | Canonical `/api/v1`, legacy compatibility, endpoints, authorization, DTO, ошибки, pagination и idempotency |
+| [USER_GUIDE.md](USER_GUIDE.md) | Пошаговые сценарии по ролям (test-author/test-admin/student) поверх HTTP API |
 | [PERSISTENCE.md](PERSISTENCE.md) | PostgreSQL 18, EF mappings, schema, migrations, optimistic concurrency и advisory locks |
 | [EVENTS_AND_OUTBOX.md](EVENTS_AND_OUTBOX.md) | Domain/integration events, transactional Outbox, RabbitMQ, retry/dead-letter и delivery semantics |
 | [SECURITY.md](SECURITY.md) | Keycloak/JWT claims, роли/policies, owner isolation, rate limiting, audit и remaining security backlog |

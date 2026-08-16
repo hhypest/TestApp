@@ -26,6 +26,7 @@ Backend-система создания, публикации, назначен�
 - [Архитектура](docs/ARCHITECTURE.md)
 - [Доменная модель](docs/DOMAIN_MODEL.md)
 - [HTTP API](docs/API.md)
+- [Руководство пользователя по ролям](docs/USER_GUIDE.md)
 - [Persistence / PostgreSQL](docs/PERSISTENCE.md)
 - [Events / Outbox / RabbitMQ](docs/EVENTS_AND_OUTBOX.md)
 - [Безопасность](docs/SECURITY.md)
