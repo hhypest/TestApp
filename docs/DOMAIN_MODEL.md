@@ -15,7 +15,7 @@
 
 Основные aggregates имеют `ConcurrencyVersion`, который изменяется при бизнес-мутации и используется EF как optimistic concurrency token.
 
-## 2. Identity value objects
+## 2. Объекты-значения идентичности
 
 Внутри бизнес-модели пользователи и группы представлены внешними идентификаторами:
 
@@ -32,7 +32,7 @@ Multi-realm identity key `(Issuer, Subject)` не реализован. Сейч
 
 ### 3.1 Назначение
 
-`Test` — mutable authoring definition.
+`Test` — изменяемое рабочее определение теста.
 
 Содержит:
 
@@ -41,9 +41,9 @@ Multi-realm identity key `(Issuer, Subject)` не реализован. Сейч
 - `Title`;
 - `TestStatus`;
 - `TestSettings`;
-- ordered collection `Question`;
+- упорядоченная коллекция `Question`;
 - aggregate `ConcurrencyVersion`;
-- domain events.
+- доменные события.
 
 ### 3.2 Lifecycle
 
@@ -63,7 +63,7 @@ stateDiagram-v2
 
 - null/empty/whitespace запрещены;
 - значение trim-ится;
-- persistence max length: 300.
+- максимальная длина в хранилище: 300.
 
 ### 3.4 Settings
 
@@ -85,18 +85,18 @@ stateDiagram-v2
 - `test-admin` имеет явно глобальный scope;
 - legacy rows migration backfill получает owner `__legacy_admin_only__` и не становится доступным случайному author.
 
-### 3.6 Question ordering
+### 3.6 Порядок вопросов
 
 - `Order >= 0`;
 - order уникален внутри `Test`;
 - reorder запрещает collision.
 
-### 3.7 Question points
+### 3.7 Баллы за вопрос
 
 - `Points > 0`;
-- persistence precision: 18,2.
+- точность в хранилище: 18,2.
 
-### 3.8 Question types
+### 3.8 Типы вопросов
 
 Текущая enum:
 
@@ -116,11 +116,11 @@ MultipleChoice = 2
 - type;
 - points;
 - order;
-- ordered answer options.
+- упорядоченные варианты ответа.
 
-Persistence max text length: 2000.
+Максимальная длина текста в хранилище: 2000.
 
-### 4.1 Answer option invariants
+### 4.1 Инварианты варианта ответа
 
 Для каждого option:
 
@@ -129,7 +129,7 @@ Persistence max text length: 2000.
 - `Order >= 0`;
 - order уникален внутри question;
 - text уникален внутри question без учёта регистра;
-- persistence max text length: 2000.
+- максимальная длина текста в хранилище: 2000.
 
 ### 4.2 SingleChoice
 
@@ -153,7 +153,7 @@ Persistence max text length: 2000.
 
 Запрещено публиковать:
 
-- archived test;
+- архивный тест;
 - test без вопросов;
 - question с менее чем 2 options;
 - SingleChoice без ровно одного correct;
@@ -171,15 +171,15 @@ Application дополнительно запрещает publish, если work
 
 - `PublishedTestRevisionId`;
 - parent `TestId`;
-- monotonically increasing `Version` (>0);
-- title snapshot;
-- passing percentage snapshot;
-- time limit snapshot;
+- монотонно возрастающая `Version` (>0);
+- снимок названия;
+- снимок порога прохождения;
+- снимок ограничения по времени;
 - `PublishedAt`;
-- ordered published questions/options;
-- correctness snapshot.
+- упорядоченные опубликованные вопросы и варианты;
+- снимок правильности.
 
-Unique persistence constraint:
+Уникальное ограничение в хранилище:
 
 ```text
 (TestId, Version)
@@ -199,7 +199,7 @@ DeadlineAt = StartedAt + TimeLimitMinutes
 
 если `TimeLimitMinutes != null`; иначе deadline отсутствует.
 
-### 6.4 Answer validation
+### 6.4 Валидация ответа
 
 Revision проверяет:
 
@@ -232,7 +232,7 @@ Percentage:
 Maximum <= 0 ? 0 : round(Earned / Maximum * 100, 2)
 ```
 
-Pass rule:
+Правило прохождения:
 
 ```text
 score.Percentage >= PassingPercentage
@@ -256,8 +256,8 @@ Assignment связывает immutable revision с target-аудиторией.
 - optional `AvailableUntil`;
 - optional `AttemptLimit`;
 - `AssignmentStatus`;
-- cancellation audit fields;
-- concurrency version.
+- поля аудита отмены;
+- версия параллельного доступа.
 
 ### 7.2 Target
 
@@ -287,7 +287,7 @@ Assignment доступен, если одновременно:
 
 `AvailableUntil` при наличии должен быть позже `AvailableFrom`.
 
-### 7.4 Attempt limit
+### 7.4 Лимит попыток
 
 - `null` = лимита нет;
 - если задан, значение > 0.
@@ -309,7 +309,7 @@ stateDiagram-v2
 
 - `CancelledBy`;
 - `CancelledAt`;
-- optional normalized reason.
+- необязательная нормализованная причина.
 
 ## 8. Aggregate `TestAttempt`
 
@@ -325,10 +325,10 @@ Attempt фиксирует прохождение конкретной revision 
 - `UserId`;
 - `StartRequestId`;
 - state;
-- start/deadline/completion timestamps;
+- отметки времени старта, дедлайна и завершения;
 - responses;
-- optional score/outcome;
-- concurrency version.
+- необязательные балл и итог;
+- версия параллельного доступа.
 
 ### 8.2 Lifecycle
 
@@ -359,7 +359,7 @@ Start требует:
 
 При старте создаётся response slot для каждого revision question ID.
 
-### 8.4 Response model
+### 8.4 Модель ответа
 
 `QuestionResponse`:
 
@@ -367,13 +367,13 @@ Start требует:
 - `AnsweredAt`;
 - collection `SelectedAnswerOption`.
 
-Answer replacement semantics:
+Семантика замены ответа:
 
 - старый selected set очищается;
 - записывается новый distinct set;
 - `AnsweredAt` обновляется.
 
-Clear answer:
+Очистка ответа:
 
 - selected options очищаются;
 - `AnsweredAt = null`.
@@ -390,7 +390,7 @@ attempt.UserId == currentActor.UserId
 
 Admin manual timeout защищён `tests:assign` endpoint policy и не требует student ownership.
 
-### 8.6 Deadline enforcement
+### 8.6 Обеспечение дедлайна
 
 Есть два уровня:
 
@@ -403,7 +403,7 @@ Background race с одновременным submit разрешается opti
 
 При completion сохраняются:
 
-- final status;
+- финальный статус;
 - `CompletedAt`;
 - `AttemptScore`;
 - `AttemptOutcome`.
@@ -417,7 +417,7 @@ Failed
 
 Timeout тоже вычисляет реальный score по сохранённым responses; он не означает автоматически 0 points.
 
-## 9. Domain events
+## 9. Доменные события
 
 Текущие domain events включают:
 
@@ -450,9 +450,9 @@ Test.OwnerId = Keycloak sub создавшего автора
 
 Она обеспечивает resource isolation между авторами без локального User aggregate. В текущем домене намеренно отсутствуют:
 
-- Workspace/Tenant/Team aggregate;
-- membership/ACL model;
-- `(Issuer, Subject)` identity key.
+- агрегат Workspace/Tenant/Team;
+- модель членства и ACL;
+- ключ идентичности `(Issuer, Subject)`.
 
 Эти concepts вводятся только при реальном multi-organization/multi-realm requirement, поскольку затрагивают aggregate keys, authorization queries, idempotency, audit, events и migrations.
 
@@ -460,19 +460,19 @@ Test.OwnerId = Keycloak sub создавшего автора
 
 На текущем head отсутствуют:
 
-- free-text/manual grading;
-- numeric answer;
-- matching/ordering questions;
-- question bank;
-- random question pools;
-- per-question time limit;
-- negative/partial scoring;
-- attempt pause/resume;
-- scheduled publication;
-- assignment prerequisite rules;
-- test prerequisites/curriculum graph;
+- свободный текст и ручная проверка;
+- числовой ответ;
+- вопросы на сопоставление и упорядочивание;
+- банк вопросов;
+- случайные пулы вопросов;
+- ограничение времени на отдельный вопрос;
+- отрицательное и частичное оценивание;
+- пауза и возобновление попытки;
+- отложенная публикация;
+- правила предварительных условий назначения;
+- предварительные условия тестов и граф учебной программы;
 - certificates;
-- tenant/team ownership.
+- владение на уровне арендатора или команды.
 
 Эти concepts перечислены в `FEATURE_PLAN.md` как planned/decision-required и не являются частью текущего domain contract.
 

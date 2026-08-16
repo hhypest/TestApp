@@ -2,7 +2,7 @@
 
 > Статус: authentication/authorization, owner isolation и repository-level production hardening **Implemented**. Ниже отдельно отмечены remaining stabilization и deployment-owned controls.
 
-## 1. Security model overview
+## 1. Обзор модели безопасности
 
 TestApp использует два уровня контроля:
 
@@ -11,17 +11,17 @@ TestApp использует два уровня контроля:
 
 Эти уровни нельзя смешивать: наличие роли не заменяет domain/business eligibility.
 
-## 2. Identity Provider
+## 2. Провайдер идентификации
 
 Keycloak является внешним source of truth для:
 
 - users;
 - groups;
-- coarse system roles.
+- крупнозернистые системные роли.
 
 TestApp не хранит локальный password hash, login/email credential state и не выдаёт access tokens.
 
-## 3. JWT configuration
+## 3. Конфигурация JWT
 
 Текущий JWT Bearer setup:
 
@@ -49,7 +49,7 @@ groups  external group identifiers
 
 Subject fallback на `ClaimTypes.NameIdentifier` существует для совместимости, но canonical claim — `sub`.
 
-## 4. External identity types
+## 4. Типы внешней идентичности
 
 Application/Domain используют:
 
@@ -60,11 +60,11 @@ JWT/ClaimsPrincipal преобразуется в эти типы в Infrastruct
 
 ## 5. Roles и policies
 
-| Role | Intended scope |
+| Роль | Предусмотренная область |
 |---|---|
-| `test-author` | authoring + publication + reviewer results |
-| `test-admin` | authoring + publication + assignment administration + reviewer + operations |
-| authenticated user without role | own assignment/attempt flow |
+| `test-author` | авторинг + публикация + результаты рецензирования |
+| `test-admin` | авторинг + публикация + администрирование назначений + рецензирование + эксплуатация |
+| аутентифицированный пользователь без роли | собственные назначения и попытки |
 
 Policies:
 
@@ -76,18 +76,18 @@ Policies:
 | `results:review` | `test-author`, `test-admin` |
 | `operations:read` | `test-admin` |
 
-## 6. Business authorization
+## 6. Бизнес-авторизация
 
-### Start attempt
+### Старт попытки
 
 Роль не требуется, но Application проверяет:
 
 - direct user target либо membership в assignment group;
-- assignment availability;
+- доступность назначения;
 - cancellation;
-- attempt limit.
+- лимит попыток.
 
-### Student attempt operations
+### Операции студента над попыткой
 
 Answer/clear/submit/detail/result разрешены только когда:
 
@@ -95,11 +95,11 @@ Answer/clear/submit/detail/result разрешены только когда:
 attempt.UserId == currentActor.UserId
 ```
 
-### Admin timeout
+### Принудительный таймаут администратором
 
 Manual timeout защищён `tests:assign` и не использует student ownership.
 
-## 7. Resource ownership isolation
+## 7. Изоляция по владельцу ресурса
 
 Текущая single-organization модель:
 
@@ -112,19 +112,19 @@ Test.OwnerId = Keycloak sub создавшего автора
 - immutable mandatory owner при создании Test;
 - owner filtering catalog/editor/revisions/reviewer list/detail в SQL;
 - owner checks для rename/settings/questions/options/publish/archive;
-- `test-admin` global scope;
-- legacy backfill `__legacy_admin_only__`;
+- глобальная область видимости для `test-admin`;
+- заполнение легаси-записей значением `__legacy_admin_only__`;
 - cross-author negative E2E, включая correctness detail.
 
 Workspace/Tenant/Team и ACL не реализованы сознательно. Они становятся P0 только при multi-organization deployment; текущий `OwnerId` не следует ошибочно называть tenant boundary.
 
-## 8. Multi-realm gap
+## 8. Пробел мультиреалмовости
 
 Текущий `ExternalUserId` основан на `sub`.
 
 При нескольких Keycloak realms/OIDC issuers одинаковый `sub` теоретически может появиться у разных issuers.
 
-Planned identity key:
+Планируемый ключ идентичности:
 
 ```text
 ExternalIdentity(Issuer, Subject)
@@ -138,11 +138,11 @@ ExternalIdentity(Issuer, Subject)
 - attempts;
 - idempotency;
 - audit;
-- author ownership;
+- владение автора;
 - indexes/migrations;
-- integration events.
+- интеграционные события.
 
-## 9. Correct-answer data boundary
+## 9. Граница данных о правильных ответах
 
 Correctness считается sensitive assessment data.
 
@@ -158,14 +158,14 @@ Student endpoints не должны раскрывать:
 
 - `IsCorrect`;
 - correct option IDs как отдельный answer key;
-- published revision raw JSON;
-- reviewer DTO.
+- сырой JSON опубликованной revision;
+- DTO рецензента.
 
 Regression tests должны проверять этот boundary при изменении read models.
 
-## 10. Rate limiting
+## 10. Ограничение частоты запросов
 
-**Implemented:** configuration-driven fixed-window policies:
+**Реализовано:** политики фиксированного окна, задаваемые конфигурацией:
 
 ```text
 RateLimiting:General:...
@@ -186,7 +186,7 @@ X-Correlation-ID
 
 Принимается только непустое значение <= 128 chars, иначе генерируется.
 
-State-changing methods:
+Методы, изменяющие состояние:
 
 ```text
 POST PUT PATCH DELETE
@@ -198,12 +198,12 @@ Audit содержит metadata, но **не request/response body**.
 
 Это снижает риск сохранения:
 
-- access tokens;
-- correct answers payload;
+- access-токены;
+- содержимое правильных ответов;
 - PII из будущих форм;
 - secrets.
 
-### Audit guarantees and limitations
+### Гарантии и ограничения аудита
 
 Audit entry создаётся best-effort после request execution. Ошибка audit persistence логируется, но не меняет business response. Это правильная availability trade-off для текущего уровня, но compliance-сценарий может потребовать другую гарантию.
 
@@ -226,11 +226,11 @@ Domain/application validation messages являются частью business co
 
 ## 13. Secrets/configuration
 
-### Current development defaults
+### Текущие значения по умолчанию для разработки
 
 Compose использует простые credentials `testapp/testapp` и dev Keycloak credentials. Они предназначены **только для local development**.
 
-### Production behavior
+### Поведение в production
 
 - вне Development database connection string обязателен; dev fallback там не применяется;
 - Keycloak authority/audience обязательны для HTTP runtime;
@@ -240,54 +240,54 @@ Compose использует простые credentials `testapp/testapp` и dev
 
 `--migrate` изолирован до database-only configuration: composition root загружает только `RuntimeConfiguration.LoadDatabase`, Keycloak/RabbitMQ/CORS/rate-limit/proxy options не загружаются.
 
-## 14. TLS / reverse proxy
+## 14. TLS и обратный прокси
 
-### Implemented repository contract
+### Реализованный контракт репозитория
 
 - JWT metadata HTTPS required вне Development;
 - opt-in `UseForwardedHeaders` с explicit `KnownProxies/KnownNetworks` и `ForwardLimit`;
-- configurable HTTPS redirect/HSTS;
+- настраиваемые перенаправление на HTTPS и HSTS;
 - explicit CORS allow-list без wildcard origin;
-- proxy-aware rate-limit partition;
-- disabled Kestrel server banner;
+- партиционирование rate limit с учётом прокси;
+- отключённый баннер сервера Kestrel;
 - `nosniff`, `DENY`, `no-referrer`, Permissions-Policy и restrictive CSP baseline.
 
 Конкретная TLS termination, external base URL, certificate rotation и ingress/network policy остаются deployment-owned.
 
-## 15. OpenAPI exposure
+## 15. Публикация OpenAPI
 
-Runtime policy configuration-driven:
+Политика времени выполнения задаётся конфигурацией:
 
 - Development: enabled/anonymous по умолчанию;
 - Production: disabled по умолчанию;
 - если включён с `AllowAnonymous=false`, endpoint требует `operations:read`;
 - anonymous production exposure возможен только как явная configuration decision.
 
-## 16. RabbitMQ security
+## 16. Безопасность RabbitMQ
 
 При enabled transport connection string может содержать credentials и должен поступать из secret source.
 
-Production recommendation:
+Рекомендация для production:
 
 - отдельный RabbitMQ user/vhost;
 - minimum permissions только на нужный exchange;
 - `amqps://` при выходе за trusted private network;
-- rotation plan;
+- план ротации;
 - не использовать `guest`/default administrator;
 - broker management UI отдельно от application traffic.
 
-## 17. Database security
+## 17. Безопасность базы данных
 
 Production:
 
 - API DB role без `SUPERUSER`, database ownership и DDL privileges;
 - migration job может иметь отдельный более привилегированный user;
 - TLS для remote PostgreSQL;
-- backup encryption;
-- credential rotation;
-- network allow-list/private subnet.
+- шифрование резервных копий;
+- ротация учётных данных;
+- сетевой allow-list или приватная подсеть.
 
-## 18. Security/stability backlog before 1.0
+## 18. Backlog безопасности и стабильности до 1.0
 
 Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы.
 
@@ -296,7 +296,7 @@ Actor-scoped `StartAttempt` replay также реализован: lookup вк�
 P0/P1 до 1.0:
 
 1. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
-2. pin GitHub Actions/container dependencies immutable SHA/digest;
+2. зафиксировать зависимости GitHub Actions и контейнеров по неизменяемому SHA/digest;
 3. выполнить staging alert/restore/rollback security rehearsal.
 
 Business-triggered/после 1.0:

@@ -2,7 +2,7 @@
 
 > Статус: инфраструктура доставки **Implemented**; каталог production integration contracts — **Planned**.
 
-## 1. Event taxonomy
+## 1. Таксономия событий
 
 В Domain определены:
 
@@ -19,7 +19,7 @@ IIntegrationEvent : IDomainEvent
 
 `DomainEvent` создаёт `EventId` через Guid v7 и реализует `IDomainEvent`.
 
-## 2. Domain events
+## 2. Доменные события
 
 Текущие aggregates поднимают внутренние события, включая:
 
@@ -38,7 +38,7 @@ IIntegrationEvent : IDomainEvent
 
 Внешним contract считается только событие, которое явно реализует `IIntegrationEvent`.
 
-## 3. Transactional Outbox capture
+## 3. Захват в транзакционный Outbox
 
 `AppDbContext.SaveChangesAsync()`:
 
@@ -61,8 +61,8 @@ IIntegrationEvent : IDomainEvent
 
 - `Id` = integration `EventId`;
 - `OccurredAt`;
-- `Type` = assembly-qualified event type;
-- `Payload` = JSON event payload;
+- `Type` = тип события с указанием сборки;
+- `Payload` = полезная нагрузка события в JSON;
 - `ProcessedAt`;
 - `AttemptCount`;
 - `LastAttemptAt`;
@@ -101,7 +101,7 @@ NoOp Publish -> success -> ProcessedAt set -> событие фактическ�
 
 ## 6. OutboxProcessor
 
-Default options:
+Значения по умолчанию:
 
 | Option | Default |
 |---|---:|
@@ -112,7 +112,7 @@ Default options:
 | MaxRetryDelay | 15 min |
 | AdvisoryLockTimeoutSeconds | 5 |
 
-### 6.1 Batch selection
+### 6.1 Выборка пакета
 
 Выбираются rows:
 
@@ -127,7 +127,7 @@ Order: oldest `OccurredAt` first.
 
 После полностью обработанного batch processor сразу выбирает следующий batch, не ожидая `PollInterval`. Это позволяет быстро дренировать накопившийся FIFO backlog. Пауза до следующего poll применяется после пустого/неполного batch либо если lock/publish failure не позволил обработать batch полностью; такое условие не создаёт tight retry loop при недоступном broker или contention.
 
-### 6.2 Multi-instance safety
+### 6.2 Безопасность при нескольких экземплярах
 
 Для каждого message используется session-level PostgreSQL advisory lock. Resource material:
 
@@ -151,7 +151,7 @@ SELECT pg_advisory_unlock(@key);
 - `AttemptCount++`;
 - `LastAttemptAt = now`;
 - `Error = exception.Message`;
-- `NextAttemptAt = exponential backoff`;
+- `NextAttemptAt` = экспоненциальная задержка;
 - после `MaxAttempts` -> `DeadLetteredAt`.
 
 Backoff:
@@ -162,17 +162,17 @@ BaseRetryDelay * 2^(attempt-1)
 
 с cap `MaxRetryDelay`.
 
-### 6.4 Worker cycle-level resilience
+### 6.4 Устойчивость воркера на уровне цикла
 
 Per-message publish exceptions переходят в retry/dead-letter state. Exception во время batch query, advisory-lock acquisition или сохранения failure state также не выводит `OutboxProcessor` из `BackgroundService` loop: каждый poll cycle обёрнут в try/catch (`RunCycleAsync`), cycle failure логируется и worker продолжает на следующий `PeriodicTimer` tick вместо fault-а хостового process.
 
-## 7. Delivery guarantee
+## 7. Гарантия доставки
 
 Semantics: **at-least-once**.
 
 Exactly-once не обещается.
 
-Crash scenario:
+Сценарий аварийного завершения:
 
 ```text
 Publish to RabbitMQ succeeds
@@ -184,21 +184,21 @@ message is published again after restart
 
 Это штатно.
 
-### Consumer requirement
+### Требование к потребителю
 
 Downstream consumer обязан быть идемпотентным по `EventId`/RabbitMQ `MessageId`.
 
-## 8. RabbitMQ publisher
+## 8. Публикатор RabbitMQ
 
 `RabbitMqOutboxPublisher`:
 
-- long-lived connection;
-- long-lived channel;
-- publisher confirmations enabled;
-- topic exchange;
-- durable exchange;
+- долгоживущее соединение;
+- долгоживущий канал;
+- включённые подтверждения публикации;
+- обменник типа topic;
+- durable-обменник;
 - `mandatory: true`;
-- persistent message;
+- устойчивое сообщение;
 - `MessageId = EventId`;
 - `Type = eventType`;
 - `ContentType = application/json`;
@@ -220,7 +220,7 @@ RoutingKeyPrefix = testapp
 ClientProvidedName = TestApp.Outbox
 ```
 
-## 9. RabbitMQ configuration
+## 9. Конфигурация RabbitMQ
 
 Transport включается только при:
 
@@ -244,7 +244,7 @@ RabbitMq:ClientProvidedName
 
 Connection string валидируется как `amqp://` или `amqps://`.
 
-## 10. RabbitMQ readiness
+## 10. Готовность RabbitMQ
 
 Если delivery включён, `/health/ready` дополнительно:
 
@@ -255,7 +255,7 @@ Connection string валидируется как `amqp://` или `amqps://`.
 
 При disabled transport RabbitMQ не является readiness dependency.
 
-## 11. Operational monitoring
+## 11. Эксплуатационный мониторинг
 
 Endpoint:
 
@@ -266,16 +266,16 @@ Policy: operations:read
 
 Operational view предназначен для:
 
-- pending count;
-- retry backlog;
-- dead-letter count;
-- oldest pending age/time;
+- количество необработанных;
+- очередь повторов;
+- количество dead-letter;
+- возраст и время самого старого необработанного;
 - последних dead-letter entries;
-- error/attempt diagnostics.
+- диагностика ошибок и попыток.
 
 Payload наружу через operational endpoint не должен раскрываться.
 
-Dead-letter management:
+Управление dead-letter:
 
 ```text
 GET  /api/v1/operations/outbox/dead-letters/{eventId}
@@ -298,7 +298,7 @@ POST /api/v1/operations/outbox/dead-letters/{eventId}/discard
 
 Это сознательно правильнее, чем публиковать internal domain objects напрямую.
 
-## 13. Planned integration event design
+## 13. Планируемый дизайн интеграционных событий
 
 Перед первым production consumer необходимо определить versioned contracts. Предлагаемый минимальный catalog:
 
@@ -317,28 +317,28 @@ POST /api/v1/operations/outbox/dead-letters/{eventId}/discard
 
 ### EVT-002 `TestAssignedV1`
 
-- assignment ID;
-- revision ID;
-- target type/id;
+- ID назначения;
+- ID ревизии;
+- тип и ID цели;
 - assignedAt.
 
 ### EVT-003 `AttemptCompletedV1`
 
 Рекомендуется один stable external contract вместо утечки внутренних `AttemptSubmitted`/`AttemptTimedOut` details:
 
-- attempt ID;
-- assignment/revision IDs;
-- user ID;
-- completion type/status;
+- ID попытки;
+- ID назначения и revision;
+- ID пользователя;
+- тип и статус завершения;
 - outcome;
-- score summary;
+- сводка по баллам;
 - completedAt.
 
-### Privacy check
+### Проверка приватности
 
 Перед публикацией внешних identity IDs должен быть определён data-classification/consumer boundary. Event payload не должен автоматически копировать весь aggregate.
 
-## 14. Versioning integration events
+## 14. Версионирование интеграционных событий
 
 После появления consumer schema нельзя silently менять.
 
@@ -359,24 +359,24 @@ Breaking changes требуют parallel publish/migration consumer либо с�
 
 - publisher фактически доставляет в real RabbitMQ;
 - `MessageId == EventId`;
-- content type/type/persistence;
+- content type, тип и устойчивость сообщения;
 - OutboxProcessor помечает `ProcessedAt` после broker delivery;
 - retry/dead-letter;
 - readiness;
-- publisher lifecycle/disposal.
+- жизненный цикл и освобождение публикатора.
 
 Для каждого production integration event дополнительно требуются:
 
-- serialization contract snapshot;
-- no-sensitive-fields assertion;
-- routing key assertion;
-- duplicate consumer/idempotency scenario;
+- снимок контракта сериализации;
+- проверка отсутствия чувствительных полей;
+- проверка routing key;
+- сценарий дублирующего потребителя и идемпотентности;
 - compatibility test при новой версии.
 
 ## 16. Чего не следует добавлять без необходимости
 
 - Kafka одновременно с RabbitMQ «на будущее»;
-- exactly-once claims;
+- заявления о exactly-once;
 - event sourcing для aggregates;
 - broker transaction вместо transactional Outbox;
 - автоматическую публикацию каждого `IDomainEvent`;
