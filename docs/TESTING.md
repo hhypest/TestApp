@@ -6,17 +6,17 @@
 
 Тесты должны защищать не количество строк кода, а архитектурные и бизнес-гарантии:
 
-- aggregate invariants;
-- immutable revision history;
-- authorization/data isolation;
+- инварианты агрегатов;
+- неизменяемая история ревизий;
+- авторизация и изоляция данных;
 - concurrency/idempotency;
-- PostgreSQL-specific behavior;
+- поведение, специфичное для PostgreSQL;
 - migrations;
-- Outbox/RabbitMQ delivery;
-- HTTP contract;
-- production container migration path.
+- доставка через Outbox/RabbitMQ;
+- HTTP-контракт;
+- путь миграции в production-контейнере.
 
-## 2. Test suites
+## 2. Наборы тестов
 
 Solution содержит четыре .NET test projects:
 
@@ -54,20 +54,20 @@ tests/TestApp.Postman
 
 Он включает Postman Collection v2.1, local environment, dependency-free validator и Newman CI. Collection использует real Keycloak fixture users и выполняет сквозной author -> admin -> student -> reviewer/operations flow по canonical `/api/v1`.
 
-### Postman/Newman coverage
+### Покрытие Postman/Newman
 
 - health и OpenAPI;
 - получение JWT для `author`, `admin`, `student`;
 - все реализованные canonical API routes;
 - ETag/If-Match и idempotency replay/fingerprint;
-- authorization/validation/precondition negative paths;
+- негативные сценарии авторизации, валидации и предусловий;
 - single/bulk assignments, attempt submit/timeout и reviewer projections;
-- audit/Outbox reads;
+- чтение аудита и Outbox;
 - dead-letter detail/requeue/discard как manual opt-in operations.
 
 Запуск и data-cleanup описаны в [`tests/TestApp.Postman/README.md`](../tests/TestApp.Postman/README.md).
 
-## 3. Core tests
+## 3. Тесты Core
 
 ```text
 ResultMonadTests.cs
@@ -75,7 +75,7 @@ ResultMonadTests.cs
 
 `Result<TSuccess, TFailure>` — это failure contract, через который выражены все domain и application правила, поэтому он проверяется отдельно: конструирование и implicit conversions, `TryGetError`, `Map`/`Bind`/`Ensure`/`Tap`, все перегрузки `Match` (sync, `Task`, `ValueTask`, cancellable), short-circuit семантика при failure и композиция в pipeline.
 
-## 4. Domain tests
+## 4. Тесты Domain
 
 ```text
 TestAggregateTests.cs             ownership, STAB-008 failure contract
@@ -93,7 +93,7 @@ PublishedRevisionScoringTests.cs  snapshot immutability, ValidateAnswer, exact-s
 
 Если новая business rule может быть проверена без Infrastructure, основной regression test должен находиться в Domain.Tests.
 
-## 5. Application tests
+## 5. Тесты Application
 
 ```text
 StartAttemptTests.cs                   idempotent start, eligibility, attempt limit
@@ -103,17 +103,17 @@ AssignmentAndAttemptCommandTests.cs    assignment administration, clear answer, 
 
 Фокус:
 
-- orchestration use case;
+- оркестрация use case;
 - ownership boundary (`test-author` vs `test-admin`) и `403 test.forbidden`;
-- optimistic concurrency precondition (`ExpectedVersion` -> `412`);
+- предусловие оптимистичного параллельного доступа (`ExpectedVersion` -> `412`);
 - target user/group validation, availability, attempt limit через abstractions;
-- domain error -> application error mapping;
+- отображение доменной ошибки в ошибку приложения;
 - actor-scoped idempotent replay после cancellation, expiry и потери group membership;
 - повторная eligibility validation для нового key и изоляция key между actors.
 
 Test doubles считают вызовы `IUnitOfWork.SaveChangesAsync`, поэтому отклонённая команда проверяется не только по возвращённой ошибке, но и по отсутствию commit.
 
-## 6. Integration tests
+## 6. Интеграционные тесты
 
 Integration tests являются критической частью проекта и работают против real PostgreSQL service в CI. RabbitMQ-specific tests работают против real RabbitMQ service.
 
@@ -125,9 +125,9 @@ Integration tests являются критической частью прое�
 
 - canonical `/api/v1`;
 - legacy `/api/*` compatibility;
-- anonymous OpenAPI;
-- correlation header;
-- audit boundary/contracts.
+- анонимный доступ к OpenAPI;
+- заголовок корреляции;
+- граница и контракты аудита.
 
 ### `AuditStatusContractTests.cs`
 
@@ -153,33 +153,33 @@ admin operations
 
 Также:
 
-- role authorization;
-- bulk assignment idempotency;
-- admin assignment queries/statistics;
-- forbidden paths.
+- авторизация по ролям;
+- идемпотентность массового назначения;
+- административные запросы назначений и статистика;
+- запрещённые пути.
 
 ### `ArchitectureAndIdentityTests.cs`
 
 Проверяет assembly dependency direction и Keycloak claim mapping.
 
-### API contract suites
+### Наборы контрактных тестов API
 
-- `ApiLifecycleContractTests.cs` — legacy enable/deprecation/sunset/retirement;
+- `ApiLifecycleContractTests.cs` — включение легаси, deprecation, sunset и вывод из эксплуатации;
 - `ConcurrencyHttpContractTests.cs` — ETag/If-Match/428/412/409;
 - `IdempotencyHttpContractTests.cs` — header/body compatibility, mismatch и fingerprint reuse;
 - `EmptyBodyIdempotencyTests.cs` — настоящий zero-length body (без `Content-Type`/payload) с header-only `Idempotency-Key` для publish/start attempt/submit (API-009);
-- `RequestValidationContractTests.cs` — malformed binding/DataAnnotations/enum normalization, plus assignment window/attempt-limit domain validation without CLR exception-message leakage into `ProblemDetails.detail` (STAB-008);
-- `OpenApiContractTests.cs` — serialized enriched document;
+- `RequestValidationContractTests.cs` — некорректный биндинг, DataAnnotations, нормализация перечислений, а также доменная валидация окна назначения и лимита попыток без утечки текста CLR-исключения в `ProblemDetails.detail` (STAB-008);
+- `OpenApiContractTests.cs` — сериализованный обогащённый документ;
 - `EdgeSecurityTests.cs` — forwarded headers, CORS, transport headers, rate limits и OpenAPI exposure;
-- `TestOwnershipTests.cs` — cross-author write/read/reviewer isolation;
+- `TestOwnershipTests.cs` — изоляция записи, чтения и рецензирования между авторами;
 - `AttemptPresentationTests.cs` — student-safe presentation/resume (ATT-010/011, UX-001): содержимое из immutable revision, слияние с собственными ответами, ownership, а также **answer-key leakage regression на сериализованном HTTP-ответе** — единственная проверка, которая реально держит границу, поскольку корректность лежит в том же `jsonb`, что и presentation (ADR-028). Верифицирована красным.
 
-### Operational suites
+### Эксплуатационные наборы
 
-- `RuntimeConfigurationTests.cs` — fail-fast typed configuration;
+- `RuntimeConfigurationTests.cs` — типизированная конфигурация с ранним отказом;
 - `OperationalRetentionTests.cs` — bounded cleanup и protected Outbox states;
 - `OutboxDeadLetterManagementTests.cs` / `OutboxDeadLetterApiTests.cs` — locked audited requeue/discard и payload-safe HTTP contract;
-- `OperationalMetricsTests.cs` — custom low-cardinality metric contract.
+- `OperationalMetricsTests.cs` — контракт собственных low-cardinality метрик.
 
 ### `PostgreSqlVersionTests.cs`
 
@@ -192,14 +192,14 @@ admin operations
 Проверяет:
 
 - migrations на пустой database;
-- assignment persistence;
-- optimistic concurrency conflict;
-- start request idempotency;
+- сохранение назначения;
+- конфликт оптимистичного параллельного доступа;
+- идемпотентность запроса старта;
 - PostgreSQL advisory idempotency lease между разными DbContexts.
 
 ### `PublishedRevisionPersistenceTests.cs`
 
-Regression test immutable revision JSON round-trip.
+Регрессионный тест round-trip JSON неизменяемой ревизии.
 
 Это защищает от EF converter/backing-field materialization regressions.
 
@@ -232,11 +232,11 @@ expired InProgress -> TimedOut
 
 Проверяет реальный broker publish contract:
 
-- exchange routing;
+- маршрутизация обменника;
 - payload;
 - `MessageId/EventId`;
 - type/content-type;
-- persistence semantics.
+- семантика устойчивости сообщений.
 
 ### `RabbitMqOutboxPipelineTests.cs`
 
@@ -254,7 +254,7 @@ outbox row
 
 Проверяет active RabbitMQ readiness connection/channel/exchange access.
 
-## 7. PostgreSQL test database strategy
+## 7. Стратегия тестовой базы PostgreSQL
 
 `PostgreSqlTestDatabase`:
 
@@ -274,22 +274,22 @@ outbox row
 
 Provider-specific behavior, которое должно проверяться на PostgreSQL:
 
-- SQL dialect;
+- диалект SQL;
 - DDL/migrations;
-- `uuid`/`timestamptz`/decimal mappings;
-- composite indexes;
-- unique constraints;
+- отображения `uuid`/`timestamptz`/decimal;
+- составные индексы;
+- уникальные ограничения;
 - PostgreSQL advisory lease не допускает превышения attempt limit при concurrent starts;
 - `pg_try_advisory_lock/pg_advisory_unlock`;
-- concurrency update semantics;
-- locale/collation behavior;
-- `jsonb` immutable snapshot round-trip.
+- семантика конкурентного обновления;
+- поведение локали и сортировки;
+- round-trip неизменяемого снимка в `jsonb`.
 
 Поэтому persistence test на SQLite не является эквивалентом production validation.
 
-## 9. RabbitMQ test strategy
+## 9. Стратегия тестирования RabbitMQ
 
-CI environment variable:
+Переменная окружения CI:
 
 ```text
 TESTAPP_RABBITMQ
@@ -300,12 +300,12 @@ RabbitMQ tests используют real broker service container.
 Для broker tests важно:
 
 - уникальные exchange/queue names на test;
-- cleanup topology;
+- очистка топологии;
 - не зависеть от management API, если AMQP достаточно;
 - не оставлять race между queue binding и publish;
 - проверять publisher lifecycle/disposal.
 
-## 10. API authentication in tests
+## 10. Аутентификация API в тестах
 
 HTTP integration tests заменяют production JWT scheme на test authentication scheme на уровне `ConfigureTestServices`.
 
@@ -322,23 +322,23 @@ Test principal формирует:
 
 Keycloak claim mapping должен иметь отдельные integration/unit tests. Полный real-Keycloak token E2E можно добавить как slower environment test, но он не должен заменять быстрый API suite.
 
-## 11. CI pipeline
+## 11. Пайплайн CI
 
-GitHub Actions `dotnet` workflow:
+Workflow `dotnet` в GitHub Actions:
 
-1. PostgreSQL 18 service container;
-2. RabbitMQ 4.3.1 management service;
+1. сервис-контейнер PostgreSQL 18;
+2. сервис RabbitMQ 4.3.1 management;
 3. checkout;
 4. setup .NET 10;
-5. `dotnet restore TestApp.slnx` + HIGH/CRITICAL NuGet audit;
-6. Release build;
-7. restore pinned `dotnet-ef` and verify `migrations has-pending-model-changes`;
-8. Release tests;
+5. `dotnet restore TestApp.slnx` + аудит NuGet на HIGH/CRITICAL;
+6. сборка в конфигурации Release;
+7. восстановление зафиксированного `dotnet-ef` и проверка `migrations has-pending-model-changes`;
+8. тесты в конфигурации Release;
 9. `docker compose config --quiet`;
-10. build production API image;
-11. run production image `--migrate` against PostgreSQL;
-12. create logical backup and verify isolated restore/business marker;
-13. cleanup containers.
+10. сборка production-образа API;
+11. запуск production-образа с `--migrate` против PostgreSQL;
+12. создание логической резервной копии и проверка изолированного восстановления и бизнес-маркера;
+13. очистка контейнеров.
 
 Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
 

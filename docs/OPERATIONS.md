@@ -34,7 +34,7 @@ graph TD
 Перед первым запуском:
 
 - Docker Engine или совместимая среда выполнения;
-- Docker Compose v2.
+- Docker Compose версии 2.
 
 Запуск:
 
