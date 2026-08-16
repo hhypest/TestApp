@@ -1,31 +1,31 @@
-# PostgreSQL backup / restore runbook
+# Резервное копирование и восстановление PostgreSQL
 
-> Scope: TestApp PostgreSQL 18. Repository scripts дают portable logical baseline; platform snapshots, WAL archiving и PITR остаются deployment responsibility.
+> Область: PostgreSQL 18 в TestApp. Скрипты репозитория дают переносимый логический baseline; снимки платформы, архивирование WAL и PITR остаются ответственностью развёртывания.
 
-## Objectives
+## Цели
 
-- RPO target: <= 24 hours;
-- RTO target: <= 4 hours;
-- backup сопровождается SHA-256;
-- drill никогда не восстанавливает поверх source database.
+- целевой RPO: <= 24 часов;
+- целевой RTO: <= 4 часов;
+- резервная копия сопровождается контрольной суммой SHA-256;
+- учебное восстановление никогда не выполняется поверх исходной базы.
 
-Два recovery layers:
+Два уровня восстановления:
 
-1. platform-native snapshots/WAL/PITR;
-2. custom-format archive из `scripts/postgresql-backup.sh`.
+1. штатные для платформы снимки/WAL/PITR;
+2. архив в custom-формате из `scripts/postgresql-backup.sh`.
 
-## Backup
+## Резервное копирование
 
-Variables:
+Переменные:
 
 ```text
-POSTGRES_PASSWORD  required
-POSTGRES_HOST      default 127.0.0.1
-POSTGRES_PORT      default 5432
-POSTGRES_DATABASE  default testapp
-POSTGRES_USER      default testapp
-POSTGRES_IMAGE     default postgres:18
-BACKUP_DIR         default backups
+POSTGRES_PASSWORD  обязательна
+POSTGRES_HOST      по умолчанию 127.0.0.1
+POSTGRES_PORT      по умолчанию 5432
+POSTGRES_DATABASE  по умолчанию testapp
+POSTGRES_USER      по умолчанию testapp
+POSTGRES_IMAGE     по умолчанию postgres:18
+BACKUP_DIR         по умолчанию backups
 ```
 
 ```bash
@@ -33,24 +33,24 @@ POSTGRES_PASSWORD=testapp \
   bash scripts/postgresql-backup.sh backups/testapp.dump
 ```
 
-Script выполняет `pg_dump --format=custom --compress=9` с serializable deferrable snapshot, исключает deployment-specific owners/ACLs, проверяет archive через `pg_restore --list`, atomically завершает файл и пишет `.sha256` sidecar.
+Скрипт выполняет `pg_dump --format=custom --compress=9` с serializable deferrable снимком, исключает специфичных для развёртывания владельцев и ACL, проверяет архив через `pg_restore --list`, атомарно завершает файл и пишет sidecar-файл `.sha256`.
 
-Production credentials и unencrypted backups не хранятся в repository.
+Production-учётные данные и незашифрованные резервные копии в репозитории не хранятся.
 
-## Restore verification
+## Проверка восстановления
 
-Variables:
+Переменные:
 
 ```text
-POSTGRES_ADMIN_PASSWORD   required
-POSTGRES_ADMIN_USER       default testapp
-POSTGRES_ADMIN_DATABASE   default postgres
-POSTGRES_SOURCE_DATABASE  default testapp
-POSTGRES_HOST             default 127.0.0.1
-POSTGRES_PORT             default 5432
-POSTGRES_IMAGE            default postgres:18
-VERIFY_QUERY              optional scalar marker query
-VERIFY_EXPECTED           expected result
+POSTGRES_ADMIN_PASSWORD   обязательна
+POSTGRES_ADMIN_USER       по умолчанию testapp
+POSTGRES_ADMIN_DATABASE   по умолчанию postgres
+POSTGRES_SOURCE_DATABASE  по умолчанию testapp
+POSTGRES_HOST             по умолчанию 127.0.0.1
+POSTGRES_PORT             по умолчанию 5432
+POSTGRES_IMAGE            по умолчанию postgres:18
+VERIFY_QUERY              необязательный скалярный запрос-маркер
+VERIFY_EXPECTED           ожидаемый результат
 ```
 
 ```bash
@@ -59,39 +59,39 @@ POSTGRES_ADMIN_PASSWORD=testapp \
     backups/testapp.dump testapp_restore_verify
 ```
 
-Script:
+Скрипт:
 
-- запрещает source/admin target;
-- проверяет checksum и archive;
-- создаёт disposable database из `template0`;
+- запрещает исходную и административную базу в качестве цели;
+- проверяет контрольную сумму и архив;
+- создаёт одноразовую базу из `template0`;
 - запускает `pg_restore --exit-on-error`;
-- сравнивает public table count;
-- сравнивает non-zero `__EFMigrationsHistory` count;
-- выполняет optional marker query;
-- удаляет target на exit.
+- сравнивает количество таблиц в схеме public;
+- сравнивает ненулевое количество записей `__EFMigrationsHistory`;
+- выполняет необязательный запрос-маркер;
+- удаляет целевую базу при завершении.
 
-Он завершает только sessions target database и не изменяет source.
+Он завершает только сессии целевой базы и не изменяет исходную.
 
-## CI drill
+## Учебное восстановление в CI
 
-`dotnet` workflow запускает production image `--migrate` против PostgreSQL 18, вставляет marker, создаёт archive, восстанавливает `testapp_restore_verify`, проверяет schema/history/marker и удаляет target.
+Workflow `dotnet` запускает production-образ в режиме `--migrate` против PostgreSQL 18, вставляет маркер, создаёт архив, восстанавливает `testapp_restore_verify`, проверяет схему, историю миграций и маркер, затем удаляет целевую базу.
 
-Это проверяет repository tooling, но не platform snapshot/PITR.
+Это проверяет инструментарий репозитория, но не снимки платформы и не PITR.
 
-## Production policy
+## Политика для production
 
-Deployment owner задаёт schedule, encrypted offsite/immutable storage, retention, WAL/PITR при более строгом RPO, separated restore credentials, alerting и measured staging drills.
+Владелец развёртывания задаёт расписание, зашифрованное внешнее/неизменяемое хранилище, сроки хранения, WAL/PITR при более строгом RPO, отдельные учётные данные для восстановления, алертинг и учебные восстановления на staging с измерением времени.
 
-Suggested minimum:
+Рекомендуемый минимум:
 
 ```text
-daily   14
-weekly   8
-monthly 12
+ежедневных   14
+еженедельных  8
+ежемесячных  12
 ```
 
-Restore accepted только после checksum/archive/schema/history/marker checks, healthy API, representative business flow, Outbox/audit verification и записи actual RTO.
+Восстановление считается принятым только после проверок контрольной суммы, архива, схемы, истории миграций и маркера, при работоспособном API, прохождении показательного бизнес-сценария, проверке Outbox/аудита и фиксации фактического RTO.
 
-## Engine-cutover warning
+## Предупреждение о смене СУБД
 
-Scripts принимают только PostgreSQL custom archives. MariaDB dump ими не восстанавливается и не конвертируется. Existing MariaDB data требует reviewed ETL/cutover из [PERSISTENCE.md](PERSISTENCE.md#engine-cutover-и-существующие-mariadb-данные). Старый backup/volume хранится как rollback point до acceptance и конца согласованного retention window.
+Скрипты принимают только архивы PostgreSQL в custom-формате. Дамп MariaDB ими не восстанавливается и не конвертируется. Существующие данные MariaDB требуют отдельно проверенного ETL/перехода — см. [PERSISTENCE.md](PERSISTENCE.md#engine-cutover-и-существующие-mariadb-данные). Старая резервная копия/том сохраняются как точка отката до приёмки и до конца согласованного срока хранения.

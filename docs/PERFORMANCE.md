@@ -1,70 +1,70 @@
-# Performance and capacity baseline
+# Базовые показатели производительности и ёмкости
 
-> Scope: `beta-ddd`. Эти значения являются CI regression gates, а не production SLA и не аппаратно-независимым обещанием throughput.
+> Область: `beta-ddd`. Эти значения являются регрессионными гейтами CI, а не production SLA и не аппаратно-независимым обещанием пропускной способности.
 
-> Verification status: **PASSED**. Полный PostgreSQL/RabbitMQ D6 gate green на implementation commit [`9916b98`](https://github.com/hhypest/TestApp/commit/9916b980bc9a8ab0dd007b568207c78ef50382e4): [performance #9](https://github.com/hhypest/TestApp/actions/runs/31779887626), [dotnet #388](https://github.com/hhypest/TestApp/actions/runs/31779887611) и [security #20](https://github.com/hhypest/TestApp/actions/runs/31779887588) завершились успешно.
+> Статус проверки: **ПРОЙДЕНО**. Полный гейт D6 на PostgreSQL/RabbitMQ зелёный на коммите реализации [`9916b98`](https://github.com/hhypest/TestApp/commit/9916b980bc9a8ab0dd007b568207c78ef50382e4): [performance #9](https://github.com/hhypest/TestApp/actions/runs/31779887626), [dotnet #388](https://github.com/hhypest/TestApp/actions/runs/31779887611) и [security #20](https://github.com/hhypest/TestApp/actions/runs/31779887588) завершились успешно.
 
 ## Цель D6
 
-Capacity baseline защищает наиболее важные пути:
+Базовые показатели ёмкости защищают наиболее важные пути:
 
-- simultaneous attempt starts;
-- answer write burst;
-- bulk assignment creation;
-- reviewer pagination;
-- overdue-attempt expiration drain;
-- Outbox backlog recovery через RabbitMQ.
+- одновременные старты попыток;
+- всплеск записи ответов;
+- массовое создание назначений;
+- постраничный обход результатов рецензентом;
+- разбор очереди просроченных попыток;
+- восстановление backlog Outbox через RabbitMQ.
 
-Workflow `.github/workflows/performance.yml` использует production Docker image и реальные PostgreSQL 18, RabbitMQ и Keycloak. HTTP-сценарии находятся в `performance/k6/api-capacity.js` и получают JWT через локальный Keycloak realm.
+Workflow `.github/workflows/performance.yml` использует production Docker-образ и реальные PostgreSQL 18, RabbitMQ и Keycloak. HTTP-сценарии находятся в `performance/k6/api-capacity.js` и получают JWT через локальный realm Keycloak.
 
-## HTTP regression gates
+## Регрессионные гейты HTTP
 
-| Scenario | Нагрузка | Gate |
+| Сценарий | Нагрузка | Гейт |
 |---|---|---|
-| simultaneous starts | 6 VU, 20 s | p95 < 2000 ms |
-| answer writes | 6 VU, 20 s | p95 < 1500 ms |
-| bulk assignments | 1 batch/s, 20 targets, 20 s | p95 < 3000 ms |
-| reviewer pagination | 4 VU, 20 s | p95 < 1200 ms |
+| одновременные старты | 6 VU, 20 с | p95 < 2000 мс |
+| запись ответов | 6 VU, 20 с | p95 < 1500 мс |
+| массовые назначения | 1 пакет/с, 20 целей, 20 с | p95 < 3000 мс |
+| постраничный обход рецензентом | 4 VU, 20 с | p95 < 1200 мс |
 
-Общие требования: checks > 99.5%, failed HTTP requests < 1%.
+Общие требования: проверок > 99,5%, неуспешных HTTP-запросов < 1%.
 
-В performance compose override rate-limit ceilings увеличены, чтобы измерять application/database path, а не configured abuse-control ceiling.
+В performance-оверрайде Compose потолки rate limit повышены, чтобы измерять путь приложения и базы данных, а не настроенный порог защиты от злоупотреблений.
 
-Последний verified baseline (`9916b98`):
+Последний проверенный baseline (`9916b98`):
 
-| Scenario | Result |
+| Сценарий | Результат |
 |---|---:|
-| checks | 8771 / 8771 |
-| failed HTTP requests | 0 / 8774 |
-| simultaneous starts p95 | 340.91 ms |
-| answer writes p95 | 30.59 ms |
-| bulk assignments p95 | 68.76 ms |
-| reviewer pagination p95 | 33.67 ms |
-| expiration drain | 1247 -> 0, 14 s |
-| Outbox drain | 100 -> 0, 1 s |
+| проверок | 8771 / 8771 |
+| неуспешных HTTP-запросов | 0 / 8774 |
+| одновременные старты, p95 | 340,91 мс |
+| запись ответов, p95 | 30,59 мс |
+| массовые назначения, p95 | 68,76 мс |
+| постраничный обход рецензентом, p95 | 33,67 мс |
+| разбор просроченных попыток | 1247 -> 0, 14 с |
+| разбор Outbox | 100 -> 0, 1 с |
 
-## Worker probes
+## Пробы воркеров
 
-### Expiration storm
+### Шторм истечения попыток
 
-После HTTP-нагрузки оставшиеся `InProgress` attempts переводятся в overdue в изолированной CI PostgreSQL. Реальный expiration worker должен уменьшить backlog до нуля не более чем за 30 секунд. В performance environment poll interval равен 1 секунде.
+После HTTP-нагрузки оставшиеся попытки в статусе `InProgress` переводятся в просроченные в изолированной CI-базе PostgreSQL. Реальный воркер истечения обязан свести backlog к нулю не более чем за 30 секунд. В performance-окружении интервал опроса равен 1 секунде.
 
-### Outbox recovery
+### Восстановление Outbox
 
-Workflow создаёт CI-scoped durable RabbitMQ queue, связанную с `testapp.events`, и после HTTP-нагрузки добавляет 100 synthetic `CapacityProbe` Outbox rows в изолированную CI database. Durable topology нужна для совместимости с RabbitMQ 4.3, где deprecated transient non-exclusive queues запрещены; queue удаляется вместе с одноразовым Compose volume. Probe не получает приоритет: если workload или будущие integration contracts оставили pending rows, сохраняется обычный FIFO order. Реальный `OutboxProcessor` с publisher confirms должен дренировать очередь и отметить все 100 probe-сообщений как processed не более чем за 30 секунд.
+Workflow создаёт durable-очередь RabbitMQ, привязанную к `testapp.events` и существующую только в рамках прогона CI, а после HTTP-нагрузки добавляет 100 синтетических записей Outbox типа `CapacityProbe` в изолированную CI-базу. Durable-топология нужна для совместимости с RabbitMQ 4.3, где устаревшие transient non-exclusive очереди запрещены; очередь удаляется вместе с одноразовым томом Compose. Проба не получает приоритета: если рабочая нагрузка или будущие интеграционные контракты оставили необработанные записи, сохраняется обычный порядок FIFO. Реальный `OutboxProcessor` с publisher confirms обязан разобрать очередь и отметить все 100 проб как обработанные не более чем за 30 секунд.
 
-Topology setup является частью gate: setup failure нельзя интерпретировать как application backlog failure.
+Настройка топологии входит в гейт: сбой настройки нельзя интерпретировать как отказ разбора backlog приложением.
 
-## Evidence
+## Свидетельства
 
-Каждый run загружает artifact `testapp-capacity-results` на 30 дней. В нём сохраняются:
+Каждый прогон загружает артефакт `testapp-capacity-results` со сроком хранения 30 дней. В нём сохраняются:
 
 - `k6-summary.json`;
 - `expiration.json`;
-- `outbox.json` с размером backlog перед probe и результатом drain.
+- `outbox.json` с размером backlog перед пробой и результатом разбора.
 
 ## Интерпретация
 
-GitHub-hosted runner — shared и шумная среда. Эти thresholds предназначены для поиска крупных регрессий. Перед 1.0 staging soak должен отдельно зафиксировать production-like topology, CPU/RAM, dataset size, concurrent students, p95/p99, DB pool behavior и sustained Outbox traffic.
+Runner, предоставляемый GitHub, — разделяемая и шумная среда. Эти пороги предназначены для поиска крупных регрессий. Перед 1.0 длительный прогон на staging должен отдельно зафиксировать топологию, близкую к production, CPU/RAM, размер набора данных, число одновременных студентов, p95/p99, поведение пула соединений БД и устойчивый трафик Outbox.
 
-При падении gate сначала сравниваются artifacts и service logs с последним зелёным PostgreSQL baseline. Если failure произошёл до создания workload, отдельно диагностируется test harness. Threshold нельзя повышать только ради зелёного CI без документированного изменения capacity expectation.
+При падении гейта сначала сравниваются артефакты и логи сервисов с последним зелёным baseline на PostgreSQL. Если сбой произошёл до создания рабочей нагрузки, отдельно диагностируется сам тестовый harness. Повышать порог только ради зелёного CI, без задокументированного изменения ожиданий по ёмкости, нельзя.

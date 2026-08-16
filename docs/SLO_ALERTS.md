@@ -1,152 +1,152 @@
-# TestApp SLO and alert baseline
+# SLO и базовые алерты TestApp
 
-> Status: initial engineering baseline for `0.9.3`. These thresholds are operational targets, not a contractual SLA. They must be recalibrated with production traffic before 1.0.
+> Статус: первичный инженерный baseline для `0.9.3`. Эти пороги — операционные цели, а не контрактный SLA. До 1.0 их необходимо перекалибровать на реальном production-трафике.
 
-## 1. Principles
+## 1. Принципы
 
-Alerts should represent user-visible risk or durable backlog, not individual log lines. Use low-cardinality labels only; never put user IDs, test IDs, attempt IDs or event IDs into metric labels.
+Алерт должен отражать риск, видимый пользователю, или устойчиво растущий backlog, а не отдельные строки лога. Используйте только low-cardinality метки; никогда не помещайте в метки идентификаторы пользователей, тестов, попыток или событий.
 
-The application exports:
+Приложение экспортирует:
 
-- ASP.NET Core/OpenTelemetry request metrics for request count, status and duration;
-- runtime/HttpClient telemetry;
-- custom `TestApp.Operations` metrics for Outbox, expiration, retention and important API exception categories;
-- `/health/live` and `/health/ready` for platform probes.
+- request-метрики ASP.NET Core/OpenTelemetry — количество запросов, статус и длительность;
+- runtime/HttpClient-телеметрию;
+- собственные метрики `TestApp.Operations` для Outbox, expiration, retention и значимых категорий API-исключений;
+- `/health/live` и `/health/ready` для платформенных проб.
 
-`OTEL_EXPORTER_OTLP_ENDPOINT` enables OTLP export. This document defines the signals and thresholds independent of any single backend, but the local/CI backend is now selected and implemented: Prometheus + Grafana behind the OTel Collector (`compose.yaml`, see ADR-027 in `docs/DECISIONS.md`). Concrete artifacts:
+`OTEL_EXPORTER_OTLP_ENDPOINT` включает OTLP-экспорт. Этот документ описывает сигналы и пороги независимо от конкретного backend, но local/CI backend уже выбран и реализован: Prometheus + Grafana позади OTel Collector (`compose.yaml`, см. ADR-027 в `docs/DECISIONS.md`). Конкретные артефакты:
 
-- `deploy/prometheus/prometheus.yml` — scrape config;
-- `deploy/prometheus/alerts.yml` — the page/warning rules from §4 below, expressed in PromQL against verified metric names;
-- `deploy/grafana/dashboards/testapp-overview.json` — the §6 dashboard minimum, provisioned automatically;
-- `scripts/validate-observability-stack.sh` (CI workflow `observability`) — keeps all of the above in a verified-working state.
+- `deploy/prometheus/prometheus.yml` — конфигурация scrape;
+- `deploy/prometheus/alerts.yml` — page/warning-правила из §4 ниже, выраженные в PromQL по проверенным именам метрик;
+- `deploy/grafana/dashboards/testapp-overview.json` — минимальный дашборд из §6, разворачивается автоматически;
+- `scripts/validate-observability-stack.sh` (CI workflow `observability`) — держит всё перечисленное в проверенно рабочем состоянии.
 
-A production deployment is not required to reuse this exact stack (a managed Prometheus/Grafana, or a different OTLP-compatible backend, can consume the same signals), but the rule/dashboard definitions below are no longer purely aspirational — they run.
+Production-развёртывание не обязано использовать именно этот стек: те же сигналы способны потреблять managed Prometheus/Grafana или другой OTLP-совместимый backend. Но описанные ниже правила и дашборд больше не являются намерением — они работают.
 
-## 2. Initial service objectives
+## 2. Первичные цели сервиса
 
-### Availability
+### Доступность
 
-Target: **99.9% successful service availability over a rolling 30-day window** for canonical `/api/v1/*` traffic.
+Цель: **99,9% успешной доступности сервиса в скользящем окне 30 дней** для канонического трафика `/api/v1/*`.
 
-Count server-side `5xx` and sustained readiness failure against availability. Client validation/authentication responses (`400/401/403/404/409/412/428`) are not availability failures. `429` should be monitored separately because it can indicate either expected abuse protection or insufficient rate-limit capacity.
+В счёт недоступности идут серверные `5xx` и устойчивый отказ readiness. Клиентские ответы валидации/аутентификации (`400/401/403/404/409/412/428`) недоступностью не считаются. `429` отслеживается отдельно, потому что он может означать как ожидаемую защиту от злоупотреблений, так и нехватку ёмкости rate limit.
 
-### Latency
+### Задержка
 
-Initial target for normal API traffic:
+Первичная цель для обычного API-трафика:
 
-- p95 server request duration < **500 ms** over 15 minutes;
-- p99 < **1.5 s** over 15 minutes.
+- p95 длительности серверного запроса < **500 мс** на интервале 15 минут;
+- p99 < **1,5 с** на интервале 15 минут.
 
-Exclude health endpoints from user-latency SLOs. Expensive administrator/report queries may receive a separate objective after production measurements exist.
+Health-эндпоинты исключаются из пользовательских SLO по задержке. Тяжёлые административные/отчётные запросы могут получить отдельную цель после появления production-измерений.
 
-### Background processing
+### Фоновая обработка
 
-- Outbox oldest pending age < **60 s** during normal broker availability.
-- No active Outbox dead letters under normal operation.
-- Oldest overdue attempt expiration lag < **60 s**.
-- Backup logical restore verification must remain green in CI; staging restore duration must satisfy the RTO target in `BACKUP_RESTORE.md`.
+- Возраст самого старого необработанного сообщения Outbox < **60 с** при нормальной доступности брокера.
+- В нормальном режиме активных dead letter в Outbox нет.
+- Отставание истечения самой старой просроченной попытки < **60 с**.
+- Проверка логического восстановления из резервной копии должна оставаться зелёной в CI; длительность восстановления на staging обязана укладываться в целевой RTO из `BACKUP_RESTORE.md`.
 
-## 3. Custom metric contract
+## 3. Контракт собственных метрик
 
 Meter: `TestApp.Operations`
 
-| Metric | Type | Labels | Meaning |
+| Метрика | Тип | Метки | Смысл |
 |---|---|---|---|
-| `testapp.api.exception` | counter | `kind` | Important API exception categories (`concurrency_conflict`, `idempotency_key_reuse`, `bad_request_binding`, `unhandled`) |
-| `testapp.outbox.publish` | counter | `outcome` | Outbox publish result (`success`, `failure`, `dead_letter`) |
-| `testapp.outbox.delivery_lag` | histogram, seconds | none | Occurrence-to-successful-delivery lag |
-| `testapp.outbox.pending` | gauge | none | Active unprocessed Outbox messages |
-| `testapp.outbox.dead_letters` | gauge | none | Active, non-discarded dead letters |
-| `testapp.outbox.oldest_pending_age` | gauge, seconds | none | Age of oldest active pending Outbox message |
-| `testapp.outbox.dead_letter_action` | counter | `action` | Explicit admin management (`requeue`, `discard`) |
-| `testapp.attempt.expiration` | counter | `outcome` | Background expiration result (`success`, `failure`) |
-| `testapp.attempt.overdue` | gauge | none | In-progress attempts already past deadline |
-| `testapp.attempt.oldest_overdue_lag` | gauge, seconds | none | Age past deadline of the oldest overdue attempt |
-| `testapp.retention.deleted` | counter | `kind` | Records deleted by retention (`audit`, `idempotency`, `processed_outbox`) |
+| `testapp.api.exception` | counter | `kind` | Значимые категории API-исключений (`concurrency_conflict`, `idempotency_key_reuse`, `bad_request_binding`, `unhandled`) |
+| `testapp.outbox.publish` | counter | `outcome` | Результат публикации Outbox (`success`, `failure`, `dead_letter`) |
+| `testapp.outbox.delivery_lag` | histogram, секунды | нет | Задержка от возникновения события до успешной доставки |
+| `testapp.outbox.pending` | gauge | нет | Активные необработанные сообщения Outbox |
+| `testapp.outbox.dead_letters` | gauge | нет | Активные, не отброшенные dead letter |
+| `testapp.outbox.oldest_pending_age` | gauge, секунды | нет | Возраст самого старого активного необработанного сообщения Outbox |
+| `testapp.outbox.dead_letter_action` | counter | `action` | Явные административные действия (`requeue`, `discard`) |
+| `testapp.attempt.expiration` | counter | `outcome` | Результат фонового истечения (`success`, `failure`) |
+| `testapp.attempt.overdue` | gauge | нет | Попытки в процессе прохождения, уже перешагнувшие дедлайн |
+| `testapp.attempt.oldest_overdue_lag` | gauge, секунды | нет | Насколько самая старая просроченная попытка вышла за дедлайн |
+| `testapp.retention.deleted` | counter | `kind` | Записи, удалённые retention (`audit`, `idempotency`, `processed_outbox`) |
 
-The backlog gauges are sampled from PostgreSQL every 30 seconds and therefore remain meaningful across multiple API replicas.
+Gauge-метрики backlog снимаются из PostgreSQL каждые 30 секунд, поэтому остаются осмысленными при нескольких репликах API.
 
-## 4. Alert policy
+## 4. Политика алертов
 
 ### Page / critical
 
-Trigger an urgent alert when any of the following is sustained:
+Срочный алерт, если что-либо из перечисленного держится устойчиво:
 
-1. `/health/ready` fails for **3 consecutive probes** on all serving replicas.
-2. API 5xx rate exceeds **2% for 5 minutes** with at least 20 requests in the window.
-3. `testapp.outbox.dead_letters > 0` for **5 minutes**.
-4. `testapp.outbox.oldest_pending_age > 300 s` for **5 minutes** while Outbox transport is enabled.
-5. `testapp.attempt.oldest_overdue_lag > 300 s` for **5 minutes**.
-6. `testapp.api.exception{kind="unhandled"}` increases repeatedly for **5 minutes** rather than a single isolated request.
+1. `/health/ready` отказывает **3 пробы подряд** на всех обслуживающих репликах.
+2. Доля 5xx превышает **2% в течение 5 минут** при не менее чем 20 запросах в окне.
+3. `testapp.outbox.dead_letters > 0` в течение **5 минут**.
+4. `testapp.outbox.oldest_pending_age > 300 с` в течение **5 минут** при включённом Outbox-транспорте.
+5. `testapp.attempt.oldest_overdue_lag > 300 с` в течение **5 минут**.
+6. `testapp.api.exception{kind="unhandled"}` растёт повторяющимся образом в течение **5 минут**, а не одним изолированным запросом.
 
 ### Warning / ticket
 
-Trigger a non-paging warning when:
+Непейджерное предупреждение, если:
 
-1. p95 request duration > **500 ms for 15 minutes**.
-2. p99 request duration > **1.5 s for 15 minutes**.
-3. `testapp.outbox.oldest_pending_age > 60 s` for **10 minutes**.
-4. `testapp.outbox.pending > 1000` for **10 minutes**.
-5. `testapp.attempt.oldest_overdue_lag > 60 s` for **10 minutes**.
-6. `testapp.attempt.expiration{outcome="failure"}` increases during two consecutive worker cycles.
-7. concurrency conflicts increase materially above the normal baseline; this is initially a diagnostic signal, not a page, because valid competing writes can legitimately cause them.
+1. p95 длительности запроса > **500 мс в течение 15 минут**;
+2. p99 длительности запроса > **1,5 с в течение 15 минут**;
+3. `testapp.outbox.oldest_pending_age > 60 с` в течение **10 минут**;
+4. `testapp.outbox.pending > 1000` в течение **10 минут**;
+5. `testapp.attempt.oldest_overdue_lag > 60 с` в течение **10 минут**;
+6. `testapp.attempt.expiration{outcome="failure"}` растёт два цикла воркера подряд;
+7. конфликты параллельного доступа заметно превышают обычный базовый уровень — изначально это диагностический сигнал, а не повод для пейджера, потому что их могут вызывать корректные конкурирующие записи.
 
-## 5. Alert triage
+## 5. Разбор алертов
 
-### Readiness failure
+### Отказ readiness
 
-Check in order:
+Проверять по порядку:
 
-1. PostgreSQL reachability and connection saturation;
-2. RabbitMQ readiness when transport is enabled;
-3. deployment/configuration errors;
-4. dependency/network incident;
-5. recent migration/deployment changes.
+1. доступность PostgreSQL и насыщение пула соединений;
+2. готовность RabbitMQ при включённом транспорте;
+3. ошибки развёртывания/конфигурации;
+4. инцидент зависимости/сети;
+5. недавние изменения миграций/деплоя.
 
-Do not restart repeatedly without identifying a dependency failure; readiness intentionally removes an unhealthy instance from service.
+Не перезапускать раз за разом, не определив отказавшую зависимость: readiness намеренно выводит нездоровый экземпляр из-под трафика.
 
-### Outbox backlog/dead letter
+### Backlog/dead letter в Outbox
 
-1. inspect `/api/v1/operations/outbox`;
-2. inspect safe metadata with `/api/v1/operations/outbox/dead-letters/{eventId}`;
-3. fix the dependency/schema/routing cause before replay;
-4. use explicit audited `requeue` only after the cause is corrected;
-5. use `discard` only when the message is proven obsolete and record a reason;
-6. correlate using request/audit/trace IDs. Event payload is intentionally not returned by the management API.
+1. посмотреть `/api/v1/operations/outbox`;
+2. посмотреть безопасные метаданные через `/api/v1/operations/outbox/dead-letters/{eventId}`;
+3. устранить причину (зависимость/схема/маршрутизация) до повторной отправки;
+4. использовать явный аудируемый `requeue` только после устранения причины;
+5. использовать `discard` только когда сообщение доказуемо устарело, и зафиксировать причину;
+6. сопоставлять по request/audit/trace ID. Payload события management API намеренно не возвращает.
 
-### Expiration lag
+### Отставание истечения попыток
 
-1. check DB readiness and query latency;
-2. inspect worker errors and `testapp.attempt.expiration{outcome="failure"}`;
-3. compare overdue count/lag with configured expiration batch size and polling interval;
-4. if sustained under healthy dependencies, capacity-test and tune batch/poll settings rather than bypassing attempt lifecycle invariants.
+1. проверить готовность БД и задержку запросов;
+2. посмотреть ошибки воркера и `testapp.attempt.expiration{outcome="failure"}`;
+3. сопоставить количество/отставание просроченных попыток с настроенными размером пакета и интервалом опроса;
+4. если отставание устойчиво при здоровых зависимостях — провести нагрузочную проверку и настроить размер пакета/интервал, а не обходить инварианты жизненного цикла попытки.
 
-## 6. Dashboard minimum
+## 6. Минимальный состав дашборда
 
-A production dashboard should contain at least:
+Production-дашборд должен содержать как минимум:
 
-- request rate by HTTP status class;
-- p50/p95/p99 request duration;
-- readiness state;
-- unhandled/concurrency/idempotency exception rate;
-- Outbox pending count, oldest pending age and publish outcomes;
-- active dead-letter count and explicit dead-letter actions;
-- overdue attempt count and oldest overdue lag;
-- runtime CPU, GC and memory signals;
-- deployment/version annotation.
+- частоту запросов по классам HTTP-статусов;
+- p50/p95/p99 длительности запроса;
+- состояние readiness;
+- частоту исключений unhandled/concurrency/idempotency;
+- количество необработанных сообщений Outbox, возраст самого старого и результаты публикации;
+- количество активных dead letter и явные действия над ними;
+- количество просроченных попыток и отставание самой старой;
+- runtime-сигналы CPU, GC и памяти;
+- аннотацию развёртывания/версии.
 
-## 7. Pre-1.0 verification gate
+## 7. Проверочный гейт перед 1.0
 
-Done (see ADR-027):
+Сделано (см. ADR-027):
 
-- alert rule expressions implemented and CI-validated for every §4 rule expressible from existing metrics (all 6 page + 6 warning rules, `deploy/prometheus/alerts.yml`);
-- dashboard implemented and CI-validated for the §6 minimum (`deploy/grafana/dashboards/testapp-overview.json`);
-- dashboards do not expose high-cardinality identifiers or correctness/payload data (labels are limited to `kind`/`outcome`/`action`/`gc_heap_generation`/`cpu_mode`/HTTP method-route-status, matching the `TestApp.Operations` contract in §3 and standard HTTP/runtime semconv attributes — never a test/user/attempt/event ID).
+- выражения правил алертов реализованы и проверяются в CI для каждого правила §4, выразимого через существующие метрики (все 6 page + 6 warning, `deploy/prometheus/alerts.yml`);
+- дашборд реализован и проверяется в CI на соответствие минимуму §6 (`deploy/grafana/dashboards/testapp-overview.json`);
+- дашборды не раскрывают high-cardinality идентификаторы и данные о правильности/payload — метки ограничены `kind`/`outcome`/`action`/`gc_heap_generation`/`cpu_mode`/HTTP method-route-status, что соответствует контракту `TestApp.Operations` из §3 и стандартным HTTP/runtime semconv-атрибутам, и никогда не содержат ID теста/пользователя/попытки/события.
 
-Still open before 1.0:
+Остаётся до 1.0:
 
-- a readiness probe rule for `/health/ready` (page-rule 1) — needs an active HTTP prober (e.g. `blackbox_exporter`), not just the metrics pipeline;
-- route every alert to an actionable destination (Alertmanager + pager/chat receiver — nothing currently fires outside the Prometheus/Grafana UI);
-- run a staging alert drill for readiness, Outbox dead-letter/backlog and expiration lag against the routed destination;
-- measure normal production-like latency/backlog and recalibrate thresholds;
-- record evidence of the backup/restore drill and actual RTO.
+- правило readiness-пробы для `/health/ready` (page-правило 1) — требует активного HTTP-пробера (например `blackbox_exporter`), одного metrics pipeline недостаточно;
+- маршрутизация каждого алерта в actionable-назначение (Alertmanager + получатель pager/chat — сейчас ничего не срабатывает за пределами UI Prometheus/Grafana);
+- прогон alert drill на staging для readiness, dead letter/backlog Outbox и отставания истечения — против настроенного назначения;
+- измерение задержки/backlog на нагрузке, близкой к production, и перекалибровка порогов;
+- фиксация результатов drill резервного копирования/восстановления и фактического RTO.
