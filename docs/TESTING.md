@@ -40,7 +40,7 @@ Baseline `2026-08-16`, `dotnet test --collect:"XPlat Code Coverage"` (line cover
 | TestApp.Api | 86.7% |
 | **Всего** | **90.3%** |
 
-Всего 316 тестов: 26 Core, 137 Domain, 45 Application, 108 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); presentation/resume добавил 15 интеграционных тестов, `STAB-009` — 31 domain и 1 integration сверх этого замера.
+Всего 318 тестов: 26 Core, 137 Domain, 45 Application, 110 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); presentation/resume добавил 15 интеграционных тестов, `STAB-009` — 31 domain и 1 integration сверх этого замера.
 
 Покрытие воспроизводится локально: `coverlet.collector` подключён во всех четырёх test projects.
 
@@ -429,6 +429,7 @@ Workflow `dotnet` в GitHub Actions:
 - контракт value objects (`STAB-009`) — `ValueObjectInvariantTests.cs`: отказ идентификаторов от `Guid.Empty`, согласованность конструктора и фабрики внешних идентификаторов, диапазон `AttemptScore`, round-trip `PublishedQuestion` через `System.Text.Json`. Последний закрывает путь материализации `jsonb`-колонки, который до этого не проверялся ни одним unit-тестом и на котором был найден реальный дефект (см. ADR-029);
 - семантика таймаута (`ADR-030`) — пять тестов в `AttemptLifecycleTests.cs` разделяют deadline-путь и административный `ForceTimeout`;
 - отказ транспорта от нулевого GUID в route/query/body — `RequestValidationContractTests.The_empty_guid_is_answered_by_the_transport_and_never_reaches_the_domain_guard`.
+- каталог интеграционных событий — `IntegrationEventCatalogTests`: фактический набор реализаций `IIntegrationEvent` в production-сборках сверяется с каталогом `docs/EVENTS_AND_OUTBOX.md` §13 (на 1.0 обе стороны пусты, ADR-033). Подтверждён красным: временный production-тип роняет тест с указанием его полного имени. Второй тест удерживает предпосылку — ни одно доменное событие не является интеграционным.
 - заморозка контракта v1 — `OpenApiSnapshotTests`: живой `/openapi/v1.json` сверяется с `docs/openapi/v1.json`. Тест не требует PostgreSQL (эндпоинт OpenAPI не обращается к базе), поэтому контракт проверяется и там, где Docker недоступен. Подтверждён красным: добавление необязательного поля в `OrderRequest` роняет его с указанием строки расхождения.
 
 ### P1 (остаётся)

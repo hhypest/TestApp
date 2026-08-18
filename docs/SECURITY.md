@@ -306,6 +306,49 @@ Business-triggered/после 1.0:
 8. Workspace/Tenant/ACL только при multi-organization requirement;
 9. compliance-grade immutable external audit sink, если он требуется нормативно.
 
+## 18.1 Чеклист P0 перед 1.0 (гейт §7 пункты 2 и 5)
+
+Гейт требует «ноль открытых дефектов P0 по безопасности и изоляции данных». Отсутствие открытых issues доказательством не является, поэтому каждое утверждение ниже сопровождается тем, чем оно проверяется. Строка без проверки — это не «сделано», а «не измерено».
+
+| Утверждение | Чем проверяется | Статус |
+|---|---|---|
+| Вне Development connection string обязателен, dev fallback не применяется | `RuntimeConfigurationTests.Production_requires_explicit_database_connection_string`, `Development_database_default_is_explicitly_development_only` | закрыто |
+| Startup-миграции запрещены вне Development | `RuntimeConfigurationTests.Production_rejects_automatic_schema_migration` | закрыто |
+| Keycloak требует HTTPS metadata по умолчанию | `RuntimeConfigurationTests.Production_keycloak_requires_https_metadata_by_default` | закрыто |
+| CORS не принимает wildcard, список источников явный | `RuntimeConfigurationTests.Cors_requires_explicit_non_wildcard_origin_allow_list`, `EdgeSecurityTests.Cors_preflight_allows_only_configured_origin` | закрыто |
+| Reverse proxy не включается без явной границы доверия; untrusted `X-Forwarded-*` игнорируется | `RuntimeConfigurationTests.Reverse_proxy_cannot_be_enabled_without_explicit_trust_boundary`, `EdgeSecurityTests.Untrusted_forwarded_for_is_ignored` | закрыто |
+| Transport security в production объявляется явно | `RuntimeConfigurationTests.Production_transport_security_must_be_explicit` | закрыто |
+| OpenAPI в production выключен по умолчанию, при включении закрыт ролью | `RuntimeConfigurationTests.OpenApi_defaults_to_development_only_public_exposure`, `EdgeSecurityTests.Production_OpenAPI_can_be_enabled_as_admin_only` | закрыто |
+| Ключ ответов не попадает в student-контракт | `AttemptPresentationTests.The_serialized_student_payload_contains_no_correctness_information` — проверка на сериализованных байтах, подтверждена красным | закрыто |
+| Изоляция по владельцу на write, read и reviewer boundary | `TestOwnershipTests`, cross-author E2E | закрыто |
+| Текст CLR-исключения не утекает в `ProblemDetails.detail` | `RequestValidationContractTests`, `TestAggregateTests` (STAB-008, ADR-026) | закрыто |
+| Нулевой GUID не превращается в `500` | `RequestValidationContractTests.The_empty_guid_is_answered_by_the_transport_and_never_reaches_the_domain_guard` (ADR-029) | закрыто |
+| Наружу не публикуется ни одного интеграционного события | `IntegrationEventCatalogTests` (ADR-033) | закрыто |
+| Репозиторий не содержит секретов | шаг `Scan repository for secrets` в workflow `security` (Trivy) | закрыто |
+| Production-образ без уязвимостей HIGH/CRITICAL | шаг image scan в workflow `security` | закрыто |
+| `__legacy_admin_only__` не всплывает у произвольного автора ни в одном read model | **проверка на staging, issue #21 пункт 3** | открыто |
+| Отсутствие отладочных креденшелов на самом контуре | **проверка на staging, issue #16** | открыто |
+
+### Результат sweep по креденшелам (пункт 5)
+
+Проверены `compose.yaml`, конфигурационные файлы приложения, realm-файл Keycloak и переменные workflow.
+
+**Приложение не содержит конфигурационных файлов вообще:** в репозитории нет ни одного `appsettings*.json`. Вся конфигурация приходит из окружения через `RuntimeConfiguration`, поэтому отладочный креденшел физически не может уехать в образ через закоммиченный файл.
+
+**Единственные fallback-значения в коде конфигурации** — не секреты, а операционные умолчания RabbitMQ: `RabbitMq:Exchange` → `testapp.events`, `RabbitMq:RoutingKeyPrefix` → `testapp`, `RabbitMq:ClientProvidedName` → `TestApp.Outbox` (`RuntimeConfiguration.Messaging.cs`). Креденшелов среди них нет.
+
+**Отладочные креденшелы существуют только в local-dev артефактах** и в production-путь не входят:
+
+| Где | Что | Назначение |
+|---|---|---|
+| `compose.yaml` | `POSTGRES_PASSWORD: testapp`, строка подключения с `Password=testapp` | локальный стек |
+| `compose.yaml` | `KC_BOOTSTRAP_ADMIN_PASSWORD: bootstrap-admin` | локальный Keycloak |
+| `compose.yaml` | `GF_SECURITY_ADMIN_PASSWORD: admin` | локальная Grafana |
+| `deploy/keycloak/testapp-realm.json` | пользователи `admin`/`author`/`student` с тривиальными паролями; клиент `testapp-api` — public, без секрета | fixture для тестов и Postman |
+| `.github/workflows/dotnet.yml` | `POSTGRES_PASSWORD: testapp` | сервисный контейнер CI |
+
+Ни один из этих файлов не является артефактом развёртывания: production разворачивается образом из GHCR с конфигурацией из окружения. Требование отдельного realm `testapp-staging` со своими секретами закреплено в issue #16; до его выполнения пункт остаётся открытым **для контура**, но не для приложения.
+
 ## 19. Security review checklist для новой фичи
 
 Перед merge проверить:
