@@ -267,6 +267,7 @@ Per-message publish failures обрабатываются, и cycle-level failur
 - importable Postman Collection v2.1 с real Keycloak author/admin/student flow;
 - Newman API contract workflow с JUnit artifact;
 - аутентифицированный k6 + workflow ёмкости истечения попыток и Outbox.
+- триггеры пяти workflow покрывают `beta-ddd`, `master` и — для `dotnet`/`security` — теги `v*`; три path-фильтрованных workflow запускаются на релизном коммите вручную, порядок сбора run ID см. `docs/OPERATIONS.md` §16.1.
 
 ## 11. Главные оставшиеся ограничения
 

@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - beta-ddd
+      - master
+    # Тег не запускает этот workflow: paths-фильтр применяется и к push тега,
+    # а релизный коммит меняет только CHANGELOG.md. Прогон на голове тега
+    # берётся через workflow_dispatch — см. docs/OPERATIONS.md, «Сбор доказательств CI».
     paths:
       - "src/**"
       - "tests/TestApp.Postman/**"
@@ -15,6 +19,7 @@ on:
   pull_request:
     branches:
       - beta-ddd
+      - master
     paths:
       - "src/**"
       - "tests/TestApp.Postman/**"

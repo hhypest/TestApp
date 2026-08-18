@@ -1,9 +1,14 @@
 name: observability
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - beta-ddd
+      - master
+    # Тег не запускает этот workflow: paths-фильтр применяется и к push тега,
+    # а релизный коммит меняет только CHANGELOG.md. Прогон на голове тега
+    # берётся через workflow_dispatch — см. docs/OPERATIONS.md, «Сбор доказательств CI».
     paths:
       - "deploy/otel-collector-config.yaml"
       - "deploy/prometheus/**"
@@ -15,6 +20,7 @@ on:
   pull_request:
     branches:
       - beta-ddd
+      - master
     paths:
       - "deploy/otel-collector-config.yaml"
       - "deploy/prometheus/**"

@@ -1,11 +1,16 @@
 name: dotnet
 on:
+  workflow_dispatch:
   push:
     branches:
       - beta-ddd
+      - master
+    tags:
+      - "v*"
   pull_request:
     branches:
       - beta-ddd
+      - master
 jobs:
   build-test:
     runs-on: ubuntu-latest
