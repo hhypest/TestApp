@@ -15,7 +15,15 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 - активный readiness prober для `/health/ready` (например `blackbox_exporter`);
 - репетиция релиза с откатом/исправлением вперёд;
 - целевые показатели ёмкости на staging;
-- формальная фиксация API v1 contract freeze.
+- окончательная фиксация API v1 contract freeze (черновая введена: снимок + diff-тест, см. ниже);
+- каталог интеграционных событий, проверка миграции, целевые показатели ёмкости, SBOM в Release — см. issue #16–#23.
+
+### Added
+
+- **Снимок публичного контракта v1** — `docs/openapi/v1.json` как артефакт версии, защищённый `OpenApiSnapshotTests` (issue #22, гейт `docs/ROADMAP.md` §7 пункт 1). Существующий `OpenApiContractTests` проверяет свойства, которые мы решили считать обязательными; снимок ловит **любое** изменение формы документа, включая незапланированное. Тест не требует PostgreSQL — эндпоинт OpenAPI не обращается к базе (ADR-032), поэтому контракт проверяется и без Docker. Обновление снимка осознанное: `UPDATE_OPENAPI_SNAPSHOT=1 dotnet test --filter OpenApiSnapshotTests`, diff обязан попасть в тот же change set.
+- Политика совместимости v1 в `docs/API.md` §1: что ломающее и требует v2, что допустимо внутри v1, порядок изменения. Заморозка объявлена **черновой** — фронтенд роли `test-admin` ещё не прошёл happy path трёх ролей, поэтому изменения контракта пока допустимы, но видимы и осознанны. Обе legacy-возможности (rewrite `/api/*`, ADR-019, и `idempotencyKey` в теле, ADR-020) остаются в v1: у обеих управляемый lifecycle, а удаление до telemetry о клиентах сломало бы работающих потребителей.
+- `CHANGELOG.md` (этот файл) — `DEV-005`.
+- Prometheus + Grafana в `compose.yaml` как local/CI observability backend позади OTel Collector: provisioned dashboard (`TestApp Overview`) и alert rule expressions, реализующие весь технически выразимый контракт `docs/SLO_ALERTS.md` §4/§6 — `OBS-012`, `OBS-013`, ADR-027. Новый CI workflow `observability` и `scripts/validate-observability-stack.sh` держат стек в проверенном состоянии.
 
 ### Changed
 
@@ -24,11 +32,6 @@ Phase D7 (`0.9.4`, correctness/stabilization) полностью закрыта,
 ### Fixed
 
 - **Триггеры CI не покрывали релизный путь.** Все пять workflow были объявлены как `on.push.branches: [beta-ddd]`: тег не запускал ни одного прогона, а `master` не был покрыт вообще — то есть финальный `1.0.0` после merge оказался бы коммитом без CI, а RC можно было объявить готовым, не запустив ничего. `dotnet` и `security` получили триггер на теги `v*` и ветку `master`; `observability`, `performance` и `postman` — ветку `master` и ручной запуск (`observability` до этого не имел `workflow_dispatch`). Триггер на тег для трёх последних сознательно не добавлен: `paths`-фильтр применяется и к push тега, поэтому давал бы ложное ощущение покрытия. Порядок сбора run ID для релиза — `docs/OPERATIONS.md` §16.1.
-
-### Added
-
-- `CHANGELOG.md` (этот файл) — `DEV-005`.
-- Prometheus + Grafana в `compose.yaml` как local/CI observability backend позади OTel Collector: provisioned dashboard (`TestApp Overview`) и alert rule expressions, реализующие весь технически выразимый контракт `docs/SLO_ALERTS.md` §4/§6 — `OBS-012`, `OBS-013`, ADR-027. Новый CI workflow `observability` и `scripts/validate-observability-stack.sh` держат стек в проверенном состоянии.
 
 ## [0.9.7] — Self-validating value objects (`STAB-009`)
 
