@@ -22,6 +22,13 @@ public sealed class ApiContractOperationTransformer : IOpenApiOperationTransform
             operation.OperationId = contract.OperationId;
             operation.Summary = contract.Summary;
             operation.Description = contract.Description;
+
+            // Форма успешного ответа — часть контракта наравне с кодами ошибок. Эндпоинты
+            // возвращают нетипизированный IResult (Results.Ok/ApiResultMapper), поэтому вывести
+            // её из делегата нечем, и она объявляется здесь. Что ни один 200 не остался без
+            // схемы, проверяет OpenApiResponseSchemaTests.
+            var successSchema = await context.GetOrCreateSchemaAsync(contract.SuccessType, null, cancellationToken);
+            AddSuccessResponse(operation, successSchema);
         }
         else
         {
@@ -111,6 +118,19 @@ public sealed class ApiContractOperationTransformer : IOpenApiOperationTransform
         },
         Example = JsonValue.Create("018f42d7-55b7-7b66-bdb6-7f0b1ef00c01")
     };
+
+    private static void AddSuccessResponse(OpenApiOperation operation, IOpenApiSchema successSchema)
+    {
+        operation.Responses ??= new OpenApiResponses();
+        operation.Responses["200"] = new OpenApiResponse
+        {
+            Description = "OK",
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["application/json"] = new OpenApiMediaType { Schema = successSchema }
+            }
+        };
+    }
 
     private static void AddProblemResponse(
         OpenApiOperation operation,
