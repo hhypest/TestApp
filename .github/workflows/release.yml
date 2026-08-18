@@ -1,0 +1,162 @@
+name: release
+
+# Выпуск по тегу: собирает образ, публикует его в GHCR по immutable digest и создаёт
+# GitHub Release со списком доказательств (issue #17, гейт docs/ROADMAP.md §7 пункты 10 и 11).
+#
+# Этот workflow НЕ является гейтом качества: он не запускает тесты и ничего не проверяет.
+# Гейт — пять существующих пайплайнов на том же коммите; их run ID собираются отдельно и
+# прикладываются к Release. Порядок сбора — docs/OPERATIONS.md §16.1.
+#
+# Политика тегов: 1.0.0-rc.N режется из beta-ddd, финальный 1.0.0 — после merge в master.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Существующий тег для повторного выпуска (например v1.0.0-rc.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve version from tag
+        id: version
+        run: |
+          set -euo pipefail
+          raw="${{ inputs.tag || github.ref_name }}"
+          version="${raw#v}"
+          if [ "$version" = "$raw" ]; then
+            echo "Тег '$raw' не начинается с 'v'. Политика тегов — docs/OPERATIONS.md §16.2." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$raw" >> "$GITHUB_OUTPUT"
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # Версия в образе обязана совпадать с тегом, иначе /api/v1/operations/version на контуре
+      # будет уверенно называть неверную сборку — это хуже, чем не сообщать версию вовсе.
+      - name: Verify tag matches the version source
+        run: |
+          set -euo pipefail
+          prefix="$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props)"
+          tagged="${{ steps.version.outputs.version }}"
+          if [ "${tagged%%-*}" != "$prefix" ]; then
+            echo "Тег $tagged не согласуется с VersionPrefix=$prefix в Directory.Build.props." >&2
+            echo "Поднимите VersionPrefix в том же change set, что и тег." >&2
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build production image
+        run: |
+          set -euo pipefail
+          docker build \
+            --build-arg VERSION_SUFFIX="$(printf '%s' '${{ steps.version.outputs.version }}' | cut -s -d- -f2-)" \
+            --tag "$IMAGE_NAME:${{ steps.version.outputs.version }}" \
+            --tag "$IMAGE_NAME:release-candidate" \
+            .
+
+      - name: Push image and capture immutable digest
+        id: push
+        run: |
+          set -euo pipefail
+          docker push "$IMAGE_NAME:${{ steps.version.outputs.version }}"
+          digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE_NAME:${{ steps.version.outputs.version }}")"
+          echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
+          echo "reference=$digest" >> "$GITHUB_OUTPUT"
+
+      # Тот же шаг, что в workflow security, но артефакт прикладывается к Release, а не к прогону:
+      # доказательство должно жить столько же, сколько релиз.
+      - name: Generate CycloneDX image SBOM
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/artifacts:/out" \
+            aquasec/trivy:0.66.0 \
+            image \
+            --format cyclonedx \
+            --output /out/testapp-api.cdx.json \
+            "$IMAGE_NAME:${{ steps.version.outputs.version }}"
+          test -s artifacts/testapp-api.cdx.json
+
+      - name: Attach the frozen v1 contract
+        run: cp docs/openapi/v1.json artifacts/openapi-v1.json
+
+      - name: Write evidence list
+        run: |
+          set -euo pipefail
+          cat > artifacts/EVIDENCE.md <<EOF
+          # Доказательства выпуска ${{ steps.version.outputs.tag }}
+
+          | Что | Значение |
+          |---|---|
+          | Коммит | \`${{ github.sha }}\` |
+          | Образ | \`$IMAGE_NAME:${{ steps.version.outputs.version }}\` |
+          | Digest | \`${{ steps.push.outputs.digest }}\` |
+          | Развернуть по digest | \`${{ steps.push.outputs.reference }}\` |
+
+          Разворачивать следует **по digest, а не по тегу**: тег перемещаем, digest — нет.
+          Развёртывание обязано пробросить digest в переменную \`TESTAPP_IMAGE_DIGEST\`,
+          тогда \`GET /api/v1/operations/version\` отвечает, что именно запущено.
+
+          ## Приложено
+
+          - \`testapp-api.cdx.json\` — SBOM образа в формате CycloneDX;
+          - \`openapi-v1.json\` — замороженный контракт v1 на момент выпуска.
+
+          ## Заполняется вручную перед объявлением RC готовым
+
+          Гейт §7 пункт 7 требует зелёные пайплайны на этом коммите. Тег сам по себе запускает
+          только \`dotnet\` и \`security\`; \`observability\`, \`performance\` и \`postman\`
+          ограничены paths-фильтром и запускаются вручную. Порядок — docs/OPERATIONS.md §16.1.
+
+          | Пайплайн | Run ID |
+          |---|---|
+          | dotnet | _заполнить_ |
+          | security | _заполнить_ |
+          | observability | _заполнить_ |
+          | performance | _заполнить_ |
+          | postman | _заполнить_ |
+
+          Отсутствие Run ID означает «не запускался», а не «прошёл».
+          EOF
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file artifacts/EVIDENCE.md \
+            ${{ steps.version.outputs.prerelease == 'true' && '--prerelease' || '' }} \
+            artifacts/testapp-api.cdx.json \
+            artifacts/openapi-v1.json

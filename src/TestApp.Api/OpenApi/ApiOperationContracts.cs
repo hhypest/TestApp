@@ -42,6 +42,7 @@ internal static class ApiOperationContracts
             C("POST", "/api/v1/operations/outbox/dead-letters/{eventId}/requeue", "OutboxDeadLetters_Requeue", "Requeue Outbox dead letter", "Requeues an active dead letter after an explicit administrator reason and records an immutable management audit action."),
             C("POST", "/api/v1/operations/outbox/dead-letters/{eventId}/discard", "OutboxDeadLetters_Discard", "Discard Outbox dead letter", "Marks an active dead letter as terminally discarded without deleting its operational record and records an immutable management audit action."),
             C("GET", "/api/v1/operations/audit", "Operations_GetAudit", "Query audit trail", "Returns paged state-changing request audit metadata."),
+            C("GET", "/api/v1/operations/version", "Operations_GetVersion", "Get deployed build", "Returns the informational version of the running API assembly and the immutable image digest it was deployed from."),
             C("PUT", "/api/v1/attempts/{id}/answers/{questionId}", "Attempts_Answer", "Save answer", "Stores selected option identifiers for one question in an in-progress owned attempt."),
             C("DELETE", "/api/v1/attempts/{id}/answers/{questionId}", "Attempts_ClearAnswer", "Clear answer", "Removes the saved response for one question."),
             C("POST", "/api/v1/attempts/{id}/submit", "Attempts_Submit", "Submit attempt", "Completes and scores an attempt. Supports Idempotency-Key replay."),

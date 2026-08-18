@@ -1456,6 +1456,213 @@
         ]
       }
     },
+    "/api/v1/operations/version": {
+      "get": {
+        "tags": [
+          "TestApp.Api"
+        ],
+        "summary": "Get deployed build",
+        "description": "Returns the informational version of the running API assembly and the immutable image digest it was deployed from.",
+        "operationId": "Operations_GetVersion",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildInformation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or validation failure.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "title": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "status": {
+                      "pattern": "^-?(?:0|[1-9]\\d*)$",
+                      "type": [
+                        "null",
+                        "integer",
+                        "string"
+                      ],
+                      "format": "int32"
+                    },
+                    "detail": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "instance": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "title": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "status": {
+                      "pattern": "^-?(?:0|[1-9]\\d*)$",
+                      "type": [
+                        "null",
+                        "integer",
+                        "string"
+                      ],
+                      "format": "int32"
+                    },
+                    "detail": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "instance": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated principal is not allowed to perform the operation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "title": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "status": {
+                      "pattern": "^-?(?:0|[1-9]\\d*)$",
+                      "type": [
+                        "null",
+                        "integer",
+                        "string"
+                      ],
+                      "format": "int32"
+                    },
+                    "detail": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "instance": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The request was rejected by rate limiting.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "title": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "status": {
+                      "pattern": "^-?(?:0|[1-9]\\d*)$",
+                      "type": [
+                        "null",
+                        "integer",
+                        "string"
+                      ],
+                      "format": "int32"
+                    },
+                    "detail": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "instance": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/tests": {
       "get": {
         "tags": [
@@ -13431,6 +13638,24 @@
       },
       "AttemptStatus": {
         "type": "integer"
+      },
+      "BuildInformation": {
+        "required": [
+          "version",
+          "imageDigest"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "imageDigest": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "BulkAssignmentTargetRequest": {
         "required": [

@@ -29,6 +29,12 @@ internal static class OperationsEndpoints
             .RequireAuthorization(Permissions.OperationsRead)
             .RequireRateLimiting(RatePolicies.Operations);
 
+        // Что именно развёрнуто на контуре. Под operations:read, а не анонимно: точная версия
+        // облегчает подбор CVE, а операторам роль и так выдана.
+        endpoints.MapGet("/api/v1/operations/version", () => TypedResults.Ok(BuildInformation.Current))
+            .RequireAuthorization(Permissions.OperationsRead)
+            .RequireRateLimiting(RatePolicies.Operations);
+
         endpoints.MapOutboxDeadLetterEndpoints();
 
         return endpoints;

@@ -297,7 +297,7 @@ PostgreSQL implementation commit `9916b98` прошёл полный `performanc
 8. определённые и достигнутые целевые показатели ёмкости на staging;
 9. **DONE:** явно задокументированный каталог интеграционных событий — на 1.0 он пуст намеренно, состояние закреплено `IntegrationEventCatalogTests` (ADR-033, issue #21);
 10. release notes (**ГОТОВО:** `CHANGELOG.md`, DEV-005) + runbook отката/исправления вперёд (открыто — требует репетиции релиза на staging);
-11. свидетельства по зависимостям, контейнеру и SBOM приложены к процессу релиза;
+11. **DONE:** свидетельства по зависимостям, контейнеру и SBOM приложены к процессу релиза — workflow `release` публикует образ в GHCR по immutable digest и прикладывает к GitHub Release SBOM, замороженный контракт v1 и список доказательств (issue #17, `docs/OPERATIONS.md` §16.2);
 12. дашборды и алерты SLO отработаны против staging (**ГОТОВО локально/в CI:** Prometheus + Grafana добавлены в `compose.yaml`, дашборд и выражения правил алертов реализованы и проверяются в CI — OBS-012/OBS-013, ADR-027; остаётся открытым — маршрутизация алертов в actionable-назначение, readiness-пробер и сам drill на staging, см. `docs/SLO_ALERTS.md` §7);
 13. **DONE:** deterministic pagination order (`timestamp + ID`) на всех paged read models;
 14. **DONE:** reviewer/admin hot queries выполняют joins/aggregates в SQL без high-cardinality materialization;

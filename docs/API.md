@@ -641,6 +641,13 @@ Outbox/dead-letter endpoints не раскрывают event payload. Requeue/di
 
 ---
 
+```http
+GET /api/v1/operations/version
+Authorization: operations:read
+```
+
+Отвечает, что именно развёрнуто: `version` — информационная версия работающей сборки, `imageDigest` — immutable digest образа GHCR из переменной `TESTAPP_IMAGE_DIGEST` (или `null`, если развёртывание её не задало). Подробности выпуска — `docs/OPERATIONS.md` §16.2.
+
 # 17. Health
 
 ```http
