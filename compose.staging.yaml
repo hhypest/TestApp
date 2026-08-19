@@ -71,7 +71,14 @@ services:
     restart: unless-stopped
     # Не start-dev: на контуре нужен production-режим Keycloak, иначе проверяется
     # не та конфигурация, которая поедет дальше.
-    command: ["start", "--optimized", "--import-realm"]
+    #
+    # Без --optimized намеренно: этот флаг означает «образ уже аугментирован через kc.sh build»,
+    # а KC_DB, KC_HEALTH_ENABLED и KC_METRICS_ENABLED — build-time опции, заданные здесь в
+    # runtime. Со стоковым образом quay.io/keycloak/keycloak такой старт падает. Плата за
+    # корректность — несколько десятков секунд авто-сборки при каждом старте контейнера;
+    # если это станет мешать, правильный путь — свой образ с выполненным kc.sh build,
+    # а не возврат флага.
+    command: ["start", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
