@@ -517,6 +517,151 @@ GET https://<host>/api/v1/operations/version      -> версия и digest со
 
 Развёрнутый digest записать — он потребуется для отката в `#23`.
 
+## 16.0.1 Первый подъём контура
+
+Одноразовая процедура. Отличается от штатного развёртывания (§16.0) тем, что образа в GHCR ещё нет, `.env` не заполнен, а realm импортируется впервые. Дальнейшие развёртывания — §16.0 и §16.2.
+
+Выполнять по порядку: каждый шаг проверяем прежде, чем идти дальше. Отказ на пятом шаге, вызванный ошибкой на втором, диагностируется втрое дольше.
+
+### Шаг 1. Образ в GHCR
+
+Штатно `TESTAPP_IMAGE` берётся digest'ом из тела GitHub Release, но ни одного релиза ещё нет. Есть два пути; **рекомендуется первый**.
+
+**Через `release` workflow на временном теге.** Заодно это первый реальный прогон `release.yml`, который до сих пор проверялся только синтаксически — лучше узнать о его проблемах здесь, чем при выпуске RC.
+
+```bash
+git tag v1.0.0-preflight.1 <коммит>
+git push origin v1.0.0-preflight.1
+```
+
+Тег обязан начинаться с `v` и согласовываться с `VersionPrefix` из `Directory.Build.props` — workflow это проверяет и падает при расхождении. Суффикс `preflight`, а не `rc`, чтобы не занимать имя первого кандидата.
+
+Digest берётся из тела созданного Release, строка «Развернуть по digest».
+
+**Вручную**, если workflow недоступен:
+
+```bash
+docker build -t ghcr.io/hhypest/testapp:preflight .
+docker push ghcr.io/hhypest/testapp:preflight
+docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/hhypest/testapp:preflight
+```
+
+Имя образа **в нижнем регистре** — Docker не принимает заглавные в имени репозитория, хотя сам репозиторий называется `hhypest/TestApp`.
+
+### Шаг 2. Доступ к GHCR с машины контура
+
+Пакет приватного репозитория по умолчанию приватный, поэтому анонимный `docker pull` вернёт `denied`. Нужен PAT с областью `read:packages`:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-логин> --password-stdin
+docker pull ghcr.io/hhypest/testapp@sha256:<digest>    # проверка доступа до подъёма стека
+```
+
+Если `pull` не проходит — дальше идти бессмысленно: контейнеры `migrate` и `api` не стартуют.
+
+### Шаг 3. Окружение
+
+```bash
+git clone <repo> && cd TestApp
+cp .env.staging.example .env && chmod 600 .env
+```
+
+Заполнить. Пароли **генерировать**, а не придумывать: `openssl rand -base64 32`. `TESTAPP_IMAGE` и `TESTAPP_IMAGE_DIGEST` — из шага 1; первый в форме `образ@sha256:...`, второй — только `sha256:...`.
+
+`TESTAPP_INTERNAL_CIDR` на этом шаге ещё неизвестен: сети не существует, пока стек не поднят. Оставить значение из шаблона, исправить на шаге 5.
+
+DNS-запись домена из `TESTAPP_PUBLIC_HOST` должна указывать на машину **до** первого запуска: Caddy запрашивает сертификат при старте, и без резолва получит отказ, а Let's Encrypt ограничивает частоту повторов.
+
+### Шаг 4. Первый запуск
+
+```bash
+docker compose -f compose.staging.yaml --env-file .env up -d
+docker compose -f compose.staging.yaml --env-file .env ps
+```
+
+Порядок гарантирован `depends_on`: PostgreSQL → init-скрипт создаёт базу Keycloak → `migrate` отрабатывает и завершается → стартует `api`.
+
+Проверить, что миграции применились и контейнер завершился успешно, а не молча упал:
+
+```bash
+docker compose -f compose.staging.yaml --env-file .env logs migrate | tail -20
+```
+
+Ожидаемо: `migrate` в состоянии `exited (0)`. Ненулевой код — читать логи, API всё равно не поднимется.
+
+### Шаг 5. Доверенная сеть — до любых измерений
+
+Узнать фактический CIDR и вписать его в `.env`:
+
+```bash
+docker network inspect testapp-staging_default -f '{{(index .IPAM.Config 0).Subnet}}'
+```
+
+Если значение отличается от того, что в `.env`, — исправить и перезапустить API:
+
+```bash
+docker compose -f compose.staging.yaml --env-file .env up -d --force-recreate api
+```
+
+**Почему это нельзя отложить.** Лимит частоты ключуется по claim `sub`, а для анонимных запросов — по `RemoteIpAddress`; `ForwardedHeaders` доверяет только объявленным сетям. При неверном CIDR весь анонимный трафик схлопнется в одну партицию по адресу ingress. Нагрузочный прогон `#20` упрётся в `429`, не связанные с ёмкостью, эти цифры уйдут в `PERFORMANCE.md` как baseline 1.0, а по ним откалибруются пороги алертов `#19`. Обе ошибки будут выглядеть как настоящие измерения.
+
+### Шаг 6. Пользователи realm
+
+Realm `testapp-staging` импортируется **без пользователей**. Завести вручную в консоли Keycloak (`https://<host>/auth`, вход по `KEYCLOAK_ADMIN_USER`):
+
+| Пользователь | Роль realm | Группа |
+|---|---|---|
+| автор | `test-author` | — |
+| администратор | `test-admin` | — |
+| студент | — | `students` |
+
+Пароли — те, что записаны в `.env` (`AUTHOR_PASSWORD` и остальные): их читают k6 и Postman.
+
+### Шаг 7. Проверка
+
+```bash
+curl -sf https://<host>/health/live                 # 200
+curl -sf https://<host>/health/ready                # healthy
+```
+
+Токен и версия:
+
+```bash
+TOKEN=$(curl -s -X POST "https://<host>/auth/realms/testapp-staging/protocol/openid-connect/token" \
+  -d client_id=testapp-api -d client_secret="$TESTAPP_KEYCLOAK_CLIENT_SECRET" \
+  -d grant_type=password -d username="$ADMIN_USERNAME" -d password="$ADMIN_PASSWORD" \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+
+curl -s -H "Authorization: Bearer $TOKEN" https://<host>/api/v1/operations/version
+```
+
+Ответ обязан содержать версию и **тот самый digest**, который развёрнут. Расхождение означает, что `TESTAPP_IMAGE_DIGEST` не соответствует `TESTAPP_IMAGE` — до исправления откат в `#23` будет выполняться вслепую.
+
+Затем — проверка доверенной сети из шага 5:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "https://<host>/api/v1/operations/audit?page=1&pageSize=5"
+```
+
+В записях должны быть **клиентские** адреса, а не адрес контейнера ingress.
+
+Наконец, дашборд `TestApp Overview` в `https://<host>/grafana` должен показывать живой трафик — значит цепочка API → OTel Collector → Prometheus → Grafana собрана.
+
+### Шаг 8. Зафиксировать
+
+Записать в `#16`: развёрнутый digest, фактический CIDR, дату подъёма и владельца машины. Digest потребуется для отката в `#23`, CIDR — при пересоздании сети.
+
+### Если что-то пошло не так
+
+| Симптом | Наиболее вероятная причина |
+|---|---|
+| `denied` при старте `migrate`/`api` | нет `docker login ghcr.io` (шаг 2) или образ приватный |
+| Caddy не получает сертификат | DNS не резолвится в машину, либо порт 80 закрыт фаерволом |
+| Keycloak падает на старте | база из `KEYCLOAK_DB` не создана — том инициализировался до появления init-скрипта; пересоздать том |
+| `401` на любой запрос с валидным токеном | `Keycloak__Authority` не совпадает с issuer токена; сверить `KC_HOSTNAME` и путь `/auth` |
+| `429` в спокойном режиме | неверный `TESTAPP_INTERNAL_CIDR` (шаг 5) |
+| `/operations/version` отдаёт `imageDigest: null` | `TESTAPP_IMAGE_DIGEST` не задан в `.env` |
+
 ## 16.1 Сбор доказательств CI для релиза
 
 Гейт 1.0 (`docs/ROADMAP.md` §7, пункт 7) требует зелёных пайплайнов на релизном коммите, а критерий готовности RC (issue #23) — записанных run ID. Триггеры устроены так, что «прогон не запускался» и «прогон прошёл» выглядят в интерфейсе одинаково, поэтому собирать нужно именно ID, а не отсутствие красного.

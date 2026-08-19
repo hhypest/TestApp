@@ -28,8 +28,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
+# IMAGE_NAME вычисляется в шаге ниже, а не здесь: ${{ github.repository }} сохраняет регистр
+# (hhypest/TestApp), а Docker требует имя репозитория в нижнем регистре — иначе push падает
+# с "repository name must be lowercase".
 
 jobs:
   release:
@@ -39,6 +40,10 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
+
+      - name: Resolve image name
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Resolve version from tag
         id: version
@@ -78,16 +83,16 @@ jobs:
           set -euo pipefail
           docker build \
             --build-arg VERSION_SUFFIX="$(printf '%s' '${{ steps.version.outputs.version }}' | cut -s -d- -f2-)" \
-            --tag "$IMAGE_NAME:${{ steps.version.outputs.version }}" \
-            --tag "$IMAGE_NAME:release-candidate" \
+            --tag "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}" \
+            --tag "${{ steps.image.outputs.name }}:release-candidate" \
             .
 
       - name: Push image and capture immutable digest
         id: push
         run: |
           set -euo pipefail
-          docker push "$IMAGE_NAME:${{ steps.version.outputs.version }}"
-          digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE_NAME:${{ steps.version.outputs.version }}")"
+          docker push "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}"
+          digest="$(docker inspect --format='{{index .RepoDigests 0}}' "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}")"
           echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
           echo "reference=$digest" >> "$GITHUB_OUTPUT"
 
@@ -104,7 +109,7 @@ jobs:
             image \
             --format cyclonedx \
             --output /out/testapp-api.cdx.json \
-            "$IMAGE_NAME:${{ steps.version.outputs.version }}"
+            "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}"
           test -s artifacts/testapp-api.cdx.json
 
       - name: Attach the frozen v1 contract
@@ -119,7 +124,7 @@ jobs:
           | Что | Значение |
           |---|---|
           | Коммит | \`${{ github.sha }}\` |
-          | Образ | \`$IMAGE_NAME:${{ steps.version.outputs.version }}\` |
+          | Образ | \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}\` |
           | Digest | \`${{ steps.push.outputs.digest }}\` |
           | Развернуть по digest | \`${{ steps.push.outputs.reference }}\` |
 
