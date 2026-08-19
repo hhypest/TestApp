@@ -117,12 +117,31 @@ services:
       # а не по одному прогону.
       - "--storage.tsdb.retention.time=30d"
     volumes:
-      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Конфиг контура: тот же, что локальный, плюс блок alerting.
+      - ./deploy/staging/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - testapp-staging-prometheus:/prometheus
     depends_on:
       otel-collector:
         condition: service_started
+      alertmanager:
+        condition: service_started
+
+  # Закрывает худший из открытых сценариев: авария, о которой никто не узнал. Правила
+  # алертов существовали и раньше, но срабатывали только в UI Prometheus.
+  # Полный объём issue #19 (три drill'а с измеренным time-to-alert и перекалибровкой
+  # порогов) этим НЕ закрыт — закрыта только доставка.
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    volumes:
+      - ./deploy/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # URL webhook'а — секрет: создаётся оператором на машине, лежит в .gitignore.
+      # Без файла Alertmanager не стартует, и это правильно: молчащий приёмник хуже,
+      # чем явный отказ (та же логика, что в ADR-014 про no-op publisher).
+      - ./deploy/staging/webhook-url:/etc/alertmanager/webhook-url:ro
+      - testapp-staging-alertmanager:/alertmanager
 
   grafana:
     image: grafana/grafana:12.2.0
@@ -225,6 +244,7 @@ volumes:
   testapp-staging-postgres:
   testapp-staging-rabbitmq:
   testapp-staging-prometheus:
+  testapp-staging-alertmanager:
   testapp-staging-grafana:
   testapp-staging-caddy-data:
   testapp-staging-caddy-config:

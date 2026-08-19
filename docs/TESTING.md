@@ -40,7 +40,7 @@ Baseline `2026-08-16`, `dotnet test --collect:"XPlat Code Coverage"` (line cover
 | TestApp.Api | 86.7% |
 | **Всего** | **90.3%** |
 
-Всего 328 тестов: 26 Core, 137 Domain, 45 Application, 120 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); presentation/resume добавил 15 интеграционных тестов, `STAB-009` — 31 domain и 1 integration сверх этого замера.
+Всего 332 теста: 26 Core, 137 Domain, 45 Application, 124 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); presentation/resume добавил 15 интеграционных тестов, `STAB-009` — 31 domain и 1 integration сверх этого замера.
 
 Покрытие воспроизводится локально: `coverlet.collector` подключён во всех четырёх test projects.
 
@@ -429,6 +429,7 @@ Workflow `dotnet` в GitHub Actions:
 - контракт value objects (`STAB-009`) — `ValueObjectInvariantTests.cs`: отказ идентификаторов от `Guid.Empty`, согласованность конструктора и фабрики внешних идентификаторов, диапазон `AttemptScore`, round-trip `PublishedQuestion` через `System.Text.Json`. Последний закрывает путь материализации `jsonb`-колонки, который до этого не проверялся ни одним unit-тестом и на котором был найден реальный дефект (см. ADR-029);
 - семантика таймаута (`ADR-030`) — пять тестов в `AttemptLifecycleTests.cs` разделяют deadline-путь и административный `ForceTimeout`;
 - отказ транспорта от нулевого GUID в route/query/body — `RequestValidationContractTests.The_empty_guid_is_answered_by_the_transport_and_never_reaches_the_domain_guard`.
+- согласованность конфигураций Prometheus — `PrometheusConfigTests`: контур обязан наблюдать то же, что локальный стенд и CI, и отличаться ровно блоком `alerting`; отдельно проверяется, что маршрутизация Alertmanager разбирает те метки `severity`, которые правила реально проставляют, и что URL webhook'а не попал в репозиторий. Подтверждён красным добавлением scrape job только в конфиг контура.
 - содержимое каталога импорта Keycloak — `KeycloakImportDirectoryTests`: `compose.yaml` монтирует `deploy/keycloak` целиком, поэтому чужой realm-файл роняет Keycloak на старте и вместе с ним `postman` и `performance`. Тест не требует Docker; подтверждён красным возвратом staging-realm в dev-каталог.
 - схемы тел успешных ответов — `OpenApiResponseSchemaTests`: ни одна операция с `200` не может остаться без схемы, и каждая ссылка `$ref` обязана разрешаться. Подтверждён красным на состоянии до правки — падал на всех 43 операциях.
 - единый источник версии и эндпоинт «что развёрнуто» — `BuildInformationTests`: версия приходит из `Directory.Build.props`, build metadata после `+` не утекает в операционный ответ, digest читается из переменной развёртывания, эндпоинт закрыт `operations:read`. PostgreSQL не требуется.

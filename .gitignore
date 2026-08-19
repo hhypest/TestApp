@@ -365,3 +365,6 @@ FodyWeavers.xsd
 .env
 .env.*
 !.env.*.example
+
+# URL webhook Alertmanager — секрет, создаётся оператором (docs/OPERATIONS.md §16.0.2)
+deploy/staging/webhook-url

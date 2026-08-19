@@ -1,0 +1,40 @@
+# Маршрутизация алертов (issue #19, частично — для внутреннего пилота).
+#
+# Полный объём #19 — три drill'а с измеренным time-to-alert и перекалибровкой порогов.
+# Здесь закрыто только одно, но самое дорогое в отказе: авария доходит до человека,
+# а не остаётся в UI Prometheus, на который ночью никто не смотрит.
+#
+# URL webhook'а — секрет (у Slack и Mattermost он даёт право писать в канал), поэтому он не
+# лежит в этом файле, а читается из url_file. Файл создаёт оператор на машине, он в .gitignore.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: operators
+  # Группируем по имени алерта и severity: при падении базы не нужно двадцать сообщений.
+  group_by: ["alertname", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  # Повтор, пока авария не устранена. Четыре часа — компромисс: реже теряется из виду,
+  # чаще превращается в шум, который перестают читать.
+  repeat_interval: 4h
+
+  routes:
+    # Page-правила требуют реакции немедленно, поэтому ждут меньше и повторяются чаще.
+    - matchers: ['severity="page"']
+      receiver: operators
+      group_wait: 10s
+      repeat_interval: 1h
+
+receivers:
+  - name: operators
+    webhook_configs:
+      - url_file: /etc/alertmanager/webhook-url
+        send_resolved: true
+
+inhibit_rules:
+  # Пока горит page, warning того же алерта не добавляет информации.
+  - source_matchers: ['severity="page"']
+    target_matchers: ['severity="warning"']
+    equal: ["alertname"]

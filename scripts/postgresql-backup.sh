@@ -2,6 +2,11 @@
 set -euo pipefail
 
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18}"
+# Сеть контейнера pg_dump/pg_restore. По умолчанию host — так работает CI, где PostgreSQL
+# опубликован на 127.0.0.1. На staging-контуре порт наружу не публикуется намеренно, поэтому
+# там передаётся сеть compose:
+#   POSTGRES_DOCKER_NETWORK=testapp-staging_default POSTGRES_HOST=postgres
+POSTGRES_DOCKER_NETWORK="${POSTGRES_DOCKER_NETWORK:-host}"
 POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_DATABASE="${POSTGRES_DATABASE:-testapp}"
@@ -20,7 +25,7 @@ tmp="${output}.tmp"
 trap 'rm -f "$tmp"' EXIT
 
 echo "Creating logical backup for database '$POSTGRES_DATABASE'..."
-docker run --rm --network host \
+docker run --rm --network "$POSTGRES_DOCKER_NETWORK" \
   -e PGPASSWORD="$POSTGRES_PASSWORD" \
   "$POSTGRES_IMAGE" \
   pg_dump \

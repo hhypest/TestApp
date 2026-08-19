@@ -3,6 +3,11 @@ set -euo pipefail
 
 backup="${1:?Usage: postgresql-restore-verify.sh <backup.dump> [target_database]}"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18}"
+# Сеть контейнера pg_dump/pg_restore. По умолчанию host — так работает CI, где PostgreSQL
+# опубликован на 127.0.0.1. На staging-контуре порт наружу не публикуется намеренно, поэтому
+# там передаётся сеть compose:
+#   POSTGRES_DOCKER_NETWORK=testapp-staging_default POSTGRES_HOST=postgres
+POSTGRES_DOCKER_NETWORK="${POSTGRES_DOCKER_NETWORK:-host}"
 POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_SOURCE_DATABASE="${POSTGRES_SOURCE_DATABASE:-testapp}"
@@ -36,7 +41,7 @@ docker run --rm -i "$POSTGRES_IMAGE" pg_restore --list < "$backup" >/dev/null
 postgres_exec() {
   local database="$1"
   local sql="$2"
-  docker run --rm --network host \
+  docker run --rm --network "$POSTGRES_DOCKER_NETWORK" \
     -e PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" \
     "$POSTGRES_IMAGE" \
     psql \
@@ -63,7 +68,7 @@ cleanup
 postgres_exec "$POSTGRES_ADMIN_DATABASE" "CREATE DATABASE \"$target\" TEMPLATE template0;" >/dev/null
 
 echo "Restoring '$backup' into disposable database '$target'..."
-docker run --rm -i --network host \
+docker run --rm -i --network "$POSTGRES_DOCKER_NETWORK" \
   -e PGPASSWORD="$POSTGRES_ADMIN_PASSWORD" \
   "$POSTGRES_IMAGE" \
   pg_restore \
