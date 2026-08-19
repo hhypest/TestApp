@@ -1,0 +1,49 @@
+{
+  "realm": "testapp-staging",
+  "displayName": "TestApp Staging",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "sslRequired": "all",
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "test-author",
+        "description": "Can author and review tests"
+      },
+      {
+        "name": "test-admin",
+        "description": "Can administer assignments and operations"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "students"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "testapp-api",
+      "name": "TestApp API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "$(env:TESTAPP_KEYCLOAK_CLIENT_SECRET)",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "https://$(env:TESTAPP_PUBLIC_HOST)/*"
+      ],
+      "webOrigins": [
+        "https://$(env:TESTAPP_PUBLIC_HOST)"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://$(env:TESTAPP_PUBLIC_HOST)/*"
+      }
+    }
+  ],
+  "users": []
+}

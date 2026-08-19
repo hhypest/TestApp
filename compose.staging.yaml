@@ -89,7 +89,7 @@ services:
       TESTAPP_KEYCLOAK_CLIENT_SECRET: ${TESTAPP_KEYCLOAK_CLIENT_SECRET:?}
       TESTAPP_PUBLIC_HOST: ${TESTAPP_PUBLIC_HOST}
     volumes:
-      - ./deploy/keycloak/testapp-staging-realm.json:/opt/keycloak/data/import/testapp-staging-realm.json:ro
+      - ./deploy/staging/testapp-staging-realm.json:/opt/keycloak/data/import/testapp-staging-realm.json:ro
     depends_on:
       postgres:
         condition: service_healthy
