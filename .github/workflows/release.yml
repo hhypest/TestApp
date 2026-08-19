@@ -19,6 +19,11 @@ on:
         description: "Существующий тег для повторного выпуска (например v1.0.0-rc.1)"
         required: true
         type: string
+      evidence_only:
+        description: "Только пересобрать доказательства у существующего Release (образ не трогать)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -40,6 +45,14 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
+
+      # При запуске от тега github.sha — это и есть коммит тега, но при ручном запуске с
+      # inputs.tag он равен голове ветки, с которой запустили workflow. Дальше сходится всё:
+      # и «Коммит» в теле Release, и выборка прогонов по head_sha. Поэтому источник истины —
+      # то, что реально выгружено в рабочую директорию.
+      - name: Resolve release commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Resolve image name
         id: image
@@ -79,6 +92,7 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build production image
+        if: ${{ !inputs.evidence_only }}
         run: |
           set -euo pipefail
           docker build \
@@ -89,6 +103,7 @@ jobs:
 
       - name: Push image and capture immutable digest
         id: push
+        if: ${{ !inputs.evidence_only }}
         run: |
           set -euo pipefail
           docker push "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}"
@@ -96,9 +111,24 @@ jobs:
           echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
           echo "reference=$digest" >> "$GITHUB_OUTPUT"
 
+      # Пересборка ради обновления доказательств дала бы образу новый digest, и Release
+      # начал бы называть не то, что развёрнуто. Поэтому в режиме evidence_only образ не
+      # собирается, а digest читается у уже опубликованного.
+      - name: Resolve digest of the already published image
+        id: existing
+        if: ${{ inputs.evidence_only }}
+        run: |
+          set -euo pipefail
+          reference="${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}"
+          docker pull --quiet "$reference"
+          digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$reference")"
+          echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
+          echo "reference=$digest" >> "$GITHUB_OUTPUT"
+
       # Тот же шаг, что в workflow security, но артефакт прикладывается к Release, а не к прогону:
       # доказательство должно жить столько же, сколько релиз.
       - name: Generate CycloneDX image SBOM
+        if: ${{ !inputs.evidence_only }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -113,7 +143,36 @@ jobs:
           test -s artifacts/testapp-api.cdx.json
 
       - name: Attach the frozen v1 contract
+        if: ${{ !inputs.evidence_only }}
         run: cp docs/openapi/v1.json artifacts/openapi-v1.json
+
+      # Run ID собираются запросом к API по head_sha релизного коммита, а не переносятся руками.
+      # Раньше таблица создавалась с пустыми полями «заполнить», и заполнить их забывали — а
+      # пустая строка неотличима от «прогон не запускался». Здесь неотличимости нет: строка
+      # либо содержит настоящий ID из API, либо явное «не запускался».
+      #
+      # Прогоны от самого тега (dotnet, security) на этот момент ещё идут — они попадают в
+      # таблицу со статусом in_progress. Это не подмена гейта: гейт закрывает человек, сверяя
+      # заключения, а таблица лишь показывает, что именно сверять.
+      - name: Collect CI evidence for the release commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          : > artifacts/pipelines.md
+          for workflow in dotnet security observability performance postman; do
+            export workflow
+            rows="$(gh api \
+              "repos/${{ github.repository }}/actions/workflows/$workflow.yml/runs?head_sha=${{ steps.commit.outputs.sha }}&per_page=20" \
+              --jq '.workflow_runs[] | "| \(env.workflow) | \(.id) | \(.event) | \(.status)/\(.conclusion // "—") |"')"
+            if [ -z "$rows" ]; then
+              printf '| %s | — | — | не запускался |\n' "$workflow" >> artifacts/pipelines.md
+            else
+              printf '%s\n' "$rows" >> artifacts/pipelines.md
+            fi
+          done
+          cat artifacts/pipelines.md
 
       - name: Write evidence list
         run: |
@@ -123,10 +182,10 @@ jobs:
 
           | Что | Значение |
           |---|---|
-          | Коммит | \`${{ github.sha }}\` |
+          | Коммит | \`${{ steps.commit.outputs.sha }}\` |
           | Образ | \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}\` |
-          | Digest | \`${{ steps.push.outputs.digest }}\` |
-          | Развернуть по digest | \`${{ steps.push.outputs.reference }}\` |
+          | Digest | \`${{ steps.push.outputs.digest || steps.existing.outputs.digest }}\` |
+          | Развернуть по digest | \`${{ steps.push.outputs.reference || steps.existing.outputs.reference }}\` |
 
           Разворачивать следует **по digest, а не по тегу**: тег перемещаем, digest — нет.
           Развёртывание обязано пробросить digest в переменную \`TESTAPP_IMAGE_DIGEST\`,
@@ -137,21 +196,22 @@ jobs:
           - \`testapp-api.cdx.json\` — SBOM образа в формате CycloneDX;
           - \`openapi-v1.json\` — замороженный контракт v1 на момент выпуска.
 
-          ## Заполняется вручную перед объявлением RC готовым
+          ## Пайплайны на этом коммите
 
-          Гейт §7 пункт 7 требует зелёные пайплайны на этом коммите. Тег сам по себе запускает
-          только \`dotnet\` и \`security\`; \`observability\`, \`performance\` и \`postman\`
-          ограничены paths-фильтром и запускаются вручную. Порядок — docs/OPERATIONS.md §16.1.
+          Гейт §7 пункт 7 требует зелёные пайплайны на релизном коммите. Тег сам по себе
+          запускает только \`dotnet\` и \`security\`; \`observability\`, \`performance\` и
+          \`postman\` ограничены paths-фильтром и запускаются вручную — порядок описан в
+          docs/OPERATIONS.md §16.1.
 
-          | Пайплайн | Run ID |
-          |---|---|
-          | dotnet | _заполнить_ |
-          | security | _заполнить_ |
-          | observability | _заполнить_ |
-          | performance | _заполнить_ |
-          | postman | _заполнить_ |
+          | Пайплайн | Run ID | Событие | Статус |
+          |---|---|---|---|
+          EOF
+          cat artifacts/pipelines.md >> artifacts/EVIDENCE.md
+          cat >> artifacts/EVIDENCE.md <<'EOF'
 
-          Отсутствие Run ID означает «не запускался», а не «прошёл».
+          Таблица собрана из API по `head_sha` этого коммита на момент выпуска. Прогоны,
+          запущенные позже, в неё не попадут: обновить её можно повторным запуском workflow
+          `release` с включённым `evidence_only` — образ при этом не пересобирается.
           EOF
 
       - name: Publish GitHub Release
@@ -159,9 +219,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.version.outputs.tag }}" \
-            --notes-file artifacts/EVIDENCE.md \
-            ${{ steps.version.outputs.prerelease == 'true' && '--prerelease' || '' }} \
-            artifacts/testapp-api.cdx.json \
-            artifacts/openapi-v1.json
+          tag="${{ steps.version.outputs.tag }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # Release уже существует: обновляем тело, не трогая приложенные артефакты —
+            # они относятся к образу, который никуда не делся.
+            gh release edit "$tag" --notes-file artifacts/EVIDENCE.md
+          else
+            gh release create "$tag" \
+              --title "$tag" \
+              --notes-file artifacts/EVIDENCE.md \
+              ${{ steps.version.outputs.prerelease == 'true' && '--prerelease' || '' }} \
+              artifacts/testapp-api.cdx.json \
+              artifacts/openapi-v1.json
+          fi
