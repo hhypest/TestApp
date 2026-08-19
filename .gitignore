@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Секреты staging-контура (issue #16). Шаблон — .env.staging.example
+.env
+.env.*
+!.env.*.example

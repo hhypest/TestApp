@@ -1,0 +1,223 @@
+# Staging-контур гейта 1.0 (issue #16, ADR-031).
+#
+# Это НЕ вариант compose.yaml с другими портами. Локальный compose поднимает
+# Development-профиль с отладочными креденшелами; здесь профиль production, а все секреты
+# приходят из .env, который лежит на самой машине и никогда не коммитится.
+#
+#   docker compose -f compose.staging.yaml --env-file .env up -d
+#
+# Образ задаётся ТОЛЬКО digest'ом (TESTAPP_IMAGE), а не тегом: тег перемещаем, digest — нет.
+# Тот же digest пробрасывается в TESTAPP_IMAGE_DIGEST, поэтому GET /api/v1/operations/version
+# отвечает, что именно запущено. Порядок выпуска — docs/OPERATIONS.md §16.2.
+#
+# Наружу опубликован один порт — ingress. Всё остальное живёт во внутренней сети: PostgreSQL,
+# RabbitMQ, Prometheus и Grafana не должны быть доступны из интернета, а на локальном стенде
+# они публикуются именно потому, что он локальный.
+
+name: testapp-staging
+
+services:
+  ingress:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TESTAPP_PUBLIC_HOST: ${TESTAPP_PUBLIC_HOST:?нужен публичный домен контура}
+    volumes:
+      - ./deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro
+      - testapp-staging-caddy-data:/data
+      - testapp-staging-caddy-config:/config
+    depends_on:
+      api:
+        condition: service_started
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      KEYCLOAK_DB: ${KEYCLOAK_DB:?}
+    volumes:
+      - testapp-staging-postgres:/var/lib/postgresql
+      # Выполняется один раз при инициализации пустого тома: заводит отдельную базу
+      # для Keycloak. Без неё Keycloak падает на старте.
+      - ./deploy/staging/init-keycloak-db.sh:/docker-entrypoint-initdb.d/10-keycloak-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.3.1-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?}
+    volumes:
+      - testapp-staging-rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    restart: unless-stopped
+    # Не start-dev: на контуре нужен production-режим Keycloak, иначе проверяется
+    # не та конфигурация, которая поедет дальше.
+    command: ["start", "--optimized", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KC_HOSTNAME: https://${TESTAPP_PUBLIC_HOST}/auth
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:?}
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Подставляются Keycloak при импорте realm через синтаксис $(env:VAR).
+      TESTAPP_KEYCLOAK_CLIENT_SECRET: ${TESTAPP_KEYCLOAK_CLIENT_SECRET:?}
+      TESTAPP_PUBLIC_HOST: ${TESTAPP_PUBLIC_HOST}
+    volumes:
+      - ./deploy/keycloak/testapp-staging-realm.json:/opt/keycloak/data/import/testapp-staging-realm.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.157.0
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./deploy/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+  prometheus:
+    image: prom/prometheus:v3.7.3
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      # История нужна дольше одного drill: пороги в #19 калибруются по наблюдениям,
+      # а не по одному прогону.
+      - "--storage.tsdb.retention.time=30d"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - testapp-staging-prometheus:/prometheus
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: https://${TESTAPP_PUBLIC_HOST}/grafana
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/etc/grafana/testapp-dashboards:ro
+      - testapp-staging-grafana:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+
+  # Миграции — отдельный одноразовый прогон тем же образом. Вне Development код запрещает
+  # startup-миграции (RuntimeConfiguration.Database.cs), поэтому иначе API просто не поднимется.
+  migrate:
+    image: ${TESTAPP_IMAGE:?нужен digest образа, например ghcr.io/hhypest/testapp@sha256:...}
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
+      Database__ApplyMigrationsOnStartup: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: ${TESTAPP_IMAGE:?}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+      ASPNETCORE_HTTP_PORTS: 8080
+
+      # Отвечает на вопрос «что именно развёрнуто» через /api/v1/operations/version.
+      TESTAPP_IMAGE_DIGEST: ${TESTAPP_IMAGE_DIGEST:?}
+
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
+      Database__ApplyMigrationsOnStartup: "false"
+
+      Keycloak__Authority: https://${TESTAPP_PUBLIC_HOST}/auth/realms/testapp-staging
+      Keycloak__Audience: testapp-api
+      Keycloak__RequireHttpsMetadata: "true"
+
+      RabbitMq__Enabled: "true"
+      RabbitMq__ConnectionString: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      RabbitMq__Exchange: testapp.events
+      RabbitMq__RoutingKeyPrefix: testapp
+
+      # TLS терминируется на ingress — код поддерживает это явно, поэтому редирект выключен,
+      # а HSTS включён: заголовок ставит приложение, соединение шифрует Caddy.
+      TransportSecurity__HttpsRedirectionEnabled: "false"
+      TransportSecurity__HstsEnabled: "true"
+      TransportSecurity__HstsMaxAgeDays: "30"
+      TransportSecurity__HstsIncludeSubDomains: "false"
+      TransportSecurity__HstsPreload: "false"
+      TransportSecurity__SecurityHeadersEnabled: "true"
+
+      # КРИТИЧНО для issue #20 и #19. Лимит частоты ключуется по claim `sub`, а для анонимных
+      # запросов — по RemoteIpAddress (RateLimitPartitioning.cs). Если не объявить доверенную
+      # сеть, ForwardedHeaders отбросит X-Forwarded-For, весь анонимный трафик схлопнется в одну
+      # партицию по адресу ingress, и нагрузочный прогон упрётся в 429, не имеющие отношения
+      # к ёмкости. Цифры из такого прогона попадут в PERFORMANCE.md как baseline, а по ним
+      # откалибруются пороги алертов — обе ошибки будут выглядеть как настоящие измерения.
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__ForwardLimit: "1"
+      ReverseProxy__KnownNetworks__0: ${TESTAPP_INTERNAL_CIDR:?CIDR внутренней сети compose}
+
+      # Явный список источников; wildcard код запрещает.
+      Cors__Enabled: ${CORS_ENABLED:-false}
+      Cors__AllowedOrigins__0: ${CORS_ORIGIN:-}
+      Cors__AllowCredentials: "false"
+
+      # На контуре спецификация закрыта ролью администратора, а не анонимна.
+      OpenApi__Enabled: "true"
+      OpenApi__AllowAnonymous: "false"
+
+      OTEL_SERVICE_NAME: TestApp.Api
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=staging
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+
+volumes:
+  testapp-staging-postgres:
+  testapp-staging-rabbitmq:
+  testapp-staging-prometheus:
+  testapp-staging-grafana:
+  testapp-staging-caddy-data:
+  testapp-staging-caddy-config:

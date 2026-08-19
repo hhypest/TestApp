@@ -467,6 +467,56 @@ OTEL -> traces/metrics arrive
 
 Для migration release дополнительно выполнить representative create/publish/assign/start/submit flow в staging.
 
+## 16.0 Staging-контур
+
+Контур гейта 1.0 (issue #16, ADR-031). Одна VM, `compose.staging.yaml`, наружу опубликован только ingress.
+
+### Что нужно от машины
+
+4 vCPU / 8 ГБ — разумный минимум для девяти контейнеров, из которых Keycloak на JVM, Prometheus и Grafana — основные потребители памяти. Это оценка; фактическую цифру даст `#20`.
+
+**k6 запускать с другой машины.** Генератор нагрузки на том же хосте конкурирует за CPU с системой под тестом, и `p95` измерит борьбу за планировщик, а не ёмкость.
+
+### Развёртывание
+
+```bash
+git clone <repo> && cd TestApp
+cp .env.staging.example .env && chmod 600 .env    # заполнить, пароли генерировать: openssl rand -base64 32
+docker compose -f compose.staging.yaml --env-file .env up -d
+```
+
+`TESTAPP_IMAGE` задаётся **digest'ом** из тела GitHub Release, не тегом. `TESTAPP_INTERNAL_CIDR` узнаётся после первого запуска:
+
+```bash
+docker network inspect testapp-staging_default -f '{{(index .IPAM.Config 0).Subnet}}'
+```
+
+### Обязательная проверка после первого запуска
+
+Лимит частоты ключуется по claim `sub`, а для анонимных запросов — по `RemoteIpAddress`, при этом `ForwardedHeaders` доверяет только объявленным сетям. Если `ReverseProxy:KnownNetworks` задан неверно, весь анонимный трафик схлопнется в одну партицию по адресу ingress: `#20` упрётся в `429`, не связанные с ёмкостью, а `#19` откалибрует по этим цифрам пороги. Обе ошибки выглядят как настоящие измерения.
+
+Проверить до первого нагрузочного прогона — в audit trail должны быть **клиентские** адреса, а не адрес ingress:
+
+```bash
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "https://$TESTAPP_PUBLIC_HOST/api/v1/operations/audit?page=1&pageSize=5"
+```
+
+### Фикстурные пользователи
+
+Realm `testapp-staging` импортируется **без пользователей** — в репозитории не лежит ни одного действующего креденшела контура. Автора, администратора и студента заводит оператор вручную в консоли Keycloak (`/auth`), с ролями `test-author`, `test-admin` и группой `students` соответственно, паролями из `.env`. Клиент `testapp-api` — confidential; его секрет нужен k6 и Postman.
+
+### Проверка готовности
+
+```text
+GET https://<host>/health/live                    -> 200
+GET https://<host>/health/ready                   -> healthy
+GET https://<host>/api/v1/operations/version      -> версия и digest совпадают с развёрнутым
+дашборд TestApp Overview в /grafana               -> живой трафик
+```
+
+Развёрнутый digest записать — он потребуется для отката в `#23`.
+
 ## 16.1 Сбор доказательств CI для релиза
 
 Гейт 1.0 (`docs/ROADMAP.md` §7, пункт 7) требует зелёных пайплайнов на релизном коммите, а критерий готовности RC (issue #23) — записанных run ID. Триггеры устроены так, что «прогон не запускался» и «прогон прошёл» выглядят в интерфейсе одинаково, поэтому собирать нужно именно ID, а не отсутствие красного.

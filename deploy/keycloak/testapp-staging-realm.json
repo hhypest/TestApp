@@ -1,0 +1,59 @@
+{
+  "_comment": [
+    "Realm staging-контура (issue #16). Отличается от testapp-realm.json тремя вещами,",
+    "и каждая из них — причина, по которой dev-realm нельзя импортировать на контур:",
+    "1) здесь НЕТ пользователей с паролями — их заводит оператор вручную после импорта,",
+    "   поэтому в репозитории не лежит ни одного действующего креденшела контура;",
+    "2) клиент confidential, секрет подставляется из переменной окружения при импорте;",
+    "3) redirect/web origins привязаны к публичному домену, а не к localhost.",
+    "Роли и группы совпадают с dev-realm намеренно: авторизация должна проверяться та же.",
+    "Подстановка $(env:VAR) выполняется Keycloak при импорте; переменные приходят из .env через compose."
+  ],
+  "realm": "testapp-staging",
+  "displayName": "TestApp Staging",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "sslRequired": "all",
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "test-author",
+        "description": "Can author and review tests"
+      },
+      {
+        "name": "test-admin",
+        "description": "Can administer assignments and operations"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "students"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "testapp-api",
+      "name": "TestApp API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "$(env:TESTAPP_KEYCLOAK_CLIENT_SECRET)",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "https://$(env:TESTAPP_PUBLIC_HOST)/*"
+      ],
+      "webOrigins": [
+        "https://$(env:TESTAPP_PUBLIC_HOST)"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://$(env:TESTAPP_PUBLIC_HOST)/*"
+      }
+    }
+  ],
+  "users": []
+}

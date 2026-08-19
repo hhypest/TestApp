@@ -5,6 +5,15 @@ import exec from 'k6/execution';
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const KEYCLOAK_URL = __ENV.KEYCLOAK_URL || 'http://localhost:8081';
 const CLIENT_ID = __ENV.KEYCLOAK_CLIENT_ID || 'testapp-api';
+// Realm и секрет параметризованы ради staging-контура (issue #16/#20): там realm называется
+// testapp-staging, а клиент confidential. Умолчания повторяют локальный стенд, поэтому
+// поведение workflow performance не меняется.
+const REALM = __ENV.KEYCLOAK_REALM || 'testapp';
+const CLIENT_SECRET = __ENV.KEYCLOAK_CLIENT_SECRET || '';
+// Логины и пароли фикстур на контуре другие — dev-значения там не заводятся намеренно.
+const AUTHOR = { username: __ENV.AUTHOR_USERNAME || 'author', password: __ENV.AUTHOR_PASSWORD || 'author' };
+const ADMIN = { username: __ENV.ADMIN_USERNAME || 'admin', password: __ENV.ADMIN_PASSWORD || 'admin' };
+const STUDENT = { username: __ENV.STUDENT_USERNAME || 'student', password: __ENV.STUDENT_PASSWORD || 'student' };
 
 export const options = {
   discardResponseBodies: false,
@@ -60,14 +69,19 @@ function uuid() {
 }
 
 function token(username, password) {
+  const form = {
+    client_id: CLIENT_ID,
+    grant_type: 'password',
+    username,
+    password,
+  };
+  // Пустой client_secret не отправляем: публичный клиент локального стенда его не принимает.
+  if (CLIENT_SECRET !== '') {
+    form.client_secret = CLIENT_SECRET;
+  }
   const response = http.post(
-    `${KEYCLOAK_URL}/realms/testapp/protocol/openid-connect/token`,
-    {
-      client_id: CLIENT_ID,
-      grant_type: 'password',
-      username,
-      password,
-    },
+    `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`,
+    form,
     { tags: { phase: 'setup', operation: 'token' } },
   );
   if (response.status !== 200) {
@@ -143,9 +157,9 @@ function startAttempt(assignmentId, studentToken, operation = 'start attempt') {
 }
 
 export function setup() {
-  const authorToken = token('author', 'author');
-  const adminToken = token('admin', 'admin');
-  const studentToken = token('student', 'student');
+  const authorToken = token(AUTHOR.username, AUTHOR.password);
+  const adminToken = token(ADMIN.username, ADMIN.password);
+  const studentToken = token(STUDENT.username, STUDENT.password);
 
   const create = requireStatus(
     http.post(
