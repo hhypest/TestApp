@@ -83,7 +83,7 @@ stateDiagram-v2
 - `test-author` read/write scope ограничен owned tests;
 - reviewer author видит результаты только revisions собственных tests;
 - `test-admin` имеет явно глобальный scope;
-- legacy rows migration backfill получает owner `__legacy_admin_only__` и не становится доступным случайному author.
+- владельца нельзя получить иначе, чем из `sub` вызывающего: колонка `OwnerId` обязательна и не имеет значения по умолчанию. Backfill легаси-записей значением `__legacy_admin_only__` существовал в миграциях до их схлопывания в baseline и в текущем репозитории отсутствует — вместе с самой возможностью появления такого владельца.
 
 ### 3.6 Порядок вопросов
 

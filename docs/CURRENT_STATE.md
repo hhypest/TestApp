@@ -51,7 +51,7 @@ Identity source of truth — Keycloak. TestApp не создаёт локаль�
 
 `test-admin` имеет global scope.
 
-Migration существующих tests использует специальный owner `__legacy_admin_only__`, после чего DB default удаляется. Такие legacy records не становятся автоматически доступными случайному author.
+Владелец задаётся только из `sub` вызывающего. Специальный owner `__legacy_admin_only__` для существующих записей применялся в миграциях до их схлопывания в единственную baseline-миграцию; сейчас `OwnerId` — обязательная колонка без значения по умолчанию, поэтому запись с таким владельцем не может появиться. Удерживается тестом `CrossAuthorIsolationTests.No_owner_can_exist_that_the_application_never_issued`.
 
 ### 2.4 Assignments
 

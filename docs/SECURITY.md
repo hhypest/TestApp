@@ -113,7 +113,7 @@ Test.OwnerId = Keycloak sub создавшего автора
 - owner filtering catalog/editor/revisions/reviewer list/detail в SQL;
 - owner checks для rename/settings/questions/options/publish/archive;
 - глобальная область видимости для `test-admin`;
-- заполнение легаси-записей значением `__legacy_admin_only__`;
+- владелец не может появиться иначе, чем из `sub` вызывающего: `OwnerId` — обязательная колонка без значения по умолчанию, а «легаси-владелец» `__legacy_admin_only__` из ранних миграций не существует ни в коде, ни в схеме (история схлопнута в baseline-миграцию);
 - cross-author negative E2E, включая correctness detail.
 
 Workspace/Tenant/Team и ACL не реализованы сознательно. Они становятся P0 только при multi-organization deployment; текущий `OwnerId` не следует ошибочно называть tenant boundary.
@@ -321,12 +321,15 @@ Business-triggered/после 1.0:
 | OpenAPI в production выключен по умолчанию, при включении закрыт ролью | `RuntimeConfigurationTests.OpenApi_defaults_to_development_only_public_exposure`, `EdgeSecurityTests.Production_OpenAPI_can_be_enabled_as_admin_only` | закрыто |
 | Ключ ответов не попадает в student-контракт | `AttemptPresentationTests.The_serialized_student_payload_contains_no_correctness_information` — проверка на сериализованных байтах, подтверждена красным | закрыто |
 | Изоляция по владельцу на write, read и reviewer boundary | `TestOwnershipTests`, cross-author E2E | закрыто |
+| Ни один мутирующий эндпоинт не принимает чужого автора | `CrossAuthorIsolationTests.Not_a_single_mutating_endpoint_accepts_a_foreign_author` — перебираются все 12, состояние после отказа сверяется; подтверждён красным снятием одной проверки | закрыто |
+| Поиск и `TotalCount` не выдают существование чужого теста | `CrossAuthorIsolationTests.Search_and_paging_count_only_the_callers_own_tests` | закрыто |
+| Представления попытки принадлежат студенту, а не владельцу теста | `CrossAuthorIsolationTests.The_test_owner_reads_attempts_through_the_reviewer_route_and_no_other` | закрыто |
 | Текст CLR-исключения не утекает в `ProblemDetails.detail` | `RequestValidationContractTests`, `TestAggregateTests` (STAB-008, ADR-026) | закрыто |
 | Нулевой GUID не превращается в `500` | `RequestValidationContractTests.The_empty_guid_is_answered_by_the_transport_and_never_reaches_the_domain_guard` (ADR-029) | закрыто |
 | Наружу не публикуется ни одного интеграционного события | `IntegrationEventCatalogTests` (ADR-033) | закрыто |
 | Репозиторий не содержит секретов | шаг `Scan repository for secrets` в workflow `security` (Trivy) | закрыто |
 | Production-образ без уязвимостей HIGH/CRITICAL | шаг image scan в workflow `security` | закрыто |
-| `__legacy_admin_only__` не всплывает у произвольного автора ни в одном read model | **проверка на staging, issue #21 пункт 3** | открыто |
+| `__legacy_admin_only__` не всплывает у произвольного автора ни в одном read model | `CrossAuthorIsolationTests.No_owner_can_exist_that_the_application_never_issued` — проверять на контуре нечего: backfill жил в схлопнутых миграциях, `OwnerId` объявлен обязательным без значения по умолчанию, строка-часовой отсутствует в `src/` | закрыто |
 | Отсутствие отладочных креденшелов на самом контуре | **проверка на staging, issue #16** | открыто |
 
 ### Результат sweep по креденшелам (пункт 5)
