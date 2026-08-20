@@ -236,7 +236,7 @@ public sealed class CrossAuthorIsolationTests
 
         var migration = File.ReadAllLines(
             Path.Combine(root, "src/TestApp.Infrastructure/Persistence/Migrations/20260813183117_PostgreSqlBaseline.cs"));
-        var ownerColumn = Assert.Single(migration.Where(line => line.Contains("OwnerId = table.Column<string>", StringComparison.Ordinal)));
+        var ownerColumn = Assert.Single(migration, line => line.Contains("OwnerId = table.Column<string>", StringComparison.Ordinal));
 
         Assert.Contains("nullable: false", ownerColumn, StringComparison.Ordinal);
         Assert.DoesNotContain("defaultValue", ownerColumn, StringComparison.Ordinal);

@@ -1,0 +1,1216 @@
+{
+  "__note": "Замороженная поверхность контракта v1. Файл редактируется ТОЛЬКО вручную и только вместе с решением о переходе на v2: он перечисляет то, удаление или переименование чего ломает уже написанных клиентов. Дополнения сюда не вносятся — они разрешены политикой docs/API.md §1 и видны в diff снимка docs/openapi/v1.json. Автоматической регенерации у файла нет намеренно: она превратила бы заморозку в описание того, что получилось.",
+  "operations": {
+    "GET /api/v1/assignments": {
+      "operationId": "Assignments_List",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "items",
+        "items[].assignedAt",
+        "items[].assignedBy",
+        "items[].assignedBy.value",
+        "items[].attemptCount",
+        "items[].attemptLimit",
+        "items[].availableFrom",
+        "items[].availableUntil",
+        "items[].averagePercentage",
+        "items[].completedCount",
+        "items[].failedCount",
+        "items[].id",
+        "items[].id.value",
+        "items[].inProgressCount",
+        "items[].passedCount",
+        "items[].revisionId",
+        "items[].revisionId.value",
+        "items[].revisionVersion",
+        "items[].status",
+        "items[].targetId",
+        "items[].targetType",
+        "items[].testId",
+        "items[].testId.value",
+        "items[].testTitle",
+        "page",
+        "pageSize",
+        "totalCount",
+        "totalPages"
+      ]
+    },
+    "POST /api/v1/assignments": {
+      "operationId": "Assignments_Create",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "POST /api/v1/assignments/bulk": {
+      "operationId": "Assignments_BulkCreate",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "assignmentIds",
+        "assignmentIds[].value",
+        "createdCount"
+      ]
+    },
+    "GET /api/v1/assignments/{id}": {
+      "operationId": "Assignments_Get",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "assignedAt",
+        "assignedBy",
+        "assignedBy.value",
+        "attemptCount",
+        "attemptLimit",
+        "availableFrom",
+        "availableUntil",
+        "averagePercentage",
+        "bestPercentage",
+        "cancelReason",
+        "cancelledAt",
+        "cancelledBy",
+        "cancelledBy.value",
+        "failedCount",
+        "id",
+        "id.value",
+        "inProgressCount",
+        "passedCount",
+        "revisionId",
+        "revisionId.value",
+        "revisionVersion",
+        "status",
+        "submittedCount",
+        "targetId",
+        "targetType",
+        "testId",
+        "testId.value",
+        "testTitle",
+        "timedOutCount"
+      ]
+    },
+    "PATCH /api/v1/assignments/{id}/attempt-limit": {
+      "operationId": "Assignments_ChangeAttemptLimit",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "GET /api/v1/assignments/{id}/attempts": {
+      "operationId": "Assignments_ListAttempts",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "items",
+        "items[].attemptId",
+        "items[].attemptId.value",
+        "items[].completedAt",
+        "items[].deadlineAt",
+        "items[].earned",
+        "items[].maximum",
+        "items[].outcome",
+        "items[].percentage",
+        "items[].startedAt",
+        "items[].status",
+        "items[].userId",
+        "items[].userId.value",
+        "page",
+        "pageSize",
+        "totalCount",
+        "totalPages"
+      ]
+    },
+    "POST /api/v1/assignments/{id}/attempts": {
+      "operationId": "Attempts_Start",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "GET /api/v1/assignments/{id}/attempts/active": {
+      "operationId": "Assignments_GetActiveAttempt",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "assignmentId",
+        "assignmentId.value",
+        "attemptId",
+        "attemptId.value",
+        "completedAt",
+        "deadlineAt",
+        "outcome",
+        "passingPercentage",
+        "questions",
+        "questions[].answeredAt",
+        "questions[].id",
+        "questions[].id.value",
+        "questions[].options",
+        "questions[].options[].id",
+        "questions[].options[].id.value",
+        "questions[].options[].order",
+        "questions[].options[].text",
+        "questions[].order",
+        "questions[].points",
+        "questions[].selectedOptionIds",
+        "questions[].selectedOptionIds[].value",
+        "questions[].text",
+        "questions[].type",
+        "revisionId",
+        "revisionId.value",
+        "revisionVersion",
+        "serverTime",
+        "startedAt",
+        "status",
+        "testTitle",
+        "timeLimitMinutes"
+      ]
+    },
+    "POST /api/v1/assignments/{id}/cancel": {
+      "operationId": "Assignments_Cancel",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "PATCH /api/v1/assignments/{id}/window": {
+      "operationId": "Assignments_ChangeWindow",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "GET /api/v1/attempts/{id}": {
+      "operationId": "Attempts_Get",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "assignmentId",
+        "assignmentId.value",
+        "completedAt",
+        "deadlineAt",
+        "id",
+        "id.value",
+        "outcome",
+        "responses",
+        "responses[].answeredAt",
+        "responses[].questionId",
+        "responses[].questionId.value",
+        "responses[].selectedOptionIds",
+        "responses[].selectedOptionIds[].value",
+        "revisionId",
+        "revisionId.value",
+        "startedAt",
+        "status"
+      ]
+    },
+    "DELETE /api/v1/attempts/{id}/answers/{questionId}": {
+      "operationId": "Attempts_ClearAnswer",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "PUT /api/v1/attempts/{id}/answers/{questionId}": {
+      "operationId": "Attempts_Answer",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "GET /api/v1/attempts/{id}/presentation": {
+      "operationId": "Attempts_GetPresentation",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "assignmentId",
+        "assignmentId.value",
+        "attemptId",
+        "attemptId.value",
+        "completedAt",
+        "deadlineAt",
+        "outcome",
+        "passingPercentage",
+        "questions",
+        "questions[].answeredAt",
+        "questions[].id",
+        "questions[].id.value",
+        "questions[].options",
+        "questions[].options[].id",
+        "questions[].options[].id.value",
+        "questions[].options[].order",
+        "questions[].options[].text",
+        "questions[].order",
+        "questions[].points",
+        "questions[].selectedOptionIds",
+        "questions[].selectedOptionIds[].value",
+        "questions[].text",
+        "questions[].type",
+        "revisionId",
+        "revisionId.value",
+        "revisionVersion",
+        "serverTime",
+        "startedAt",
+        "status",
+        "testTitle",
+        "timeLimitMinutes"
+      ]
+    },
+    "GET /api/v1/attempts/{id}/result": {
+      "operationId": "Attempts_GetResult",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "completedAt",
+        "deadlineAt",
+        "earned",
+        "id",
+        "id.value",
+        "maximum",
+        "outcome",
+        "percentage",
+        "revisionId",
+        "revisionId.value",
+        "startedAt",
+        "status"
+      ]
+    },
+    "POST /api/v1/attempts/{id}/submit": {
+      "operationId": "Attempts_Submit",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "earned",
+        "maximum",
+        "percentage"
+      ]
+    },
+    "POST /api/v1/attempts/{id}/timeout": {
+      "operationId": "Attempts_Timeout",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "earned",
+        "maximum",
+        "percentage"
+      ]
+    },
+    "GET /api/v1/me/assignments": {
+      "operationId": "Me_ListAssignments",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "items",
+        "items[].attemptLimit",
+        "items[].availableFrom",
+        "items[].availableUntil",
+        "items[].id",
+        "items[].id.value",
+        "items[].passingPercentage",
+        "items[].revisionId",
+        "items[].revisionId.value",
+        "items[].revisionVersion",
+        "items[].status",
+        "items[].testTitle",
+        "items[].timeLimitMinutes",
+        "page",
+        "pageSize",
+        "totalCount",
+        "totalPages"
+      ]
+    },
+    "GET /api/v1/me/attempts": {
+      "operationId": "Me_ListAttempts",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "items",
+        "items[].assignmentId",
+        "items[].assignmentId.value",
+        "items[].completedAt",
+        "items[].deadlineAt",
+        "items[].id",
+        "items[].id.value",
+        "items[].outcome",
+        "items[].percentage",
+        "items[].revisionId",
+        "items[].revisionId.value",
+        "items[].startedAt",
+        "items[].status",
+        "page",
+        "pageSize",
+        "totalCount",
+        "totalPages"
+      ]
+    },
+    "GET /api/v1/operations/audit": {
+      "operationId": "Operations_GetAudit",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "items",
+        "items[].actorId",
+        "items[].correlationId",
+        "items[].durationMs",
+        "items[].id",
+        "items[].method",
+        "items[].occurredAt",
+        "items[].route",
+        "items[].statusCode",
+        "items[].traceId",
+        "page",
+        "pageSize",
+        "totalCount",
+        "totalPages"
+      ]
+    },
+    "GET /api/v1/operations/outbox": {
+      "operationId": "Operations_GetOutbox",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "deadLetterCount",
+        "discardedCount",
+        "oldestPendingOccurredAt",
+        "pendingCount",
+        "recentDeadLetters",
+        "recentDeadLetters[].attemptCount",
+        "recentDeadLetters[].deadLetteredAt",
+        "recentDeadLetters[].error",
+        "recentDeadLetters[].eventId",
+        "recentDeadLetters[].eventType",
+        "recentDeadLetters[].occurredAt",
+        "retryScheduledCount"
+      ]
+    },
+    "GET /api/v1/operations/outbox/dead-letters/{eventId}": {
+      "operationId": "OutboxDeadLetters_Get",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "attemptCount",
+        "deadLetteredAt",
+        "discardedAt",
+        "error",
+        "eventId",
+        "eventType",
+        "lastAttemptAt",
+        "occurredAt"
+      ]
+    },
+    "POST /api/v1/operations/outbox/dead-letters/{eventId}/discard": {
+      "operationId": "OutboxDeadLetters_Discard",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "attemptCount",
+        "deadLetteredAt",
+        "discardedAt",
+        "error",
+        "eventId",
+        "eventType",
+        "lastAttemptAt",
+        "occurredAt"
+      ]
+    },
+    "POST /api/v1/operations/outbox/dead-letters/{eventId}/requeue": {
+      "operationId": "OutboxDeadLetters_Requeue",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "attemptCount",
+        "deadLetteredAt",
+        "discardedAt",
+        "error",
+        "eventId",
+        "eventType",
+        "lastAttemptAt",
+        "occurredAt"
+      ]
+    },
+    "GET /api/v1/operations/version": {
+      "operationId": "Operations_GetVersion",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "imageDigest",
+        "version"
+      ]
+    },
+    "GET /api/v1/results": {
+      "operationId": "Results_List",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "items",
+        "items[].assignmentId",
+        "items[].assignmentId.value",
+        "items[].attemptId",
+        "items[].attemptId.value",
+        "items[].completedAt",
+        "items[].deadlineAt",
+        "items[].earned",
+        "items[].maximum",
+        "items[].outcome",
+        "items[].percentage",
+        "items[].revisionId",
+        "items[].revisionId.value",
+        "items[].revisionVersion",
+        "items[].startedAt",
+        "items[].status",
+        "items[].testId",
+        "items[].testId.value",
+        "items[].testTitle",
+        "items[].userId",
+        "items[].userId.value",
+        "page",
+        "pageSize",
+        "totalCount",
+        "totalPages"
+      ]
+    },
+    "GET /api/v1/results/{attemptId}": {
+      "operationId": "Results_Get",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "assignmentId",
+        "assignmentId.value",
+        "attemptId",
+        "attemptId.value",
+        "completedAt",
+        "deadlineAt",
+        "earned",
+        "maximum",
+        "outcome",
+        "percentage",
+        "questions",
+        "questions[].answeredAt",
+        "questions[].earnedPoints",
+        "questions[].id",
+        "questions[].id.value",
+        "questions[].maximumPoints",
+        "questions[].options",
+        "questions[].options[].id",
+        "questions[].options[].id.value",
+        "questions[].options[].isCorrect",
+        "questions[].options[].isSelected",
+        "questions[].options[].order",
+        "questions[].options[].text",
+        "questions[].order",
+        "questions[].text",
+        "questions[].type",
+        "revisionId",
+        "revisionId.value",
+        "revisionVersion",
+        "startedAt",
+        "status",
+        "testId",
+        "testId.value",
+        "testTitle",
+        "userId",
+        "userId.value"
+      ]
+    },
+    "GET /api/v1/tests": {
+      "operationId": "Tests_List",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "429"
+      ],
+      "responseFields": [
+        "items",
+        "items[].id",
+        "items[].id.value",
+        "items[].latestPublishedAt",
+        "items[].latestRevisionVersion",
+        "items[].passingPercentage",
+        "items[].publishedRevisionCount",
+        "items[].questionCount",
+        "items[].status",
+        "items[].timeLimitMinutes",
+        "items[].title",
+        "page",
+        "pageSize",
+        "totalCount",
+        "totalPages"
+      ]
+    },
+    "POST /api/v1/tests": {
+      "operationId": "Tests_Create",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "409",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "POST /api/v1/tests/{id}/archive": {
+      "operationId": "Tests_Archive",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "GET /api/v1/tests/{id}/editor": {
+      "operationId": "Tests_GetEditor",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "concurrencyVersion",
+        "id",
+        "id.value",
+        "passingPercentage",
+        "questions",
+        "questions[].id",
+        "questions[].id.value",
+        "questions[].options",
+        "questions[].options[].id",
+        "questions[].options[].id.value",
+        "questions[].options[].isCorrect",
+        "questions[].options[].order",
+        "questions[].options[].text",
+        "questions[].order",
+        "questions[].points",
+        "questions[].text",
+        "questions[].type",
+        "status",
+        "timeLimitMinutes",
+        "title"
+      ]
+    },
+    "POST /api/v1/tests/{id}/publish": {
+      "operationId": "Tests_Publish",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "POST /api/v1/tests/{id}/questions": {
+      "operationId": "Tests_AddQuestion",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "DELETE /api/v1/tests/{id}/questions/{questionId}": {
+      "operationId": "Tests_RemoveQuestion",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "PUT /api/v1/tests/{id}/questions/{questionId}": {
+      "operationId": "Tests_UpdateQuestion",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "POST /api/v1/tests/{id}/questions/{questionId}/options": {
+      "operationId": "Tests_AddOption",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "DELETE /api/v1/tests/{id}/questions/{questionId}/options/{optionId}": {
+      "operationId": "Tests_RemoveOption",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "PUT /api/v1/tests/{id}/questions/{questionId}/options/{optionId}": {
+      "operationId": "Tests_UpdateOption",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "PATCH /api/v1/tests/{id}/questions/{questionId}/options/{optionId}/order": {
+      "operationId": "Tests_ReorderOption",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "PATCH /api/v1/tests/{id}/questions/{questionId}/order": {
+      "operationId": "Tests_ReorderQuestion",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "GET /api/v1/tests/{id}/revisions": {
+      "operationId": "Tests_ListRevisions",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "429"
+      ],
+      "responseFields": [
+        "[].id",
+        "[].id.value",
+        "[].passingPercentage",
+        "[].publishedAt",
+        "[].testId",
+        "[].testId.value",
+        "[].timeLimitMinutes",
+        "[].title",
+        "[].version"
+      ]
+    },
+    "PATCH /api/v1/tests/{id}/settings": {
+      "operationId": "Tests_ChangeSettings",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    },
+    "PATCH /api/v1/tests/{id}/title": {
+      "operationId": "Tests_Rename",
+      "responses": [
+        "200",
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "412",
+        "428",
+        "429"
+      ],
+      "responseFields": [
+        "value"
+      ]
+    }
+  },
+  "schemas": {
+    "AnswerOptionUpdateRequest": {
+      "properties": [
+        "isCorrect",
+        "text"
+      ],
+      "required": [
+        "isCorrect",
+        "text"
+      ],
+      "request": true
+    },
+    "AnswerOptionWriteRequest": {
+      "properties": [
+        "isCorrect",
+        "order",
+        "text"
+      ],
+      "required": [
+        "isCorrect",
+        "order",
+        "text"
+      ],
+      "request": true
+    },
+    "AnswerQuestionRequest": {
+      "properties": [
+        "optionIds"
+      ],
+      "required": [
+        "optionIds"
+      ],
+      "request": true
+    },
+    "AssignRequest": {
+      "properties": [
+        "attemptLimit",
+        "availableFrom",
+        "availableUntil",
+        "groupId",
+        "idempotencyKey",
+        "revisionId",
+        "userId"
+      ],
+      "required": [
+        "attemptLimit",
+        "availableFrom",
+        "availableUntil",
+        "groupId",
+        "idempotencyKey",
+        "revisionId",
+        "userId"
+      ],
+      "request": true
+    },
+    "AssignmentStatus": {},
+    "AssignmentTargetType": {},
+    "AssignmentWindowRequest": {
+      "properties": [
+        "availableFrom",
+        "availableUntil"
+      ],
+      "required": [
+        "availableFrom",
+        "availableUntil"
+      ],
+      "request": true
+    },
+    "AttemptLimitRequest": {
+      "properties": [
+        "attemptLimit"
+      ],
+      "required": [
+        "attemptLimit"
+      ],
+      "request": true
+    },
+    "AttemptOutcome": {},
+    "AttemptStatus": {},
+    "BuildInformation": {
+      "properties": [
+        "imageDigest",
+        "version"
+      ],
+      "required": [
+        "imageDigest",
+        "version"
+      ]
+    },
+    "BulkAssignRequest": {
+      "properties": [
+        "attemptLimit",
+        "availableFrom",
+        "availableUntil",
+        "idempotencyKey",
+        "revisionId",
+        "targets"
+      ],
+      "required": [
+        "attemptLimit",
+        "availableFrom",
+        "availableUntil",
+        "idempotencyKey",
+        "revisionId",
+        "targets"
+      ],
+      "request": true
+    },
+    "BulkAssignmentTargetRequest": {
+      "properties": [
+        "groupId",
+        "userId"
+      ],
+      "required": [
+        "groupId",
+        "userId"
+      ]
+    },
+    "CancelAssignmentRequest": {
+      "properties": [
+        "reason"
+      ],
+      "required": [
+        "reason"
+      ],
+      "request": true
+    },
+    "CreateTestRequest": {
+      "properties": [
+        "title"
+      ],
+      "required": [
+        "title"
+      ],
+      "request": true
+    },
+    "DeadLetterActionRequest": {
+      "properties": [
+        "reason"
+      ],
+      "required": [
+        "reason"
+      ],
+      "request": true
+    },
+    "OrderRequest": {
+      "properties": [
+        "order"
+      ],
+      "required": [
+        "order"
+      ],
+      "request": true
+    },
+    "PublishRequest": {
+      "properties": [
+        "idempotencyKey"
+      ],
+      "required": [
+        "idempotencyKey"
+      ]
+    },
+    "QuestionType": {},
+    "QuestionUpdateRequest": {
+      "properties": [
+        "points",
+        "text",
+        "type"
+      ],
+      "required": [
+        "points",
+        "text",
+        "type"
+      ],
+      "request": true
+    },
+    "QuestionWriteRequest": {
+      "properties": [
+        "order",
+        "points",
+        "text",
+        "type"
+      ],
+      "required": [
+        "order",
+        "points",
+        "text",
+        "type"
+      ],
+      "request": true
+    },
+    "RenameTestRequest": {
+      "properties": [
+        "title"
+      ],
+      "required": [
+        "title"
+      ],
+      "request": true
+    },
+    "StartAttemptRequest": {
+      "properties": [
+        "idempotencyKey"
+      ],
+      "required": [
+        "idempotencyKey"
+      ]
+    },
+    "SubmitAttemptRequest": {
+      "properties": [
+        "idempotencyKey"
+      ],
+      "required": [
+        "idempotencyKey"
+      ]
+    },
+    "TestSettingsRequest": {
+      "properties": [
+        "passingPercentage",
+        "timeLimitMinutes"
+      ],
+      "required": [
+        "passingPercentage",
+        "timeLimitMinutes"
+      ],
+      "request": true
+    },
+    "TestStatus": {}
+  }
+}
