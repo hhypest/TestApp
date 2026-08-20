@@ -5,21 +5,32 @@
 # get a `_total` suffix) — see docs/SLO_ALERTS.md for the source
 # `TestApp.Operations` metric contract.
 #
-# Not implemented here: docs/SLO_ALERTS.md §4 page-rule 1
-# ("/health/ready fails for 3 consecutive probes") requires an active
-# HTTP probe (e.g. blackbox_exporter) against /health/ready, which is
-# a separate component from "add Prometheus/Grafana" and is tracked
-# as a follow-up rather than silently approximated.
+# docs/SLO_ALERTS.md §4 page-rule 1 ("/health/ready fails for 3 consecutive
+# probes") is implemented by TestAppReadinessProbeFailing and needs the
+# blackbox_exporter probe defined in deploy/blackbox/blackbox.yml — a metrics
+# pipeline alone cannot express it, because a hung process stops updating its
+# own metrics instead of reporting itself unhealthy.
 #
-# These rules only evaluate inside Prometheus (visible under
-# Alerts in the Prometheus/Grafana UI). Routing them to an actionable
-# destination (Alertmanager + pager/chat integration) is explicitly
-# still open — see docs/SLO_ALERTS.md §7 and docs/ROADMAP.md Phase E
-# item 12.
+# Routing to an actionable destination is configured for the staging contour
+# (deploy/alertmanager/alertmanager.yml); the local stand deliberately runs
+# without Alertmanager, so there these rules only evaluate inside Prometheus.
+# The drill that proves the routing works is still open — see
+# docs/SLO_ALERTS.md §7.
 
 groups:
   - name: testapp-page
     rules:
+      # Правило 1 §4. `for: 45s` — это три подряд неуспешные пробы при scrape_interval 15s,
+      # то есть ровно то, что сказано в контракте, а не «примерно минута».
+      - alert: TestAppReadinessProbeFailing
+        expr: probe_success{job="testapp-readiness"} == 0
+        for: 45s
+        labels:
+          severity: page
+        annotations:
+          summary: "/health/ready has failed three consecutive probes"
+          description: "docs/SLO_ALERTS.md §4 page-rule 1. Probe target: {{ $labels.instance }}. Unlike TestAppMetricsPipelineDown this asks the API from outside, the way a load balancer would."
+
       - alert: TestAppMetricsPipelineDown
         expr: up{job="testapp"} == 0
         for: 5m
@@ -27,7 +38,7 @@ groups:
           severity: page
         annotations:
           summary: "Prometheus cannot scrape the TestApp OTel Collector metrics endpoint"
-          description: "up{{ $labels.instance }} has been 0 for 5 minutes. This does not by itself mean the API is unhealthy — /health/ready still needs a dedicated probe (see file header)."
+          description: "up{{ $labels.instance }} has been 0 for 5 minutes. This does not by itself mean the API is unhealthy: readiness is answered by TestAppReadinessProbeFailing, which probes the API directly."
 
       - alert: TestAppHighServerErrorRate
         expr: |
@@ -138,3 +149,15 @@ groups:
         annotations:
           summary: "Background attempt expiration failed on at least one recent worker cycle"
           description: "docs/SLO_ALERTS.md §4 warning-rule 6. Window approximates two cycles at the default 30s AttemptExpiration poll interval; retune per deployment."
+
+      # Дополнение к §4: пробер — единственный источник page-правила 1, и его отказ делает
+      # готовность ненаблюдаемой. Молчание в этом случае неотличимо от «всё хорошо», поэтому
+      # слепота сама по себе является поводом для алерта.
+      - alert: TestAppReadinessProbeUnreachable
+        expr: up{job="testapp-readiness"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus cannot reach the blackbox readiness prober"
+          description: "docs/SLO_ALERTS.md §4 warning-rule 8. While this fires, page-rule 1 cannot fire at all — readiness is unobserved, not healthy."

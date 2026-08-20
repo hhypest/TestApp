@@ -9,7 +9,9 @@ set -euo pipefail
 #   3. The alert rule groups documented in docs/SLO_ALERTS.md §4 loaded without error.
 #   4. Expected metric families are actually present (custom TestApp.Operations
 #      metrics, ASP.NET Core request metrics, .NET runtime metrics).
-#   5. Grafana is healthy, the provisioned Prometheus datasource works end to end,
+#   5. The blackbox readiness probe reaches /health/ready and reports success,
+#      and the alert rule that depends on it is loaded.
+#   6. Grafana is healthy, the provisioned Prometheus datasource works end to end,
 #      and the "TestApp Overview" dashboard was provisioned.
 #
 # Expects the stack from compose.yaml (otel-collector, prometheus, grafana, and
@@ -108,17 +110,45 @@ while true; do
   sleep 5
 done
 
-echo "== 5. Checking Grafana health =="
+echo "== 5. Checking the readiness probe actually probes the API =="
+# probe_success приходит от blackbox_exporter, а не от приложения: он ходит в /health/ready
+# снаружи, как это делал бы балансировщик. Единица здесь означает, что цель отвечает 200 —
+# то есть page-правило 1 из docs/SLO_ALERTS.md §4 имеет источник данных, а не только текст.
+deadline=$((SECONDS + TIMEOUT_SECONDS))
+while true; do
+  probe="$(curl --fail --silent --show-error --get "$PROMETHEUS_URL/api/v1/query" \
+    --data-urlencode 'query=probe_success{job="testapp-readiness"}' \
+    | python3 -c 'import json,sys
+result = json.load(sys.stdin)["data"]["result"]
+print(result[0]["value"][1] if result else "missing")')"
+  if [ "$probe" = "1" ]; then
+    echo "Readiness probe reports the API as ready."
+    break
+  fi
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    fail "probe_success{job=\"testapp-readiness\"} is '$probe' after ${TIMEOUT_SECONDS}s (expected 1)"
+  fi
+  sleep 3
+done
+
+# Правило без источника данных молчит ровно так же, как правило, у которого всё хорошо,
+# поэтому проверяется и наличие самого правила в загруженном наборе.
+rules_json="$(curl --fail --silent --show-error "$PROMETHEUS_URL/api/v1/rules")"
+echo "$rules_json" | grep -q "TestAppReadinessProbeFailing" \
+  || fail "Alert rule TestAppReadinessProbeFailing is not loaded in Prometheus"
+echo "Readiness alert rule is loaded."
+
+echo "== 6. Checking Grafana health =="
 grafana_health="$(curl --fail --silent --show-error "$GRAFANA_URL/api/health" | python3 -c 'import json,sys;print(json.load(sys.stdin)["database"])')"
 [ "$grafana_health" = "ok" ] || fail "Grafana health check reported database=$grafana_health"
 
-echo "== 6. Checking the provisioned Prometheus datasource is queryable end to end =="
+echo "== 7. Checking the provisioned Prometheus datasource is queryable end to end =="
 ds_health_json="$(curl --fail --silent --show-error -u "$GRAFANA_USER:$GRAFANA_PASSWORD" \
   "$GRAFANA_URL/api/datasources/uid/testapp-prometheus/health")"
 ds_status="$(echo "$ds_health_json" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("status",""))')"
 [ "$ds_status" = "OK" ] || fail "Grafana Prometheus datasource health is not OK: $ds_health_json"
 
-echo "== 7. Checking the TestApp Overview dashboard is provisioned =="
+echo "== 8. Checking the TestApp Overview dashboard is provisioned =="
 dashboard_json="$(curl --fail --silent --show-error -u "$GRAFANA_USER:$GRAFANA_PASSWORD" \
   "$GRAFANA_URL/api/dashboards/uid/testapp-overview")"
 panel_count="$(echo "$dashboard_json" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(len([p for p in d["dashboard"]["panels"] if p.get("type") != "row"]))')"

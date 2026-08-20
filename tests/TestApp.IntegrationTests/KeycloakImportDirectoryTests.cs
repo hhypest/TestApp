@@ -75,6 +75,63 @@ public sealed class KeycloakImportDirectoryTests
     }
 
     /// <summary>
+    /// Оба realm обязаны выдавать один и тот же набор claim'ов, потому что читает их один и тот
+    /// же код: <c>RoleClaimType = "roles"</c> в <c>Program.cs</c>, claim <c>groups</c> в
+    /// <c>KeycloakClaimsMapper</c> и обязательная audience <c>testapp-api</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Realm контура был заведён без единого protocol mapper. Keycloak при этом стартует, токен
+    /// выдаёт, вход проходит — но в токене нет ни <c>roles</c>, ни <c>groups</c>, ни нужной
+    /// <c>aud</c>. На контуре это выглядело бы как «всё поднялось, но любой запрос отвечает
+    /// 401/403», причём одинаково для всех ролей, то есть максимально похоже на ошибку в самом
+    /// приложении. Мапперы восстановлены; тест не даёт им снова разойтись.
+    /// </para>
+    /// <para>
+    /// Сравнивается контракт, а не файлы целиком: у realm контура другой клиент
+    /// (confidential, с секретом из окружения) и нет пользователей — это осознанные отличия.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Both_realms_issue_the_claims_the_application_reads()
+    {
+        foreach (var relativePath in new[] { "deploy/keycloak/testapp-realm.json", "deploy/staging/testapp-staging-realm.json" })
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath)));
+            var root = document.RootElement;
+
+            var client = root.GetProperty("clients")
+                .EnumerateArray()
+                .Single(element => element.GetProperty("clientId").GetString() == "testapp-api");
+
+            var mappers = client.GetProperty("protocolMappers").EnumerateArray().ToArray();
+
+            var claims = mappers
+                .Select(mapper => mapper.GetProperty("config").TryGetProperty("claim.name", out var claim) ? claim.GetString() : null)
+                .Where(claim => claim is not null)
+                .ToArray();
+
+            Assert.Contains("roles", claims);
+            Assert.Contains("groups", claims);
+
+            var audience = mappers.Single(mapper =>
+                mapper.GetProperty("protocolMapper").GetString() == "oidc-audience-mapper");
+            Assert.Equal("testapp-api", audience.GetProperty("config").GetProperty("included.client.audience").GetString());
+
+            // Группа, на которую выдаются групповые назначения, обязана существовать в обоих
+            // realm: без неё назначение на группу не совпадёт ни с одним студентом.
+            var groups = root.GetProperty("groups").EnumerateArray().Select(group => group.GetProperty("name").GetString());
+            Assert.Contains("students", groups);
+
+            var roles = root.GetProperty("roles").GetProperty("realm").EnumerateArray()
+                .Select(role => role.GetProperty("name").GetString())
+                .ToArray();
+            Assert.Contains("test-author", roles);
+            Assert.Contains("test-admin", roles);
+        }
+    }
+
+    /// <summary>
     /// Подмножество <c>RealmRepresentation</c>, которое проект реально использует. Список
     /// намеренно узкий: расширять его следует осознанно, сверившись с моделью Keycloak,
     /// а не добавлять поле «раз оно уже написано в файле».

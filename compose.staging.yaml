@@ -108,6 +108,15 @@ services:
     volumes:
       - ./deploy/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
 
+  # Активный пробер готовности (docs/SLO_ALERTS.md §4, page-правило 1, ADR-034). На контуре
+  # он нужнее, чем локально: именно здесь page-алерт должен доехать до дежурного.
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.28.0
+    restart: unless-stopped
+    command: ["--config.file=/etc/blackbox/blackbox.yml"]
+    volumes:
+      - ./deploy/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+
   prometheus:
     image: prom/prometheus:v3.7.3
     restart: unless-stopped
@@ -125,6 +134,8 @@ services:
       otel-collector:
         condition: service_started
       alertmanager:
+        condition: service_started
+      blackbox-exporter:
         condition: service_started
 
   # Закрывает худший из открытых сценариев: авария, о которой никто не узнал. Правила

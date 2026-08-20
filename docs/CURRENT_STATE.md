@@ -285,7 +285,7 @@ Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 
 
 - staging/platform restore drill с измеренным RTO;
 - alert routes (Alertmanager + pager/chat receiver) и alert drill против staging — rule expressions сами по себе уже реализованы и оцениваются в Prometheus, но никуда не маршрутизируются;
-- активный readiness prober (`blackbox_exporter` или аналог) для `/health/ready` — сейчас есть только metrics-pipeline health check;
+- drill доставки алертов на контуре с измеренным time-to-alert: пробер готовности и маршрутизация в Alertmanager настроены (ADR-034), но ни один page-алерт ещё не доехал до получателя;
 - хранилище секретов на стороне развёртывания, расписание резервных копий, PITR и политика внешнего хранения;
 - репетиция релиза с откатом и исправлением вперёд.
 

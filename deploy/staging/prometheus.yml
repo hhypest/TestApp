@@ -24,6 +24,23 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+  # Активный пробер готовности (docs/SLO_ALERTS.md §4, page-правило 1). Prometheus ходит в
+  # blackbox_exporter, а тот — в API; поэтому адрес цели переезжает в параметр target, а
+  # instance сохраняет исходный URL, чтобы алерт называл проверяемый адрес, а не экспортер.
+  - job_name: testapp-readiness
+    metrics_path: /probe
+    params:
+      module: [testapp_ready]
+    static_configs:
+      - targets: ["http://api:8080/health/ready"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
 alerting:
   alertmanagers:
     - static_configs:

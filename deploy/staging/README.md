@@ -17,7 +17,13 @@ Realm контура. Отличается от `deploy/keycloak/testapp-realm.j
 2. **клиент confidential**, секрет подставляется из окружения при импорте;
 3. **redirect/web origins** привязаны к публичному домену, а не к `localhost`.
 
-Роли и группы совпадают с dev-realm намеренно: авторизация должна проверяться та же.
+Роли, группы **и protocol mappers** совпадают с dev-realm намеренно: авторизация должна
+проверяться та же. Мапперы здесь не косметика — приложение читает роли из claim `roles`
+(`RoleClaimType` в `Program.cs`), группы из claim `groups` (`KeycloakClaimsMapper`) и требует
+audience `testapp-api`. Realm без мапперов стартует, выдаёт токен и пропускает вход, но любой
+запрос отвечает 401/403 одинаково для всех ролей — то есть выглядит как поломка приложения.
+Так и было до `KeycloakImportDirectoryTests.Both_realms_issue_the_claims_the_application_reads`,
+который теперь держит оба файла на одном контракте.
 
 Подстановка `$(env:VAR)` выполняется Keycloak при импорте; переменные приходят из `.env`
 через `compose.staging.yaml`.

@@ -12,6 +12,7 @@ on:
     paths:
       - "deploy/otel-collector-config.yaml"
       - "deploy/prometheus/**"
+      - "deploy/blackbox/**"
       - "deploy/grafana/**"
       - "src/TestApp.Infrastructure/Observability/**"
       - "compose.yaml"
@@ -24,6 +25,7 @@ on:
     paths:
       - "deploy/otel-collector-config.yaml"
       - "deploy/prometheus/**"
+      - "deploy/blackbox/**"
       - "deploy/grafana/**"
       - "src/TestApp.Infrastructure/Observability/**"
       - "compose.yaml"

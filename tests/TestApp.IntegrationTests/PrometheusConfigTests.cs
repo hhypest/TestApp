@@ -90,6 +90,37 @@ public sealed class PrometheusConfigTests
         Assert.DoesNotContain("https://hooks.", routing, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Готовность проверяется активной пробой, а не метрикой приложения, поэтому у правила
+    /// есть внешний источник данных — job пробера. Job обязан существовать в обоих конфигах:
+    /// правило одно на оба окружения, и без job оно не сработает никогда.
+    /// </summary>
+    /// <remarks>
+    /// Отказ здесь тихий: правило загрузится, Prometheus не пожалуется, алерт просто не
+    /// сможет перейти в firing — при отсутствии серии выражение <c>probe_success == 0</c>
+    /// не даёт ни одного результата. То есть удаление job выглядит как «всё хорошо».
+    /// </remarks>
+    [Fact]
+    public void The_readiness_probe_job_backs_the_readiness_alert_in_both_environments()
+    {
+        foreach (var config in new[] { LocalConfig, StagingConfig })
+        {
+            var content = string.Join('\n', Meaningful(config));
+            Assert.Contains("job_name: testapp-readiness", content, StringComparison.Ordinal);
+            Assert.Contains("/health/ready", content, StringComparison.Ordinal);
+            Assert.Contains("blackbox-exporter:9115", content, StringComparison.Ordinal);
+        }
+
+        var rules = File.ReadAllText(Path.Combine(RepositoryRoot(), "deploy/prometheus/alerts.yml"));
+        Assert.Contains("probe_success{job=\"testapp-readiness\"}", rules, StringComparison.Ordinal);
+        Assert.Contains("up{job=\"testapp-readiness\"}", rules, StringComparison.Ordinal);
+
+        // Модуль пробы, на который ссылается scrape config, обязан существовать в конфиге
+        // экспортера: неизвестный модуль даёт 400 на каждой пробе, то есть постоянный page.
+        var blackbox = File.ReadAllText(Path.Combine(RepositoryRoot(), "deploy/blackbox/blackbox.yml"));
+        Assert.Contains("testapp_ready:", blackbox, StringComparison.Ordinal);
+    }
+
     private static string[] Meaningful(string relativePath) =>
         File.ReadAllLines(Path.Combine(RepositoryRoot(), relativePath))
             .Select(line => line.TrimEnd())

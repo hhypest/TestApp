@@ -55,6 +55,16 @@ services:
       - "4317:4317"
       - "4318:4318"
 
+  # Активный пробер готовности: спрашивает /health/ready снаружи, как это делал бы
+  # балансировщик. Метрика самого приложения на этот вопрос не отвечает — зависший процесс
+  # перестаёт её обновлять, а не сообщает о своей неготовности (docs/SLO_ALERTS.md §4,
+  # page-правило 1, ADR-034).
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.28.0
+    command: ["--config.file=/etc/blackbox/blackbox.yml"]
+    volumes:
+      - ./deploy/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+
   prometheus:
     image: prom/prometheus:v3.7.3
     command: ["--config.file=/etc/prometheus/prometheus.yml"]
@@ -66,6 +76,8 @@ services:
       - "9090:9090"
     depends_on:
       otel-collector:
+        condition: service_started
+      blackbox-exporter:
         condition: service_started
 
   grafana:
