@@ -51,10 +51,12 @@ POSTGRES_PORT             по умолчанию 5432
 POSTGRES_IMAGE            по умолчанию postgres:18
 VERIFY_QUERY              необязательный скалярный запрос-маркер
 VERIFY_EXPECTED           ожидаемый результат
+RESTORE_EVIDENCE_PATH     необязательный путь для JSON evidence
 ```
 
 ```bash
 POSTGRES_ADMIN_PASSWORD=testapp \
+RESTORE_EVIDENCE_PATH=artifacts/restore/staging-database-restore.json \
   bash scripts/postgresql-restore-verify.sh \
     backups/testapp.dump testapp_restore_verify
 ```
@@ -68,13 +70,24 @@ POSTGRES_ADMIN_PASSWORD=testapp \
 - сравнивает количество таблиц в схеме public;
 - сравнивает ненулевое количество записей `__EFMigrationsHistory`;
 - выполняет необязательный запрос-маркер;
-- удаляет целевую базу при завершении.
+- удаляет целевую базу до публикации успешного evidence;
+- атомарно записывает JSON с SHA-256/размером архива, числом таблиц и миграций,
+  монотонным временем restore и проверки; файл создаётся с режимом `0600`.
 
 Он завершает только сессии целевой базы и не изменяет исходную.
 
+Evidence имеет `scope: database-restore-verified`. Это намеренно **не полный RTO сервиса**:
+`databaseRecoverySeconds` заканчивается после восстановления и DB-level проверок. Для закрытия
+issue #18 к нему нужно добавить время до первого успешного `/health/ready` и бизнес-запроса
+из восстановленного экземпляра. Скрипт не выдаёт нижнюю границу за production RTO.
+
+Запись fail-closed: при несовпадении маркера, ошибке restore или невозможности удалить
+одноразовую базу новый JSON не публикуется, а существующий evidence не перезаписывается.
+Путь evidence не может совпадать с архивом или его `.sha256`.
+
 ## Учебное восстановление в CI
 
-Workflow `dotnet` запускает production-образ в режиме `--migrate` против PostgreSQL 18, вставляет маркер, создаёт архив, восстанавливает `testapp_restore_verify`, проверяет схему, историю миграций и маркер, затем удаляет целевую базу.
+Workflow `dotnet` запускает production-образ в режиме `--migrate` против PostgreSQL 18, вставляет маркер, создаёт архив, восстанавливает `testapp_restore_verify`, проверяет схему, историю миграций и маркер, затем удаляет целевую базу. JSON сохраняется как artifact `ci-database-restore-evidence`.
 
 Это проверяет инструментарий репозитория, но не снимки платформы и не PITR.
 

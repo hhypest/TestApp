@@ -436,6 +436,8 @@ Repository baseline реализован:
 - `scripts/postgresql-backup.sh` создаёт consistent custom-format archive + SHA-256;
 - `scripts/postgresql-restore-verify.sh` восстанавливает только в disposable target database;
 - проверяются table counts, EF migration history и optional business marker;
+- `RESTORE_EVIDENCE_PATH` атомарно сохраняет приватный JSON (`0600`) с database recovery
+  timing и не перезаписывает прошлое доказательство при неуспехе;
 - основной CI выполняет recovery drill после migration production image;
 - инженерные цели: RPO <= 24 ч, RTO <= 4 ч.
 
@@ -448,6 +450,10 @@ Repository baseline реализован:
 - уметь пересоздать RabbitMQ topology; broker не является единственным source of truth благодаря Outbox.
 
 Полный runbook: `BACKUP_RESTORE.md`.
+
+`databaseRecoverySeconds` из repository-level evidence — нижняя граница, а не фактический
+RTO приложения. Issue #18 закрывается только после прибавления времени до `/health/ready`
+и показательного бизнес-запроса на восстановленном staging-экземпляре.
 
 ### Проверка производительности D6
 

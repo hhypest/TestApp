@@ -335,7 +335,7 @@ Workflow `dotnet` в GitHub Actions:
 1. сервис-контейнер PostgreSQL 18 по immutable digest;
 2. сервис RabbitMQ 4.3.1 management по immutable digest;
 3. checkout и setup .NET 10.0.400 по commit SHA соответствующих Actions на runner `ubuntu-24.04`;
-4. unit-проверки release tooling, включая запрет плавающих Action/container references;
+4. unit-проверки release/restore tooling, включая запрет плавающих Action/container references;
 5. `dotnet restore TestApp.slnx` + аудит NuGet на HIGH/CRITICAL;
 6. сборка в конфигурации Release;
 7. восстановление зафиксированного `dotnet-ef` и проверка `migrations has-pending-model-changes`;
@@ -343,10 +343,16 @@ Workflow `dotnet` в GitHub Actions:
 9. `docker compose config --quiet`;
 10. сборка production-образа API из base images по digest;
 11. запуск production-образа с `--migrate` против PostgreSQL;
-12. создание логической резервной копии и проверка изолированного восстановления и бизнес-маркера;
+12. создание логической резервной копии, проверка изолированного восстановления и
+    бизнес-маркера, публикация fail-closed JSON evidence;
 13. очистка контейнеров.
 
 Версия остаётся читаемой перед digest (`postgres:18@sha256:...`, комментарий `# v4` рядом с SHA Action), но исполняется только неизменяемый объект. `scripts/verify_immutable_references_test.py` содержит негативные fixtures для Action tag, Dockerfile `FROM`, Compose/service image, standalone `docker run` image и shell default.
+
+`postgresql-restore-verify.test.mjs` подменяет только Docker boundary и проверяет сам
+операционный контракт: evidence появляется после успешной проверки, остаётся прежним при
+ошибке бизнес-маркера, не содержит query/password и не может перезаписать backup. Это не
+заменяет CI restore на реальном PostgreSQL; тест защищает fail-closed оркестрацию вокруг него.
 
 Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
 

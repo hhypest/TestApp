@@ -72,6 +72,8 @@ jobs:
           python3 scripts/verify_coverage_test.py
           python3 scripts/verify_immutable_references_test.py
           python3 scripts/verify_immutable_references.py
+          node --test scripts/postgresql-restore-verify.test.mjs
+          bash -n scripts/postgresql-restore-verify.sh
           node --test scripts/sanitize-k6-summary.test.mjs
           node --check scripts/sanitize-k6-summary.mjs
           node --test performance/k6/seed-plan.test.mjs
@@ -142,9 +144,19 @@ jobs:
         env:
           POSTGRES_PASSWORD: testapp
           POSTGRES_ADMIN_PASSWORD: testapp
+          RESTORE_EVIDENCE_PATH: artifacts/restore/ci-database-restore.json
           VERIFY_QUERY: SELECT COUNT(*) FROM idempotency_records WHERE "Operation" = 'ci.backup.restore';
           VERIFY_EXPECTED: '1'
         run: |
           bash scripts/postgresql-backup.sh /tmp/testapp-ci.dump
           POSTGRES_SOURCE_DATABASE=testapp \
             bash scripts/postgresql-restore-verify.sh /tmp/testapp-ci.dump testapp_restore_verify
+          python3 -m json.tool artifacts/restore/ci-database-restore.json >/dev/null
+      - name: Upload database recovery evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-database-restore-evidence
+          path: artifacts/restore/ci-database-restore.json
+          if-no-files-found: warn
+          retention-days: 30

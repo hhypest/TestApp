@@ -281,7 +281,7 @@ Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 
 
 ### Эксплуатационная надёжность
 
-Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s. Дополнительно реализован и CI-validated local/CI observability backend — Prometheus + Grafana в `compose.yaml` (dashboard + alert rule expressions, `OBS-012`/`OBS-013`, ADR-027). Все внешние Actions и container inputs исполняются по immutable SHA/digest; regression guard входит в `dotnet`.
+Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. Restore CI публикует fail-closed JSON с SHA-256 архива, DB-level timing и результатами проверки; scope явно не выдаёт это время за полный RTO приложения. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s. Дополнительно реализован и CI-validated local/CI observability backend — Prometheus + Grafana в `compose.yaml` (dashboard + alert rule expressions, `OBS-012`/`OBS-013`, ADR-027). Все внешние Actions и container inputs исполняются по immutable SHA/digest; regression guard входит в `dotnet`.
 
 Не завершены:
 
