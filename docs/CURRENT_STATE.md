@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-20. Phase A–D7 полностью реализованы (STAB-001..009, API-009, PostgreSQL migration, EF Core 10 upgrade), плюс observability backend и pre-RC release/staging tooling. На последнем проверенном exact head успешно 341 тест; 90.3% line coverage относится к историческому срезу из 267 тестов и не является текущим quality gate. Exact-head evidence определяется последними GitHub Actions runs ветки.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-20. Phase A–D7 полностью реализованы (STAB-001..009, API-009, PostgreSQL migration, EF Core 10 upgrade), плюс observability backend и pre-RC release/staging tooling. На последнем проверенном exact head успешно 341 тест и измерено 90.58% line coverage; workflow `dotnet` требует не менее 90.00%. Exact-head evidence определяется последними GitHub Actions runs ветки.
 
 ## 1. Назначение системы
 
@@ -277,7 +277,7 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 Все P0/P1 stabilization findings текущего backlog (STAB-001..009) закрыты: business rules, достижимые через application use case, возвращают `Result<T, DomainError>` (ADR-026), а value objects валидируют себя сами — strong identifiers отвергают `Guid.Empty`, `AttemptScore` требует `0 <= Earned <= Maximum`, `TestAttempt.Timeout` требует наступившего deadline (ADR-029, ADR-030).
 
-Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 90.3% на тогдашнем наборе из 267 тестов и закрыл четыре дефекта, найденных при чтении непокрытых участков: порядок проверок в `ReorderQuestion`/`ReorderAnswerOption` (404 вместо 409), смена типа вопроса в обход инварианта single-choice, отсутствие tie-breaker в audit pagination (пропуск STAB-006) и nullable-аннотация `Result.TryGetError`. После расширения набора до 341 теста coverage заново не измерялся и порог в CI не установлен; старое число нельзя выдавать за exact-head evidence. Роль, определяющая owner-scope, консолидирована в одном месте. Детали — `docs/TESTING.md` §2/§14 и `CHANGELOG.md`.
+Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 90.3% на тогдашнем наборе из 267 тестов и закрыл четыре дефекта, найденных при чтении непокрытых участков: порядок проверок в `ReorderQuestion`/`ReorderAnswerOption` (404 вместо 409), смена типа вопроса в обход инварианта single-choice, отсутствие tie-breaker в audit pagination (пропуск STAB-006) и nullable-аннотация `Result.TryGetError`. После расширения набора до 341 теста четыре exact-head Cobertura-отчёта объединены без двойного подсчёта: 5807/6411 строк, 90.58%. CI закрепляет floor 90.00% и падает при отсутствии отчёта. Роль, определяющая owner-scope, консолидирована в одном месте. Детали — `docs/TESTING.md` §2/§14 и `CHANGELOG.md`.
 
 ### Эксплуатационная надёжность
 

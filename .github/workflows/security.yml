@@ -26,12 +26,10 @@ jobs:
         run: >-
           docker run --rm
           -v "$PWD:/work"
-          aquasec/trivy:0.66.0
+          aquasec/trivy:0.66.0@sha256:086971aaf400beebd94e8300fd8ea623774419597169156cec56eec5b00dfb1e
           fs
           --scanners secret
           --exit-code 1
-          --skip-files .github/workflows/dotnet.yml
-          --skip-files compose.yaml
           /work
 
       - name: Build production API image
@@ -41,7 +39,7 @@ jobs:
         run: >-
           docker run --rm
           -v /var/run/docker.sock:/var/run/docker.sock
-          aquasec/trivy:0.66.0
+          aquasec/trivy:0.66.0@sha256:086971aaf400beebd94e8300fd8ea623774419597169156cec56eec5b00dfb1e
           image
           --severity HIGH,CRITICAL
           --ignore-unfixed
@@ -54,7 +52,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/artifacts:/out" \
-            aquasec/trivy:0.66.0 \
+            aquasec/trivy:0.66.0@sha256:086971aaf400beebd94e8300fd8ea623774419597169156cec56eec5b00dfb1e \
             image \
             --format cyclonedx \
             --output /out/testapp-api.cdx.json \

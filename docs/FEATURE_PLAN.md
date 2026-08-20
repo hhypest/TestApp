@@ -71,7 +71,7 @@ Effort — относительный: `S`, `M`, `L`, `XL`.
 | TEST-001 | PostgreSQL integration suite | ГОТОВО | real provider |
 | TEST-002 | RabbitMQ integration suite | ГОТОВО | real broker |
 | TEST-003 | production image migration CI | ГОТОВО | release-path gate |
-| TEST-004 | Core/Domain/Application unit suites | ГОТОВО | 267 tests, 90.3% line coverage (`0.9.5`) |
+| TEST-004 | Core/Domain/Application unit suites | ГОТОВО | 341 tests, 90.58% exact-head line coverage; CI floor 90.00% |
 
 ---
 

@@ -29,22 +29,28 @@ tests/TestApp.IntegrationTests
 
 ### Измеренное покрытие
 
-Baseline `2026-08-16`, `dotnet test --collect:"XPlat Code Coverage"` (line coverage, без EF migrations и generated OpenAPI кода):
+Exact-head baseline `2026-08-20`, `dotnet test --collect:"XPlat Code Coverage"` (line coverage, без EF migrations и generated OpenAPI кода):
 
-| Проект | Line coverage |
-|---|---:|
-| TestApp.Core | 96.7% |
-| TestApp.Domain | 93.8% |
-| TestApp.Application | 90.3% |
-| TestApp.Infrastructure | 91.7% |
-| TestApp.Api | 86.7% |
-| **Всего** | **90.3%** |
+| Проект | Покрыто / всего строк | Line coverage |
+|---|---:|---:|
+| TestApp.Core | 88 / 122 | 72.13% |
+| TestApp.Domain | 508 / 540 | 94.07% |
+| TestApp.Application | 870 / 955 | 91.10% |
+| TestApp.Infrastructure | 2990 / 3152 | 94.86% |
+| TestApp.Api | 1351 / 1642 | 82.28% |
+| **Всего** | **5807 / 6411** | **90.58%** |
 
-На последнем проверенном exact head — 341 тест: 26 Core, 137 Domain, 45 Application, 133 Integration. Проценты в таблице замерены на 267 тестах (`0.9.5`); последующие тесты пока не включены в опубликованный baseline.
+На этом exact head успешно 341 тест: 26 Core, 137 Domain, 45 Application, 133 Integration. Четыре Cobertura-отчёта объединяются по `(package, filename, line)`, для строки сохраняется максимальный `hits`; поэтому код, попавший в несколько test projects, не раздувает ни числитель, ни знаменатель.
 
-Покрытие воспроизводится локально: `coverlet.collector` подключён во всех четырёх test projects. Workflow `dotnet` теперь собирает Cobertura на каждом exact head и сохраняет отчёты как artifact `exact-head-coverage`. Порог следует зафиксировать после первого такого прогона на текущем наборе, а не переносить 90.3% со старого среза вслепую.
+Покрытие воспроизводится локально: `coverlet.collector` подключён во всех четырёх test projects. Workflow `dotnet` собирает Cobertura на каждом exact head, сохраняет отчёты как artifact `exact-head-coverage` и запускает `scripts/verify_coverage.py` с fail-closed floor **90.00%**. Скрипт также падает при отсутствии отчётов или исполняемых строк. Проверка уже скачанного артефакта:
 
-**Как читать эти цифры.** Процент сам по себе ничего не гарантирует — он полезен как индикатор *непокрытых* участков, а не как цель. До `2026-08-16` распределение было перевёрнутым: Core 47.5%, Application 67.4%, Domain 75.8% при Api/Infrastructure ~87%, то есть слои с бизнес-правилами были покрыты хуже всего и почти исключительно косвенно — через integration tests. Именно чтение непокрытых участков выявило четыре дефекта (см. `CHANGELOG.md`, запись `0.9.5`), а не сам факт низкого процента.
+```bash
+python3 scripts/verify_coverage.py \
+  --reports artifacts/test-results \
+  --minimum-line-rate 90
+```
+
+**Как читать эти цифры.** Процент сам по себе ничего не гарантирует — он полезен как индикатор *непокрытых* участков, а не как цель. На историческом срезе `0.9.5` из 267 тестов общий показатель был 90.3%; переносить распределение по слоям с того среза на текущий объединённый отчёт нельзя. Именно чтение непокрытых участков выявило четыре дефекта (см. `CHANGELOG.md`, запись `0.9.5`), а не сам факт низкого процента.
 
 Репозиторий также содержит отдельный импортируемый API test project:
 

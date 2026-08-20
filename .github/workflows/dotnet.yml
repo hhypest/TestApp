@@ -67,8 +67,9 @@ jobs:
           --context AppDbContext
           --configuration Release
           --no-build
-      - name: Verify staging seed plan and shell entrypoint
+      - name: Verify release tooling and staging seed
         run: |
+          python3 scripts/verify_coverage_test.py
           node --test performance/k6/seed-plan.test.mjs
           node --check performance/k6/seed-data.js
           bash -n scripts/seed-staging.sh
@@ -94,6 +95,11 @@ jobs:
           --configuration Release
           --collect:"XPlat Code Coverage"
           --results-directory artifacts/test-results
+      - name: Enforce exact-head line coverage floor
+        run: >-
+          python3 scripts/verify_coverage.py
+          --reports artifacts/test-results
+          --minimum-line-rate 90
       - name: Upload exact-head coverage
         if: always()
         uses: actions/upload-artifact@v4

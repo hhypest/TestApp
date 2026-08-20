@@ -289,15 +289,14 @@ Production:
 
 ## 18. Backlog безопасности и стабильности до 1.0
 
-Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы.
+Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы. Secret scan проверяет весь репозиторий, включая workflow и local Compose: `--skip-files` и allowlist отсутствуют; образ Trivy закреплён по digest.
 
 Actor-scoped `StartAttempt` replay также реализован: lookup включает current `UserId`, поэтому изменение assignment/group state не ломает retry владельца и не раскрывает attempt другого пользователя.
 
 P0/P1 до 1.0:
 
-1. сузить secret-scan allowlist вместо полного исключения workflow/Compose files;
-2. зафиксировать зависимости GitHub Actions и контейнеров по неизменяемому SHA/digest;
-3. выполнить staging alert/restore/rollback security rehearsal.
+1. зафиксировать остальные зависимости GitHub Actions и контейнеров по неизменяемому SHA/digest;
+2. выполнить staging alert/restore/rollback security rehearsal.
 
 Business-triggered/после 1.0:
 
@@ -327,7 +326,7 @@ Business-triggered/после 1.0:
 | Текст CLR-исключения не утекает в `ProblemDetails.detail` | `RequestValidationContractTests`, `TestAggregateTests` (STAB-008, ADR-026) | закрыто |
 | Нулевой GUID не превращается в `500` | `RequestValidationContractTests.The_empty_guid_is_answered_by_the_transport_and_never_reaches_the_domain_guard` (ADR-029) | закрыто |
 | Наружу не публикуется ни одного интеграционного события | `IntegrationEventCatalogTests` (ADR-033) | закрыто |
-| Репозиторий не содержит секретов | шаг `Scan repository for secrets` в workflow `security` (Trivy) | закрыто |
+| Репозиторий не содержит секретов | шаг `Scan repository for secrets` в workflow `security` (Trivy, без исключённых файлов) | закрыто |
 | Production-образ без уязвимостей HIGH/CRITICAL | шаг image scan в workflow `security` | закрыто |
 | `__legacy_admin_only__` не всплывает у произвольного автора ни в одном read model | `CrossAuthorIsolationTests.No_owner_can_exist_that_the_application_never_issued` — проверять на контуре нечего: backfill жил в схлопнутых миграциях, `OwnerId` объявлен обязательным без значения по умолчанию, строка-часовой отсутствует в `src/` | закрыто |
 | Отсутствие отладочных креденшелов на самом контуре | **проверка на staging, issue #16** | открыто |
