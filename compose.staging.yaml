@@ -18,7 +18,7 @@ name: testapp-staging
 
 services:
   ingress:
-    image: caddy:2.10-alpine
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     restart: unless-stopped
     # Порты на хосте можно переназначить, если 80 и 443 заняты — например реле Docker
     # Desktop или изъятым диапазоном Hyper-V. Внутри контейнера Caddy всегда слушает 80 и 443,
@@ -49,7 +49,7 @@ services:
         condition: service_started
 
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?}
@@ -68,7 +68,7 @@ services:
       retries: 20
 
   rabbitmq:
-    image: rabbitmq:4.3.1-management
+    image: rabbitmq:4.3.1-management@sha256:8734b9e9cd03d12b2e1d973415fc4c5c941c5eca351b4bd63f721782b1bf7c8b
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?}
@@ -82,7 +82,7 @@ services:
       retries: 20
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.0
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
     restart: unless-stopped
     # Не start-dev: на контуре нужен production-режим Keycloak, иначе проверяется
     # не та конфигурация, которая поедет дальше.
@@ -117,7 +117,7 @@ services:
         condition: service_healthy
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.157.0
+    image: otel/opentelemetry-collector-contrib:0.157.0@sha256:f2f01157055a9b2aab9df7118e1f1c9abf345e99b23bc7a2bc791db374a7d0f6
     restart: unless-stopped
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
@@ -126,14 +126,14 @@ services:
   # Активный пробер готовности (docs/SLO_ALERTS.md §4, page-правило 1, ADR-034). На контуре
   # он нужнее, чем локально: именно здесь page-алерт должен доехать до дежурного.
   blackbox-exporter:
-    image: prom/blackbox-exporter:v0.28.0
+    image: prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
     restart: unless-stopped
     command: ["--config.file=/etc/blackbox/blackbox.yml"]
     volumes:
       - ./deploy/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
 
   prometheus:
-    image: prom/prometheus:v3.7.3
+    image: prom/prometheus:v3.7.3@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038
     restart: unless-stopped
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -161,7 +161,7 @@ services:
   # Полный объём issue #19 (три drill'а с измеренным time-to-alert и перекалибровкой
   # порогов) этим НЕ закрыт — закрыта только доставка.
   alertmanager:
-    image: prom/alertmanager:v0.28.1
+    image: prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba
     restart: unless-stopped
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     volumes:
@@ -173,7 +173,7 @@ services:
       - testapp-staging-alertmanager:/alertmanager
 
   grafana:
-    image: grafana/grafana:12.2.0
+    image: grafana/grafana:12.2.0@sha256:74144189b38447facf737dfd0f3906e42e0776212bf575dc3334c3609183adf7
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?}

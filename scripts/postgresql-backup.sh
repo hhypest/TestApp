@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941}"
 # Сеть контейнера pg_dump/pg_restore. По умолчанию host — так работает CI, где PostgreSQL
 # опубликован на 127.0.0.1. На staging-контуре порт наружу не публикуется намеренно, поэтому
 # там передаётся сеть compose:

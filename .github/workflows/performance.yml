@@ -45,10 +45,10 @@ concurrency:
 
 jobs:
   capacity-regression:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Build and start production-shaped stack
         run: >-
@@ -94,7 +94,7 @@ jobs:
             -e KEYCLOAK_CLIENT_ID=testapp-api \
             -v "$PWD/performance/k6:/scripts:ro" \
             -v "$PWD/artifacts/performance:/results" \
-            grafana/k6:0.54.0 \
+            grafana/k6:0.54.0@sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755 \
             run --summary-export=/results/k6-summary.json /scripts/api-capacity.js
 
       - name: Verify expiration storm drain
@@ -211,7 +211,7 @@ jobs:
 
       - name: Upload performance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: testapp-capacity-results
           path: artifacts/performance

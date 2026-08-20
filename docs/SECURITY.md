@@ -289,14 +289,13 @@ Production:
 
 ## 18. Backlog безопасности и стабильности до 1.0
 
-Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы. Secret scan проверяет весь репозиторий, включая workflow и local Compose: `--skip-files` и allowlist отсутствуют; образ Trivy закреплён по digest.
+Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы. Secret scan проверяет весь репозиторий, включая workflow и local Compose: `--skip-files` и allowlist отсутствуют. Все внешние GitHub Actions закреплены по commit SHA, исполняемые container references — по `sha256` digest, runner — по major OS label `ubuntu-24.04`, .NET SDK — точной patch-band версией; `scripts/verify_immutable_references.py` удерживает это как CI-инвариант.
 
 Actor-scoped `StartAttempt` replay также реализован: lookup включает current `UserId`, поэтому изменение assignment/group state не ломает retry владельца и не раскрывает attempt другого пользователя.
 
 P0/P1 до 1.0:
 
-1. зафиксировать остальные зависимости GitHub Actions и контейнеров по неизменяемому SHA/digest;
-2. выполнить staging alert/restore/rollback security rehearsal.
+1. выполнить staging alert/restore/rollback security rehearsal.
 
 Business-triggered/после 1.0:
 

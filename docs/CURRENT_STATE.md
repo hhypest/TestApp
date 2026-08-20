@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-20. Phase A–D7 полностью реализованы (STAB-001..009, API-009, PostgreSQL migration, EF Core 10 upgrade), плюс observability backend и pre-RC release/staging tooling. На последнем проверенном exact head успешно 341 тест и измерено 90.58% line coverage; workflow `dotnet` требует не менее 90.00%. Exact-head evidence определяется последними GitHub Actions runs ветки.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-20. Phase A–D7 полностью реализованы (STAB-001..009, API-009, PostgreSQL migration, EF Core 10 upgrade), плюс observability backend и pre-RC release/staging tooling. Консервативный exact-head baseline на 341 тесте — 90.58% line coverage; workflow `dotnet` требует не менее 90.00%. Exact-head evidence определяется последними GitHub Actions runs ветки.
 
 ## 1. Назначение системы
 
@@ -281,7 +281,7 @@ Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 
 
 ### Эксплуатационная надёжность
 
-Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s. Дополнительно реализован и CI-validated local/CI observability backend — Prometheus + Grafana в `compose.yaml` (dashboard + alert rule expressions, `OBS-012`/`OBS-013`, ADR-027).
+Реализованы repository-level D1–D6: logical backup/restore CI, retention cleanup, dead-letter management, metrics/SLO contract, security/SBOM workflow и PostgreSQL/RabbitMQ capacity gate. D6 evidence на `9916b98`: 8771/8771 checks, HTTP failure rate 0, expiration 1247 -> 0 за 14 s, Outbox 100 -> 0 за 1 s. Дополнительно реализован и CI-validated local/CI observability backend — Prometheus + Grafana в `compose.yaml` (dashboard + alert rule expressions, `OBS-012`/`OBS-013`, ADR-027). Все внешние Actions и container inputs исполняются по immutable SHA/digest; regression guard входит в `dotnet`.
 
 Не завершены:
 

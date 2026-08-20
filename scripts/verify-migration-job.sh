@@ -22,7 +22,7 @@ set -euo pipefail
 # целиком — так же скрипт запускается против образа контура или против локальной сборки.
 
 IMAGE="${IMAGE:-testapp-api:ci}"
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941}"
 DOCKER_NETWORK="${DOCKER_NETWORK:-host}"
 PGHOST="${PGHOST:-127.0.0.1}"
 PGPORT="${PGPORT:-5432}"

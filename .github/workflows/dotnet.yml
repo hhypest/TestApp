@@ -13,10 +13,10 @@ on:
       - master
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
         env:
           POSTGRES_DB: testapp
           POSTGRES_USER: testapp
@@ -29,7 +29,7 @@ jobs:
           --health-timeout=5s
           --health-retries=20
       rabbitmq:
-        image: rabbitmq:4.3.1-management
+        image: rabbitmq:4.3.1-management@sha256:8734b9e9cd03d12b2e1d973415fc4c5c941c5eca351b4bd63f721782b1bf7c8b
         env:
           RABBITMQ_DEFAULT_USER: testapp
           RABBITMQ_DEFAULT_PASS: testapp
@@ -45,10 +45,10 @@ jobs:
       ConnectionStrings__Database: Host=127.0.0.1;Port=5432;Database=testapp;Username=testapp;Password=testapp;
       TESTAPP_RABBITMQ: amqp://testapp:testapp@127.0.0.1:5672/
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.400'
       - run: dotnet restore TestApp.slnx
       - name: Audit high and critical NuGet vulnerabilities
         run: >-
@@ -70,6 +70,8 @@ jobs:
       - name: Verify release tooling and staging seed
         run: |
           python3 scripts/verify_coverage_test.py
+          python3 scripts/verify_immutable_references_test.py
+          python3 scripts/verify_immutable_references.py
           node --test performance/k6/seed-plan.test.mjs
           node --check performance/k6/seed-data.js
           bash -n scripts/seed-staging.sh
@@ -102,7 +104,7 @@ jobs:
           --minimum-line-rate 90
       - name: Upload exact-head coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: exact-head-coverage
           path: artifacts/test-results
@@ -126,7 +128,7 @@ jobs:
         run: |
           docker run --rm --network host \
             -e PGPASSWORD=testapp \
-            postgres:18 \
+            postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941 \
             psql \
               --host=127.0.0.1 \
               --port=5432 \

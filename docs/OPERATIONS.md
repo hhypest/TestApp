@@ -1174,7 +1174,6 @@ Background attempt expiration может выполняться на неско�
 - staging backup/restore drill с measured RTO;
 - deployed secret manager/injection и encrypted backup schedule/PITR policy;
 - реальные dashboard/alert routes и alert drill;
-- immutable pinning остальных dependency/action/image references;
 - задокументированная репетиция релиза с откатом и исправлением вперёд.
 
-Trusted proxies, CORS/TLS/HSTS configuration contract, configurable rate limiting, repository retention, dead-letter API, security/image scan и SBOM уже реализованы и не должны оставаться в списке отсутствующих возможностей.
+Trusted proxies, CORS/TLS/HSTS configuration contract, configurable rate limiting, repository retention, dead-letter API, security/image scan, SBOM и immutable SHA/digest для GitHub Actions и внешних контейнеров уже реализованы и не должны оставаться в списке отсутствующих возможностей. Плавающие executable references запрещает `scripts/verify_immutable_references.py` в workflow `dotnet`.

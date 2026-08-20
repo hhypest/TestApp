@@ -40,9 +40,9 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
@@ -110,8 +110,8 @@ jobs:
             .
 
       # security.yml по-прежнему проверяет production-сборку на каждом коммите, но release
-      # собирает собственный артефакт. Сканируем его до push: одинаковый SHA исходников не
-      # гарантирует одинаковый образ при плавающих base tags.
+      # собирает собственный артефакт. Сканируем именно его до push: immutable base inputs
+      # делают сборку воспроизводимой, но не заменяют проверку итоговых app layers.
       - name: Scan the exact release image for high and critical vulnerabilities
         if: ${{ !inputs.evidence_only }}
         run: >-

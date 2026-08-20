@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
     environment:
       POSTGRES_DB: testapp
       POSTGRES_USER: testapp
@@ -16,7 +16,7 @@ services:
       retries: 20
 
   rabbitmq:
-    image: rabbitmq:4.3.1-management
+    image: rabbitmq:4.3.1-management@sha256:8734b9e9cd03d12b2e1d973415fc4c5c941c5eca351b4bd63f721782b1bf7c8b
     environment:
       RABBITMQ_DEFAULT_USER: testapp
       RABBITMQ_DEFAULT_PASS: testapp
@@ -32,7 +32,7 @@ services:
       retries: 20
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.0
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
     command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: bootstrap-admin
@@ -47,7 +47,7 @@ services:
       - ./deploy/keycloak:/opt/keycloak/data/import:ro
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.157.0
+    image: otel/opentelemetry-collector-contrib:0.157.0@sha256:f2f01157055a9b2aab9df7118e1f1c9abf345e99b23bc7a2bc791db374a7d0f6
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./deploy/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
@@ -60,13 +60,13 @@ services:
   # перестаёт её обновлять, а не сообщает о своей неготовности (docs/SLO_ALERTS.md §4,
   # page-правило 1, ADR-034).
   blackbox-exporter:
-    image: prom/blackbox-exporter:v0.28.0
+    image: prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
     command: ["--config.file=/etc/blackbox/blackbox.yml"]
     volumes:
       - ./deploy/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
 
   prometheus:
-    image: prom/prometheus:v3.7.3
+    image: prom/prometheus:v3.7.3@sha256:49214755b6153f90a597adcbff0252cc61069f8ab69ce8411285cd4a560e8038
     command: ["--config.file=/etc/prometheus/prometheus.yml"]
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -81,7 +81,7 @@ services:
         condition: service_started
 
   grafana:
-    image: grafana/grafana:12.2.0
+    image: grafana/grafana:12.2.0@sha256:74144189b38447facf737dfd0f3906e42e0776212bf575dc3334c3609183adf7
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin

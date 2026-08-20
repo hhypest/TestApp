@@ -52,7 +52,7 @@ case "${1:-}" in
 esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-K6_IMAGE="${K6_IMAGE:-grafana/k6:1.4.0}"
+K6_IMAGE="${K6_IMAGE:-grafana/k6:1.4.0@sha256:6a3ee54ac0e9ff5527923f6295257453dd88012f32f40dadf0eb1b638cbb21c7}"
 COMPOSE_FILE="${COMPOSE_FILE:-compose.staging.yaml}"
 
 SEED_TAG="${SEED_TAG:-seed-v1}"
