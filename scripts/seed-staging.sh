@@ -18,7 +18,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/seed-staging.sh
+Usage: scripts/seed-staging.sh [--check]
 
 Обязательные переменные окружения:
   BASE_URL                 адрес API                     (например https://testapp.example.org)
@@ -37,13 +37,19 @@ Usage: scripts/seed-staging.sh
   SEED_SUBMITTED_SHARE SEED_VUS
   COMPOSE_FILE             файл compose для подсчёта объёма (по умолчанию compose.staging.yaml)
   SKIP_VOLUME_REPORT=1     не считать итоговый объём
+
+Режимы:
+  --check                  проверить обязательные переменные и завершиться без сети
 USAGE
 }
 
-if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-  usage
-  exit 0
-fi
+CHECK_ONLY=0
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  --check) CHECK_ONLY=1 ;;
+  "") ;;
+  *) echo "FAIL: неизвестный аргумент '$1'. scripts/seed-staging.sh --help" >&2; exit 2 ;;
+esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 K6_IMAGE="${K6_IMAGE:-grafana/k6:1.4.0}"
@@ -51,6 +57,14 @@ COMPOSE_FILE="${COMPOSE_FILE:-compose.staging.yaml}"
 
 SEED_TAG="${SEED_TAG:-seed-v1}"
 SEED_STUDENTS="${SEED_STUDENTS:-500}"
+
+# Имена в .env относятся к контейнерам staging, а runbook исторически использовал
+# короткие имена для k6. Принимаем оба варианта, чтобы источник секрета оставался один
+# и оператору не приходилось копировать значения вручную.
+KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-testapp-api}"
+KEYCLOAK_CLIENT_SECRET="${KEYCLOAK_CLIENT_SECRET:-${TESTAPP_KEYCLOAK_CLIENT_SECRET:-}}"
+KEYCLOAK_ADMIN_USERNAME="${KEYCLOAK_ADMIN_USERNAME:-${KEYCLOAK_ADMIN_USER:-}}"
+export KEYCLOAK_CLIENT_ID KEYCLOAK_CLIENT_SECRET KEYCLOAK_ADMIN_USERNAME
 
 require() {
   local name="$1"
@@ -60,10 +74,16 @@ require() {
   fi
 }
 
-for variable in BASE_URL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_ADMIN_USERNAME KEYCLOAK_ADMIN_PASSWORD \
+for variable in BASE_URL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_SECRET \
+                KEYCLOAK_ADMIN_USERNAME KEYCLOAK_ADMIN_PASSWORD \
                 AUTHOR_USERNAME AUTHOR_PASSWORD ADMIN_USERNAME ADMIN_PASSWORD SEED_STUDENT_PASSWORD; do
   require "$variable"
 done
+
+if [ "$CHECK_ONLY" = "1" ]; then
+  echo "OK: обязательные переменные staging seed заданы; сетевые запросы не выполнялись."
+  exit 0
+fi
 
 echo "== 1. Учётные записи студентов ($SEED_STUDENTS шт., префикс ${SEED_TAG}-student-) =="
 
@@ -169,12 +189,23 @@ echo "== 4. Фактический объём =="
 if [ -z "${POSTGRES_USER:-}" ] || [ -z "${POSTGRES_DB:-}" ]; then
   echo "(подсчёт строк пропущен: не заданы POSTGRES_USER/POSTGRES_DB)"
 else
-  docker compose -f "$REPO_ROOT/$COMPOSE_FILE" exec -T postgres \
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "
-      select '| ' || relname || ' | ' || to_char(n_live_tup, 'FM999G999G999') || ' |'
-      from pg_stat_user_tables
-      order by n_live_tup desc, relname;
-    " || echo "(подсчёт строк пропущен: postgres недоступен из $COMPOSE_FILE)"
+  # n_live_tup из pg_stat_user_tables является статистической оценкой и может отставать
+  # сразу после массового засева. Для воспроизводимого baseline печатаем точные COUNT(*).
+  if ! docker compose -f "$REPO_ROOT/$COMPOSE_FILE" exec -T postgres \
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At <<'SQL'
+select format(
+  'select %L || to_char(count(*), ''FM999G999G999'') || '' |'' from %I.%I;',
+  '| ' || relname || ' | ',
+  schemaname,
+  relname
+)
+from pg_stat_user_tables
+order by relname;
+\gexec
+SQL
+  then
+    echo "(подсчёт строк пропущен: postgres недоступен из $COMPOSE_FILE)"
+  fi
 
   docker compose -f "$REPO_ROOT/$COMPOSE_FILE" exec -T postgres \
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c \

@@ -3,9 +3,9 @@ name: release
 # Выпуск по тегу: собирает образ, публикует его в GHCR по immutable digest и создаёт
 # GitHub Release со списком доказательств (issue #17, гейт docs/ROADMAP.md §7 пункты 10 и 11).
 #
-# Этот workflow НЕ является гейтом качества: он не запускает тесты и ничего не проверяет.
-# Гейт — пять существующих пайплайнов на том же коммите; их run ID собираются отдельно и
-# прикладываются к Release. Порядок сбора — docs/OPERATIONS.md §16.1.
+# Перед сборкой workflow требует пять завершённых успешных пайплайнов на том же коммите.
+# Сам он тесты не дублирует: проверяет результаты обязательных workflow через GitHub API,
+# затем сканирует именно тот образ, который публикует. Порядок — docs/OPERATIONS.md §16.1.
 #
 # Политика тегов: 1.0.0-rc.N режется из beta-ddd, финальный 1.0.0 — после merge в master.
 
@@ -26,6 +26,7 @@ on:
         type: boolean
 
 permissions:
+  actions: read
   contents: write
   packages: write
 
@@ -88,6 +89,13 @@ jobs:
             exit 1
           fi
 
+      - name: Verify the exact-commit CI quality gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          RELEASE_EVIDENCE_PATH: artifacts/pipelines.md
+        run: node scripts/verify-release-gate.mjs
+
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
@@ -100,6 +108,21 @@ jobs:
             --tag "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}" \
             --tag "${{ steps.image.outputs.name }}:release-candidate" \
             .
+
+      # security.yml по-прежнему проверяет production-сборку на каждом коммите, но release
+      # собирает собственный артефакт. Сканируем его до push: одинаковый SHA исходников не
+      # гарантирует одинаковый образ при плавающих base tags.
+      - name: Scan the exact release image for high and critical vulnerabilities
+        if: ${{ !inputs.evidence_only }}
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.66.0
+          image
+          --severity HIGH,CRITICAL
+          --ignore-unfixed
+          --exit-code 1
+          "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}"
 
       - name: Push image and capture immutable digest
         id: push
@@ -166,34 +189,6 @@ jobs:
           echo "sha256=$(sha256sum "artifacts/$file" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "size=$(du -h "artifacts/$file" | cut -f1)" >> "$GITHUB_OUTPUT"
 
-      # Run ID собираются запросом к API по head_sha релизного коммита, а не переносятся руками.
-      # Раньше таблица создавалась с пустыми полями «заполнить», и заполнить их забывали — а
-      # пустая строка неотличима от «прогон не запускался». Здесь неотличимости нет: строка
-      # либо содержит настоящий ID из API, либо явное «не запускался».
-      #
-      # Прогоны от самого тега (dotnet, security) на этот момент ещё идут — они попадают в
-      # таблицу со статусом in_progress. Это не подмена гейта: гейт закрывает человек, сверяя
-      # заключения, а таблица лишь показывает, что именно сверять.
-      - name: Collect CI evidence for the release commit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts
-          : > artifacts/pipelines.md
-          for workflow in dotnet security observability performance postman; do
-            export workflow
-            rows="$(gh api \
-              "repos/${{ github.repository }}/actions/workflows/$workflow.yml/runs?head_sha=${{ steps.commit.outputs.sha }}&per_page=20" \
-              --jq '.workflow_runs[] | "| \(env.workflow) | \(.id) | \(.event) | \(.status)/\(.conclusion // "—") |"')"
-            if [ -z "$rows" ]; then
-              printf '| %s | — | — | не запускался |\n' "$workflow" >> artifacts/pipelines.md
-            else
-              printf '%s\n' "$rows" >> artifacts/pipelines.md
-            fi
-          done
-          cat artifacts/pipelines.md
-
       - name: Write evidence list
         run: |
           set -euo pipefail
@@ -246,9 +241,10 @@ jobs:
           cat artifacts/pipelines.md >> artifacts/EVIDENCE.md
           cat >> artifacts/EVIDENCE.md <<'EOF'
 
-          Таблица собрана из API по `head_sha` этого коммита на момент выпуска. Прогоны,
-          запущенные позже, в неё не попадут: обновить её можно повторным запуском workflow
-          `release` с включённым `evidence_only` — образ при этом не пересобирается.
+          Таблица собрана из API по `head_sha` этого коммита до сборки образа. Для каждого
+          workflow выбран последний завершённый прогон; отсутствие или заключение, отличное
+          от `success`, останавливает выпуск. Обновить доказательства можно повторным запуском
+          `release` с `evidence_only` — образ при этом не пересобирается.
           EOF
 
       - name: Publish GitHub Release

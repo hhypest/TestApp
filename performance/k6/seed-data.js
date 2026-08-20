@@ -19,6 +19,7 @@
 import http from 'k6/http';
 import { check, fail } from 'k6';
 import exec from 'k6/execution';
+import { studentIndex } from './seed-plan.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const KEYCLOAK_URL = __ENV.KEYCLOAK_URL || 'http://localhost:8081';
@@ -315,7 +316,7 @@ export function authorOneTest(data) {
 
 export function studentSession() {
   const vus = Math.min(VUS, STUDENTS);
-  const index = (exec.scenario.iterationInTest % Math.ceil(STUDENTS / vus)) * vus + (exec.vu.idInTest - 1);
+  const index = studentIndex(exec.vu.iterationInScenario, exec.vu.idInTest, vus);
   if (index >= STUDENTS) {
     return;
   }

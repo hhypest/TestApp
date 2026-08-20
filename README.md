@@ -15,7 +15,7 @@ Backend-система создания, публикации, назначен�
 | API | Minimal API, канонический `/api/v1` |
 | Развёртывание | Docker/Compose + режим только миграций |
 | CI | GitHub Actions + интеграционные тесты на реальных PostgreSQL/RabbitMQ |
-| Тесты | 282 (Core/Domain/Application/Integration), покрытие строк 90.3% |
+| Тесты | 341 (Core/Domain/Application/Integration); 90.3% coverage — исторический baseline, exact-head отчёт формирует CI |
 
 ## Документация
 

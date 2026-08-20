@@ -67,9 +67,45 @@ jobs:
           --context AppDbContext
           --configuration Release
           --no-build
-      - run: dotnet test TestApp.slnx --no-build --configuration Release
+      - name: Verify staging seed plan and shell entrypoint
+        run: |
+          node --test performance/k6/seed-plan.test.mjs
+          node --check performance/k6/seed-data.js
+          bash -n scripts/seed-staging.sh
+          env \
+            BASE_URL=https://staging.example.invalid \
+            KEYCLOAK_URL=https://staging.example.invalid/auth \
+            KEYCLOAK_REALM=testapp-staging \
+            TESTAPP_KEYCLOAK_CLIENT_SECRET=validation-only \
+            KEYCLOAK_ADMIN_USER=validator \
+            KEYCLOAK_ADMIN_PASSWORD=validation-only \
+            AUTHOR_USERNAME=author \
+            AUTHOR_PASSWORD=validation-only \
+            ADMIN_USERNAME=admin \
+            ADMIN_PASSWORD=validation-only \
+            SEED_STUDENT_PASSWORD=validation-only \
+            bash scripts/seed-staging.sh --check
+          node --test scripts/verify-release-gate.test.mjs
+          node --check scripts/verify-release-gate.mjs
+      - name: Run tests and collect exact-head coverage
+        run: >-
+          dotnet test TestApp.slnx
+          --no-build
+          --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory artifacts/test-results
+      - name: Upload exact-head coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-head-coverage
+          path: artifacts/test-results
+          if-no-files-found: error
+          retention-days: 30
       - name: Validate compose configuration
-        run: docker compose -f compose.yaml config --quiet
+        run: |
+          docker compose -f compose.yaml config --quiet
+          bash scripts/validate-staging-compose.sh
       - name: Build production API image
         run: docker build --tag testapp-api:ci .
       # Задание миграций проверяется целиком, а не одним успешным прогоном: применение на

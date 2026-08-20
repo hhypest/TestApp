@@ -15,6 +15,10 @@ on:
       - "deploy/**"
       - "Dockerfile"
       - "compose.yaml"
+      - "compose.staging.yaml"
+      - ".env.staging.example"
+      - "scripts/seed-staging.sh"
+      - "scripts/validate-staging-compose.sh"
       - ".github/workflows/performance.yml"
   pull_request:
     branches:
@@ -26,6 +30,10 @@ on:
       - "deploy/**"
       - "Dockerfile"
       - "compose.yaml"
+      - "compose.staging.yaml"
+      - ".env.staging.example"
+      - "scripts/seed-staging.sh"
+      - "scripts/validate-staging-compose.sh"
       - ".github/workflows/performance.yml"
 
 permissions:

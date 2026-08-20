@@ -1,6 +1,6 @@
 # Текущее состояние проекта
 
-> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-16. Phase A–D7 полностью реализованы (STAB-001..008, API-009, PostgreSQL migration, EF Core 10 upgrade), плюс observability backend (Prometheus/Grafana, ADR-027) и coverage/review pass `0.9.5` (267 тестов, 90.3% line coverage). Exact-head evidence определяется последними GitHub Actions runs ветки.
+> Статус: **Implemented snapshot** ветки `beta-ddd`, 2026-08-20. Phase A–D7 полностью реализованы (STAB-001..009, API-009, PostgreSQL migration, EF Core 10 upgrade), плюс observability backend и pre-RC release/staging tooling. На последнем проверенном exact head успешно 341 тест; 90.3% line coverage относится к историческому срезу из 267 тестов и не является текущим quality gate. Exact-head evidence определяется последними GitHub Actions runs ветки.
 
 ## 1. Назначение системы
 
@@ -244,7 +244,9 @@ Partition key = authenticated `sub`, иначе trusted remote IP.
 - эксплуатационный эндпоинт мониторинга Outbox;
 - готовность RabbitMQ.
 
-**Ограничение:** production business integration-event catalog ещё не определён. Готовность transport не означает автоматическую публикацию всех domain events.
+Production-каталог интеграционных событий явно заморожен пустым до появления реального
+потребителя (ADR-033, `IntegrationEventCatalogTests`). Готовность транспорта не означает
+автоматическую публикацию domain events и не является обязательством по будущей схеме.
 
 Per-message publish failures обрабатываются, и cycle-level failures (batch query/advisory lock/failure-state persistence) больше не могут вывести `BackgroundService` из `PeriodicTimer` loop: `OutboxProcessor`/`OverdueAttemptProcessor` логируют cycle failure и продолжают на следующий poll tick (`RunCycleAsync`).
 
@@ -275,7 +277,7 @@ Per-message publish failures обрабатываются, и cycle-level failur
 
 Все P0/P1 stabilization findings текущего backlog (STAB-001..009) закрыты: business rules, достижимые через application use case, возвращают `Result<T, DomainError>` (ADR-026), а value objects валидируют себя сами — strong identifiers отвергают `Guid.Empty`, `AttemptScore` требует `0 <= Earned <= Maximum`, `TestAttempt.Timeout` требует наступившего deadline (ADR-029, ADR-030).
 
-Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 90.3% (267 тестов) и закрыл четыре дефекта, найденных при чтении непокрытых участков: порядок проверок в `ReorderQuestion`/`ReorderAnswerOption` (404 вместо 409), смена типа вопроса в обход инварианта single-choice, отсутствие tie-breaker в audit pagination (пропуск STAB-006) и nullable-аннотация `Result.TryGetError`. Роль, определяющая owner-scope, консолидирована в одном месте. Детали — `docs/TESTING.md` §2/§14 и `CHANGELOG.md`.
+Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 90.3% на тогдашнем наборе из 267 тестов и закрыл четыре дефекта, найденных при чтении непокрытых участков: порядок проверок в `ReorderQuestion`/`ReorderAnswerOption` (404 вместо 409), смена типа вопроса в обход инварианта single-choice, отсутствие tie-breaker в audit pagination (пропуск STAB-006) и nullable-аннотация `Result.TryGetError`. После расширения набора до 341 теста coverage заново не измерялся и порог в CI не установлен; старое число нельзя выдавать за exact-head evidence. Роль, определяющая owner-scope, консолидирована в одном месте. Детали — `docs/TESTING.md` §2/§14 и `CHANGELOG.md`.
 
 ### Эксплуатационная надёжность
 
@@ -284,8 +286,9 @@ Coverage/review pass `2026-08-16` (`0.9.5`) поднял line coverage 81.1% -> 
 Не завершены:
 
 - staging/platform restore drill с измеренным RTO;
-- alert routes (Alertmanager + pager/chat receiver) и alert drill против staging — rule expressions сами по себе уже реализованы и оцениваются в Prometheus, но никуда не маршрутизируются;
-- drill доставки алертов на контуре с измеренным time-to-alert: пробер готовности и маршрутизация в Alertmanager настроены (ADR-034), но ни один page-алерт ещё не доехал до получателя;
+- drill доставки алертов на контуре с измеренным time-to-alert: пробер готовности и
+  маршрутизация в Alertmanager настроены (ADR-034), но реальный receiver ещё не подтверждён
+  и ни один page-алерт не доказан доставленным;
 - хранилище секретов на стороне развёртывания, расписание резервных копий, PITR и политика внешнего хранения;
 - репетиция релиза с откатом и исправлением вперёд.
 
