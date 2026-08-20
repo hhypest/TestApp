@@ -20,9 +20,14 @@ services:
   ingress:
     image: caddy:2.10-alpine
     restart: unless-stopped
+    # Порты на хосте можно переназначить, если 80 и 443 заняты — например реле Docker
+    # Desktop или изъятым диапазоном Hyper-V. Внутри контейнера Caddy всегда слушает 80 и 443,
+    # и снаружи контур обязан быть доступен на них же: HTTP-01 у Let's Encrypt ходит строго
+    # в 80-й, а TLS-ALPN-01 — строго в 443-й, порт в них не настраивается. Переназначение —
+    # это про сторону хоста, а роутер пробрасывает 80 -> TESTAPP_HTTP_PORT и 443 -> HTTPS.
     ports:
-      - "80:80"
-      - "443:443"
+      - "${TESTAPP_HTTP_PORT:-80}:80"
+      - "${TESTAPP_HTTPS_PORT:-443}:443"
     environment:
       TESTAPP_PUBLIC_HOST: ${TESTAPP_PUBLIC_HOST:?нужен публичный домен контура}
     volumes:
