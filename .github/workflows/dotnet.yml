@@ -72,13 +72,14 @@ jobs:
         run: docker compose -f compose.yaml config --quiet
       - name: Build production API image
         run: docker build --tag testapp-api:ci .
-      - name: Apply migrations from production image (database-only configuration)
-        run: >-
-          docker run --rm --network host
-          -e ASPNETCORE_ENVIRONMENT=Production
-          -e 'ConnectionStrings__Database=${{ env.ConnectionStrings__Database }}'
-          -e Database__ApplyMigrationsOnStartup=false
-          testapp-api:ci --migrate
+      # Задание миграций проверяется целиком, а не одним успешным прогоном: применение на
+      # чистой базе, идемпотентность повторного прогона и отказ автоприменения на старте вне
+      # Development. Порядок и обоснование — scripts/verify-migration-job.sh (issue #21 пункт 4).
+      - name: Verify the migration job from the production image
+        env:
+          IMAGE: testapp-api:ci
+          CONNECTION_STRING: ${{ env.ConnectionStrings__Database }}
+        run: bash scripts/verify-migration-job.sh
       - name: Seed backup restore probe
         run: |
           docker run --rm --network host \
