@@ -28,17 +28,78 @@ public sealed class PrometheusConfigTests
     private const string LocalConfig = "deploy/prometheus/prometheus.yml";
     private const string StagingConfig = "deploy/staging/prometheus.yml";
 
+    /// <summary>
+    /// У контура ровно два отличия от локального стенда, и оба названы: маршрутизация алертов
+    /// и внешняя проба через ingress. Всё остальное обязано совпадать.
+    /// </summary>
+    /// <remarks>
+    /// Список отличий закрытый намеренно. Разрешить «staging может содержать что-то ещё»
+    /// значило бы вернуть ту самую тихую расходимость, ради которой тест написан: конфиг
+    /// собирают руками, добавляют scrape job «только на контур», и узнают об этом при разборе
+    /// инцидента, когда нужного графика не оказывается.
+    /// </remarks>
     [Fact]
-    public void The_staging_config_scrapes_and_evaluates_exactly_what_the_local_one_does()
+    public void The_staging_config_differs_from_the_local_one_only_where_it_is_allowed_to()
     {
         var local = Meaningful(LocalConfig);
         var staging = Meaningful(StagingConfig);
 
-        // Всё, что не относится к alerting, обязано совпадать по составу.
-        var localWithoutAlerting = local.Where(line => !IsAlertingLine(line, local)).ToArray();
-        var stagingWithoutAlerting = staging.Where(line => !IsAlertingLine(line, staging)).ToArray();
+        var localComparable = local.Where(line => !IsAlertingLine(line, local)).ToArray();
+        var stagingComparable = WithoutIngressProbe(staging.Where(line => !IsAlertingLine(line, staging)))
+            .Where(line => !line.Contains("alerts-ingress.yml", StringComparison.Ordinal))
+            .ToArray();
 
-        Assert.Equal(localWithoutAlerting, stagingWithoutAlerting);
+        Assert.Equal(localComparable, stagingComparable);
+    }
+
+    /// <summary>
+    /// Внешняя проба существует только на контуре: ingress есть только там. Локальный стенд
+    /// не должен получить ни job, ни правил к нему — иначе `absent()` сработает навсегда.
+    /// </summary>
+    [Fact]
+    public void Only_the_staging_config_probes_the_public_entry_point()
+    {
+        var staging = string.Join('\n', Meaningful(StagingConfig));
+        var local = string.Join('\n', Meaningful(LocalConfig));
+
+        Assert.Contains("job_name: testapp-ingress", staging, StringComparison.Ordinal);
+        Assert.Contains("/etc/prometheus/targets/ingress.json", staging, StringComparison.Ordinal);
+        Assert.Contains("alerts-ingress.yml", staging, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("testapp-ingress", local, StringComparison.Ordinal);
+
+        var rules = File.ReadAllText(Path.Combine(RepositoryRoot(), "deploy/staging/alerts-ingress.yml"));
+        Assert.Contains("probe_success{job=\"testapp-ingress\"}", rules, StringComparison.Ordinal);
+
+        // Пустой job молчит так же, как исправный. Правило absent() — единственное, что
+        // отличает «внешняя проба в порядке» от «внешней пробы нет».
+        Assert.Contains("absent(up{job=\"testapp-ingress\"})", rules, StringComparison.Ordinal);
+    }
+
+    /// <summary>Блок job'а внешней пробы: от строки job_name до следующего job или до конца.</summary>
+    private static IEnumerable<string> WithoutIngressProbe(IEnumerable<string> lines)
+    {
+        var skipping = false;
+        foreach (var line in lines)
+        {
+            if (line.Trim() == "- job_name: testapp-ingress")
+            {
+                skipping = true;
+                continue;
+            }
+
+            if (skipping)
+            {
+                var startsNewBlock = line.TrimStart().StartsWith("- job_name:", StringComparison.Ordinal)
+                                     || !char.IsWhiteSpace(line[0]);
+                if (!startsNewBlock)
+                    continue;
+
+                skipping = false;
+            }
+
+            yield return line;
+        }
     }
 
     [Fact]

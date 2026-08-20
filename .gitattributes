@@ -3,6 +3,13 @@
 ###############################################################################
 * text=auto
 
+# Скрипты исполняются внутри Linux-контейнеров. При checkout на Windows `text=auto` дал бы им
+# CRLF, и любой из них упал бы на `$'\r': command not found` — включая
+# deploy/staging/init-keycloak-db.sh, который выполняет контейнер PostgreSQL при первом старте
+# контура. Отказ выглядел бы как «Keycloak не может подключиться к своей базе».
+*.sh text eol=lf
+Caddyfile text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

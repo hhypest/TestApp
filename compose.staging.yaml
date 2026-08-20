@@ -29,6 +29,16 @@ services:
       - ./deploy/staging/Caddyfile:/etc/caddy/Caddyfile:ro
       - testapp-staging-caddy-data:/data
       - testapp-staging-caddy-config:/config
+    # Публичное имя обязано разрешаться в ingress и изнутри сети compose. API ходит к
+    # Keycloak по адресу https://${TESTAPP_PUBLIC_HOST}/auth — это тот же issuer, что в
+    # токене, и подменить его внутренним адресом нельзя: валидация JWT сверяет issuer
+    # буквально. Без алиаса запрос ушёл бы в публичный DNS и вернулся на внешний адрес
+    # машины, а hairpin NAT на большинстве роутеров и в WSL2 не работает — API не смог бы
+    # получить метаданные OIDC, и контур выглядел бы поднятым, но не пускал бы никого.
+    networks:
+      default:
+        aliases:
+          - ${TESTAPP_PUBLIC_HOST}
     depends_on:
       api:
         condition: service_started
@@ -129,6 +139,9 @@ services:
       # Конфиг контура: тот же, что локальный, плюс блок alerting.
       - ./deploy/staging/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      # Правила и цель внешней пробы — только на контуре, ingress есть только здесь.
+      - ./deploy/staging/alerts-ingress.yml:/etc/prometheus/alerts-ingress.yml:ro
+      - ./deploy/staging/targets:/etc/prometheus/targets:ro
       - testapp-staging-prometheus:/prometheus
     depends_on:
       otel-collector:

@@ -1,0 +1,33 @@
+# Правила внешней пробы готовности. Монтируются только на контуре: на локальном стенде нет
+# ingress, поэтому и job testapp-ingress там не существует.
+#
+# Разделение проб существенно. Внутренняя (testapp-readiness) отвечает на вопрос «приложение
+# готово». Внешняя (testapp-ingress) — «клиент до него дойдёт»: тот же путь, что у настоящего
+# запроса, включая ingress, TLS и маршрутизацию. Отказ ingress при здоровом приложении
+# внутренняя проба не заметит, а для пользователя это полная недоступность.
+
+groups:
+  - name: testapp-ingress-page
+    rules:
+      - alert: TestAppIngressProbeFailing
+        expr: probe_success{job="testapp-ingress"} == 0
+        for: 45s
+        labels:
+          severity: page
+        annotations:
+          summary: "Контур недоступен снаружи: /health/ready через ingress не отвечает"
+          description: "Три подряд неуспешные пробы внешнего адреса {{ $labels.instance }}. Если TestAppReadinessProbeFailing при этом молчит, приложение здорово, а сломан путь до него: ingress, TLS или сертификат."
+
+  - name: testapp-ingress-warning
+    rules:
+      # Пустой job выглядит как тишина, а тишина неотличима от благополучия. Файл целей
+      # генерируется при подъёме (deploy/staging/targets/README.md), и его отсутствие
+      # обязано быть видно как авария наблюдаемости.
+      - alert: TestAppIngressProbeMissing
+        expr: absent(up{job="testapp-ingress"})
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "У внешней пробы нет ни одной цели"
+          description: "Не сгенерирован deploy/staging/targets/ingress.json либо Prometheus его не видит. Пока это так, TestAppIngressProbeFailing не может сработать в принципе."

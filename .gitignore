@@ -368,3 +368,6 @@ FodyWeavers.xsd
 
 # URL webhook Alertmanager — секрет, создаётся оператором (docs/OPERATIONS.md §16.0.2)
 deploy/staging/webhook-url
+
+# Цель внешней пробы: публичное имя конкретной установки (docs/OPERATIONS.md §16.0.1).
+deploy/staging/targets/ingress.json

@@ -14,6 +14,9 @@ global:
 
 rule_files:
   - /etc/prometheus/alerts.yml
+  # Только на контуре: правила внешней пробы. На локальном стенде нет ingress, и job
+  # testapp-ingress там не существует — правило absent() срабатывало бы постоянно.
+  - /etc/prometheus/alerts-ingress.yml
 
 scrape_configs:
   - job_name: testapp
@@ -33,6 +36,26 @@ scrape_configs:
       module: [testapp_ready]
     static_configs:
       - targets: ["http://api:8080/health/ready"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Внешняя проба: тот же путь, что у настоящего клиента — через ingress, с TLS. Внутренняя
+  # проба отвечает «приложение готово», эта — «клиент до него дойдёт»; отказ ingress при
+  # здоровом приложении первая не заметит. Цель генерируется при подъёме из .env, потому что
+  # Prometheus не подставляет переменные окружения в scrape_configs — см.
+  # deploy/staging/targets/README.md.
+  - job_name: testapp-ingress
+    metrics_path: /probe
+    params:
+      module: [testapp_ready]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/ingress.json
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
