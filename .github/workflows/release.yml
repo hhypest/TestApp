@@ -146,6 +146,26 @@ jobs:
         if: ${{ !inputs.evidence_only }}
         run: cp docs/openapi/v1.json artifacts/openapi-v1.json
 
+      # Образ прикладывается к Release так же, как SBOM: GHCR может стать недоступен, пакет —
+      # приватным, а машина, на которую разворачивают, — отрезанной от интернета. Архив
+      # загружается `docker load` и не требует реестра вовсе.
+      #
+      # Проверяемость даёт SHA-256 самого файла, а не digest манифеста: docker save/load
+      # сохраняет содержимое образа, но RepoDigest после загрузки может отсутствовать —
+      # он присваивается реестром, а не архивом. Поэтому канонической ссылкой остаётся digest
+      # в GHCR, а архив сверяется по контрольной сумме, записанной здесь же.
+      - name: Export the published image as a loadable archive
+        id: archive
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          file="testapp-api-${{ steps.version.outputs.version }}.image.tar.gz"
+          docker save "${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}" | gzip > "artifacts/$file"
+          test -s "artifacts/$file"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "artifacts/$file" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -h "artifacts/$file" | cut -f1)" >> "$GITHUB_OUTPUT"
+
       # Run ID собираются запросом к API по head_sha релизного коммита, а не переносятся руками.
       # Раньше таблица создавалась с пустыми полями «заполнить», и заполнить их забывали — а
       # пустая строка неотличима от «прогон не запускался». Здесь неотличимости нет: строка
@@ -186,6 +206,8 @@ jobs:
           | Образ | \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}\` |
           | Digest | \`${{ steps.push.outputs.digest || steps.existing.outputs.digest }}\` |
           | Развернуть по digest | \`${{ steps.push.outputs.reference || steps.existing.outputs.reference }}\` |
+          | Архив образа | \`${{ steps.archive.outputs.file }}\` (${{ steps.archive.outputs.size }}) |
+          | SHA-256 архива | \`${{ steps.archive.outputs.sha256 }}\` |
 
           Разворачивать следует **по digest, а не по тегу**: тег перемещаем, digest — нет.
           Развёртывание обязано пробросить digest в переменную \`TESTAPP_IMAGE_DIGEST\`,
@@ -193,8 +215,23 @@ jobs:
 
           ## Приложено
 
+          - \`${{ steps.archive.outputs.file }}\` — сам образ, загружаемый без реестра;
           - \`testapp-api.cdx.json\` — SBOM образа в формате CycloneDX;
           - \`openapi-v1.json\` — замороженный контракт v1 на момент выпуска.
+
+          ## Установка без доступа к GHCR
+
+          \`\`\`bash
+          sha256sum -c <<< "${{ steps.archive.outputs.sha256 }}  ${{ steps.archive.outputs.file }}"
+          docker load -i ${{ steps.archive.outputs.file }}
+          \`\`\`
+
+          После загрузки образ доступен под тегом \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}\`,
+          но **без** digest: RepoDigest присваивает реестр, а не архив. Поэтому на отрезанной
+          машине \`TESTAPP_IMAGE\` задаётся тегом, а не ссылкой \`@sha256:\`. Проверкой
+          подлинности в этом случае служит контрольная сумма архива, сверенная выше, а
+          \`TESTAPP_IMAGE_DIGEST\` всё равно выставляется в digest из таблицы: он определяет,
+          какая сборка запущена, и попадает в ответ \`GET /api/v1/operations/version\`.
 
           ## Пайплайны на этом коммите
 
@@ -220,15 +257,21 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ steps.version.outputs.tag }}"
+          # В режиме evidence_only собирается только архив образа — SBOM и контракт уже
+          # приложены и относятся к тому же digest, пересобирать их незачем.
+          assets=("artifacts/${{ steps.archive.outputs.file }}")
+          for optional in artifacts/testapp-api.cdx.json artifacts/openapi-v1.json; do
+            if [ -f "$optional" ]; then
+              assets+=("$optional")
+            fi
+          done
           if gh release view "$tag" >/dev/null 2>&1; then
-            # Release уже существует: обновляем тело, не трогая приложенные артефакты —
-            # они относятся к образу, который никуда не делся.
             gh release edit "$tag" --notes-file artifacts/EVIDENCE.md
+            gh release upload "$tag" "${assets[@]}" --clobber
           else
             gh release create "$tag" \
               --title "$tag" \
               --notes-file artifacts/EVIDENCE.md \
               ${{ steps.version.outputs.prerelease == 'true' && '--prerelease' || '' }} \
-              artifacts/testapp-api.cdx.json \
-              artifacts/openapi-v1.json
+              "${assets[@]}"
           fi
