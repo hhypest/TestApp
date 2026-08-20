@@ -18,6 +18,7 @@ on:
       - "compose.staging.yaml"
       - ".env.staging.example"
       - "scripts/seed-staging.sh"
+      - "scripts/sanitize-k6-summary.mjs"
       - "scripts/validate-staging-compose.sh"
       - ".github/workflows/performance.yml"
   pull_request:
@@ -33,6 +34,7 @@ on:
       - "compose.staging.yaml"
       - ".env.staging.example"
       - "scripts/seed-staging.sh"
+      - "scripts/sanitize-k6-summary.mjs"
       - "scripts/validate-staging-compose.sh"
       - ".github/workflows/performance.yml"
 
@@ -87,15 +89,26 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/performance
-          chmod 0777 artifacts/performance
+          mkdir -p "$RUNNER_TEMP/testapp-k6-private"
+          chmod 0777 "$RUNNER_TEMP/testapp-k6-private"
           docker run --rm --network host \
             -e BASE_URL=http://localhost:8080 \
             -e KEYCLOAK_URL=http://localhost:8081 \
             -e KEYCLOAK_CLIENT_ID=testapp-api \
             -v "$PWD/performance/k6:/scripts:ro" \
-            -v "$PWD/artifacts/performance:/results" \
+            -v "$RUNNER_TEMP/testapp-k6-private:/private" \
             grafana/k6:0.54.0@sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755 \
-            run --summary-export=/results/k6-summary.json /scripts/api-capacity.js
+            run --summary-export=/private/k6-summary.json /scripts/api-capacity.js
+
+      # k6 включает return value setup() в summary-export. Там находятся bearer-токены,
+      # необходимые VU во время теста, но недопустимые в 30-дневном Actions artifact.
+      # Raw-файл намеренно живёт вне upload path; sanitizer выполняется и после падения k6.
+      - name: Build upload-safe k6 evidence
+        if: always()
+        run: >-
+          node scripts/sanitize-k6-summary.mjs
+          "$RUNNER_TEMP/testapp-k6-private/k6-summary.json"
+          artifacts/performance/k6-summary.json
 
       - name: Verify expiration storm drain
         run: |

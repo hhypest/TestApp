@@ -289,7 +289,7 @@ Production:
 
 ## 18. Backlog безопасности и стабильности до 1.0
 
-Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы. Secret scan проверяет весь репозиторий, включая workflow и local Compose: `--skip-files` и allowlist отсутствуют. Все внешние GitHub Actions закреплены по commit SHA, исполняемые container references — по `sha256` digest, runner — по major OS label `ubuntu-24.04`, .NET SDK — точной patch-band версией; `scripts/verify_immutable_references.py` удерживает это как CI-инвариант.
+Repository-level edge security, ownership, NuGet/image scan, secret scan и SBOM уже реализованы. Secret scan проверяет весь репозиторий, включая workflow и local Compose: `--skip-files` и allowlist отсутствуют. Все внешние GitHub Actions закреплены по commit SHA, исполняемые container references — по `sha256` digest, runner — по major OS label `ubuntu-24.04`, .NET SDK — точной patch-band версией; `scripts/verify_immutable_references.py` удерживает это как CI-инвариант. Performance evidence не сохраняет runtime JWT: raw k6 summary остаётся в `$RUNNER_TEMP`, а в Actions artifact попадает только результат fail-closed sanitizer без `setup_data`.
 
 Actor-scoped `StartAttempt` replay также реализован: lookup включает current `UserId`, поэтому изменение assignment/group state не ломает retry владельца и не раскрывает attempt другого пользователя.
 

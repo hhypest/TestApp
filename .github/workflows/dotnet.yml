@@ -72,6 +72,8 @@ jobs:
           python3 scripts/verify_coverage_test.py
           python3 scripts/verify_immutable_references_test.py
           python3 scripts/verify_immutable_references.py
+          node --test scripts/sanitize-k6-summary.test.mjs
+          node --check scripts/sanitize-k6-summary.mjs
           node --test performance/k6/seed-plan.test.mjs
           node --check performance/k6/seed-data.js
           bash -n scripts/seed-staging.sh

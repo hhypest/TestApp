@@ -59,9 +59,16 @@ Workflow создаёт durable-очередь RabbitMQ, привязанную 
 
 Каждый прогон загружает артефакт `testapp-capacity-results` со сроком хранения 30 дней. В нём сохраняются:
 
-- `k6-summary.json`;
+- `k6-summary.json` только с метриками и thresholds;
 - `expiration.json`;
 - `outbox.json` с размером backlog перед пробой и результатом разбора.
+
+Несанитизированный `summary-export` k6 содержит возвращаемый `setup_data`, включая
+краткоживущие JWT, которыми VU пользовались во время прогона. Поэтому raw-файл создаётся
+только в `$RUNNER_TEMP`, вне upload path. `scripts/sanitize-k6-summary.mjs` удаляет
+`setup_data`, проверяет оставшийся документ на JWT/Bearer/private-key значения, атомарно
+создаёт upload-safe `k6-summary.json` и удаляет raw-файл. Ошибка чтения, JSON parsing или
+проверки роняет job; несериализованный файл при этом не может попасть в artifact.
 
 ## Засев контура данными эксплуатационного объёма (`#25`)
 

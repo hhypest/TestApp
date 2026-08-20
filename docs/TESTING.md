@@ -350,7 +350,7 @@ Workflow `dotnet` в GitHub Actions:
 
 Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
 
-Отдельный `performance` workflow поднимает production-shaped API/PostgreSQL/RabbitMQ/Keycloak stack, получает real JWT и проверяет k6 HTTP scenarios, expiration storm и Outbox recovery.
+Отдельный `performance` workflow поднимает production-shaped API/PostgreSQL/RabbitMQ/Keycloak stack, получает real JWT и проверяет k6 HTTP scenarios, expiration storm и Outbox recovery. `sanitize-k6-summary.test.mjs` закрепляет границу evidence: `setup_data` удаляется, остаточные JWT отклоняются, а невалидный raw summary не перезаписывает ранее созданный безопасный файл.
 
 Отдельный `postman` workflow валидирует importable artifacts, поднимает тот же local stack и запускает полный Postman API contract через Newman. JUnit report сохраняется как Actions artifact.
 
