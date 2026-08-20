@@ -236,8 +236,14 @@ services:
       # к ёмкости. Цифры из такого прогона попадут в PERFORMANCE.md как baseline, а по ним
       # откалибруются пороги алертов — обе ошибки будут выглядеть как настоящие измерения.
       ReverseProxy__Enabled: "true"
-      ReverseProxy__ForwardLimit: "1"
+      # ForwardLimit равен числу переприсадок перед приложением. Один — когда снаружи сразу
+      # ingress. Два — когда перед ним стоит ещё и роутер или облачный прокси: Caddy допишет
+      # в X-Forwarded-For адрес роутера, и при лимите 1 приложение примет за клиента именно
+      # его. Вторая доверенная сеть объявляет этот роутер; по умолчанию — loopback, то есть
+      # ничего, потому что пустое значение уронило бы разбор CIDR при старте.
+      ReverseProxy__ForwardLimit: ${TESTAPP_FORWARD_LIMIT:-1}
       ReverseProxy__KnownNetworks__0: ${TESTAPP_INTERNAL_CIDR:?CIDR внутренней сети compose}
+      ReverseProxy__KnownNetworks__1: ${TESTAPP_UPSTREAM_PROXY_CIDR:-127.0.0.1/32}
 
       # Явный список источников; wildcard код запрещает.
       Cors__Enabled: ${CORS_ENABLED:-false}

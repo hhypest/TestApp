@@ -117,6 +117,50 @@ public sealed class RuntimeConfigurationTests
         Assert.Single(options.KnownNetworks);
     }
 
+    /// <summary>
+    /// Контур за роутером имеет две переприсадки перед приложением, и обе объявляются
+    /// конфигурацией: `compose.staging.yaml` отдаёт вторую доверенную сеть из
+    /// `TESTAPP_UPSTREAM_PROXY_CIDR`.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Значение по умолчанию — `127.0.0.1/32`, а не пустая строка, и это не косметика.
+    /// Пустое значение переменной осталось бы в конфигурации пустым элементом массива и
+    /// уронило бы приложение при старте разбором CIDR. Тест удерживает оба свойства: две
+    /// сети принимаются, пустая строка отвергается с внятным сообщением.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Reverse_proxy_accepts_a_second_trusted_network_and_rejects_an_empty_one()
+    {
+        var chained = RuntimeConfiguration.LoadReverseProxy(BuildConfiguration(
+            ("ReverseProxy:Enabled", "true"),
+            ("ReverseProxy:ForwardLimit", "2"),
+            ("ReverseProxy:KnownNetworks:0", "172.20.0.0/16"),
+            ("ReverseProxy:KnownNetworks:1", "192.168.3.1/32")));
+
+        Assert.Equal(2, chained.ForwardLimit);
+        Assert.Equal(2, chained.KnownNetworks.Count);
+
+        // Умолчание из compose обязано разбираться: иначе контур без второй переприсадки
+        // не поднимется вовсе.
+        var single = RuntimeConfiguration.LoadReverseProxy(BuildConfiguration(
+            ("ReverseProxy:Enabled", "true"),
+            ("ReverseProxy:KnownNetworks:0", "172.20.0.0/16"),
+            ("ReverseProxy:KnownNetworks:1", "127.0.0.1/32")));
+
+        Assert.Equal(1, single.ForwardLimit);
+        Assert.Equal(2, single.KnownNetworks.Count);
+
+        var empty = Assert.Throws<InvalidOperationException>(() =>
+            RuntimeConfiguration.LoadReverseProxy(BuildConfiguration(
+                ("ReverseProxy:Enabled", "true"),
+                ("ReverseProxy:KnownNetworks:0", "172.20.0.0/16"),
+                ("ReverseProxy:KnownNetworks:1", ""))));
+
+        Assert.Contains("KnownNetworks", empty.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Cors_requires_explicit_non_wildcard_origin_allow_list()
     {
