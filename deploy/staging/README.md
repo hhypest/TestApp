@@ -38,3 +38,12 @@ Ingress контура: терминирует TLS и проксирует API, 
 
 Создаёт отдельную базу для Keycloak в том же инстансе PostgreSQL. Выполняется образом
 postgres один раз, при инициализации пустого тома.
+
+## `compose.restore-drill.yaml`
+
+Одноразовый чистый recovery-контур для issue `#18`: отдельные PostgreSQL/RabbitMQ volumes и
+API из того же immutable digest, что staging. Live database к нему не подключается; staging
+network используется recovery API только для доступа к исходному OIDC issuer Keycloak.
+
+Файл не поднимают вручную. Полный lifecycle, проверки и обязательный `down --volumes`
+выполняет `scripts/staging_restore_drill.py`; runbook — `docs/OPERATIONS.md` §16.0.5.

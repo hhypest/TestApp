@@ -354,6 +354,13 @@ Workflow `dotnet` в GitHub Actions:
 ошибке бизнес-маркера, не содержит query/password и не может перезаписать backup. Это не
 заменяет CI restore на реальном PostgreSQL; тест защищает fail-closed оркестрацию вокруг него.
 
+`staging_restore_drill_test.py` подменяет Docker и HTTP boundaries полного staging drill,
+но исполняет настоящую оркестрацию/evidence validation. Он проверяет успешный путь до
+бизнес-запроса и idempotency replay (включая различие `Value` в persistence и `value` в HTTP),
+отказ до backup на слишком малом dataset, сохранение прошлого evidence при бизнес-ошибке,
+fail-closed cleanup и удаление ресурсов после частично неуспешного `compose up`. Реальный
+PostgreSQL restore остаётся отдельным CI-шагом, а фактический RTO даёт только staging.
+
 Отдельный `security` workflow выполняет repository secret scan, production-image HIGH/CRITICAL scan и CycloneDX SBOM artifact.
 
 Отдельный `performance` workflow поднимает production-shaped API/PostgreSQL/RabbitMQ/Keycloak stack, получает real JWT и проверяет k6 HTTP scenarios, expiration storm и Outbox recovery. `sanitize-k6-summary.test.mjs` закрепляет границу evidence: `setup_data` удаляется, остаточные JWT отклоняются, а невалидный raw summary не перезаписывает ранее созданный безопасный файл.

@@ -438,6 +438,9 @@ Repository baseline реализован:
 - проверяются table counts, EF migration history и optional business marker;
 - `RESTORE_EVIDENCE_PATH` атомарно сохраняет приватный JSON (`0600`) с database recovery
   timing и не перезаписывает прошлое доказательство при неуспехе;
+- `scripts/staging_restore_drill.py` поднимает чистый одноразовый application recovery
+  контур, измеряет время до `/health/ready` и бизнес-запроса, проверяет audit,
+  idempotency/Outbox/advisory locks и публикует evidence только после удаления volumes;
 - основной CI выполняет recovery drill после migration production image;
 - инженерные цели: RPO <= 24 ч, RTO <= 4 ч.
 
@@ -452,8 +455,8 @@ Repository baseline реализован:
 Полный runbook: `BACKUP_RESTORE.md`.
 
 `databaseRecoverySeconds` из repository-level evidence — нижняя граница, а не фактический
-RTO приложения. Issue #18 закрывается только после прибавления времени до `/health/ready`
-и показательного бизнес-запроса на восстановленном staging-экземпляре.
+RTO приложения. Application-level harness уже измеряет полный интервал, но issue #18
+закрывается только его реальным запуском на засеянном staging и приложенным evidence.
 
 ### Проверка производительности D6
 
@@ -1043,6 +1046,66 @@ Docker Desktop публикует порты на хосте Windows, поэто
 | Автозапуск | systemd | Docker Desktop «Start when you log in» |
 | Расписание бэкапов | cron | Планировщик заданий через `wsl.exe` |
 | Сон машины | обычно отключён | отключать явно |
+
+## 16.0.5 Restore drill на staging (`#18`)
+
+Запускать на машине контура после §16.0.3. Рабочая БД остаётся read-only: скрипт снимает с
+неё свежий dump, а восстановление, RabbitMQ и API создаёт в отдельном Compose project с
+одноразовыми volumes. Recovery API использует тот же image digest и тот же внешний Keycloak.
+
+До запуска перенести из отчёта засева в `.env` метку и консервативные нижние границы:
+`RTO_SEED_TAG`, `RTO_MIN_DATABASE_BYTES`, `RTO_MIN_TEST_COUNT`,
+`RTO_MIN_IDEMPOTENCY_RECORDS`. Порог нельзя подбирать после drill: тогда проверка пустого
+backup превратится в формальность.
+
+Точные три числа для зафиксированного post-seed baseline (размер в байтах, тесты,
+idempotency records) читаются без изменения БД:
+
+```bash
+set -a; . ./.env; set +a
+docker compose -f compose.staging.yaml --env-file .env exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c \
+  "SELECT pg_database_size(current_database()), (SELECT COUNT(*) FROM tests), (SELECT COUNT(*) FROM idempotency_records);"
+```
+
+Результат и метку засева записать рядом с таблицей §16.0.3, затем задать не превышающие
+его значения `RTO_MIN_*` в `.env`. Рекомендуется небольшой явно документированный запас
+для физического размера (его меняет обслуживание PostgreSQL), но не значение `1`.
+
+```bash
+set -a
+. ./.env
+set +a
+
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+export CONFIRM_STAGING_RESTORE_DRILL=isolated-recovery
+
+python3 scripts/staging_restore_drill.py \
+  --backup "/var/backups/testapp/rto-${stamp}.dump" \
+  --evidence /var/backups/testapp/staging-rto-latest.json \
+  --check
+
+python3 scripts/staging_restore_drill.py \
+  --backup "/var/backups/testapp/rto-${stamp}.dump" \
+  --evidence /var/backups/testapp/staging-rto-latest.json
+```
+
+Успех означает одновременно: dataset не меньше baseline; backup/checksum приватны и
+совпадают; live и recovered API подтверждают один version/image digest; восстановленный API
+готов; запрос по seed-метке вернул ожидаемый объём;
+idempotency replay вернул ранее сохранённый revision ID без новой записи; Outbox пуст;
+audit записал probes; advisory locks отсутствуют; recovery volumes удалены; цели RPO/RTO
+выполнены. Любой отказ оставляет прошлое evidence нетронутым и повторно пытается очистить
+project. Проверить отсутствие остатков можно отдельно:
+
+```bash
+docker ps -a --filter 'name=testapp-rto-'
+docker volume ls --filter 'name=testapp-rto-'
+```
+
+Backup и JSON не коммитить. К issue `#18` приложить JSON, digest образа, UTC-время,
+характеристики машины и baseline §16.0.3. Подробный контракт полей и границы измерения —
+`docs/BACKUP_RESTORE.md`.
 
 ## 16.1 Сбор доказательств CI для релиза
 

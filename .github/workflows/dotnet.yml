@@ -72,13 +72,37 @@ jobs:
           python3 scripts/verify_coverage_test.py
           python3 scripts/verify_immutable_references_test.py
           python3 scripts/verify_immutable_references.py
+          python3 scripts/staging_restore_drill_test.py
+          python3 -m py_compile scripts/staging_restore_drill.py scripts/staging_restore_drill_test.py
           node --test scripts/postgresql-restore-verify.test.mjs
-          bash -n scripts/postgresql-restore-verify.sh
+          bash -n scripts/postgresql-backup.sh scripts/postgresql-restore-verify.sh
+          env \
+            TESTAPP_PUBLIC_HOST=staging.example.invalid \
+            TESTAPP_IMAGE=ghcr.io/example/testapp@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+            TESTAPP_IMAGE_DIGEST=sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+            POSTGRES_DB=testapp \
+            POSTGRES_USER=testapp \
+            POSTGRES_PASSWORD=validation-only \
+            RABBITMQ_USER=testapp \
+            RABBITMQ_PASSWORD=validation-only \
+            TESTAPP_KEYCLOAK_CLIENT_SECRET=validation-only \
+            ADMIN_USERNAME=admin \
+            ADMIN_PASSWORD=validation-only \
+            AUTHOR_USERNAME=author \
+            AUTHOR_PASSWORD=validation-only \
+            RTO_SEED_TAG=seed-v1 \
+            RTO_MIN_DATABASE_BYTES=1 \
+            RTO_MIN_TEST_COUNT=1 \
+            RTO_MIN_IDEMPOTENCY_RECORDS=1 \
+            python3 scripts/staging_restore_drill.py \
+              --backup /tmp/staging-restore-check.dump \
+              --evidence /tmp/staging-restore-check.json \
+              --check
           node --test scripts/sanitize-k6-summary.test.mjs
           node --check scripts/sanitize-k6-summary.mjs
           node --test performance/k6/seed-plan.test.mjs
           node --check performance/k6/seed-data.js
-          bash -n scripts/seed-staging.sh
+          bash -n scripts/seed-staging.sh scripts/validate-staging-compose.sh
           env \
             BASE_URL=https://staging.example.invalid \
             KEYCLOAK_URL=https://staging.example.invalid/auth \

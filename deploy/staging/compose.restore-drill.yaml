@@ -1,0 +1,92 @@
+# Одноразовый clean-instance контур для issue #18.
+#
+# Рабочая staging-БД не подключается к этим сервисам: PostgreSQL и RabbitMQ получают
+# отдельные project volumes, API запускается из того же immutable digest, что staging.
+# Единственная общая зависимость — внешний Keycloak в уже работающей staging-сети.
+# Полный lifecycle управляется scripts/staging_restore_drill.py; вручную этот compose
+# поднимать не следует.
+
+services:
+  recovery-postgres:
+    image: postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
+    restart: "no"
+    environment:
+      # Исходная application database намеренно НЕ создаётся entrypoint'ом. Проверенный
+      # temporary target получает её имя только после успешного pg_restore.
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - recovery-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  recovery-rabbitmq:
+    image: rabbitmq:4.3.1-management@sha256:8734b9e9cd03d12b2e1d973415fc4c5c941c5eca351b4bd63f721782b1bf7c8b
+    restart: "no"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?}
+    volumes:
+      - recovery-rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  recovery-api:
+    image: ${TESTAPP_IMAGE:?нужен immutable digest развёрнутого staging-образа}
+    restart: "no"
+    ports:
+      - "127.0.0.1:${RTO_API_PORT:?нужен свободный loopback-порт}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+      ASPNETCORE_HTTP_PORTS: 8080
+      TESTAPP_IMAGE_DIGEST: ${TESTAPP_IMAGE_DIGEST:?}
+
+      ConnectionStrings__Database: Host=recovery-postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
+      Database__ApplyMigrationsOnStartup: "false"
+
+      # Issuer остаётся внешней identity boundary. Сеть staging нужна только API, чтобы
+      # публичный host разрешался в ingress без зависимости от hairpin NAT.
+      Keycloak__Authority: https://${TESTAPP_PUBLIC_HOST}/auth/realms/${KEYCLOAK_REALM:-testapp-staging}
+      Keycloak__Audience: ${KEYCLOAK_CLIENT_ID:-testapp-api}
+      Keycloak__RequireHttpsMetadata: "true"
+
+      RabbitMq__Enabled: "true"
+      RabbitMq__ConnectionString: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@recovery-rabbitmq:5672/
+      RabbitMq__Exchange: testapp.events
+      RabbitMq__RoutingKeyPrefix: testapp
+
+      # Probe идёт напрямую через loopback port, без ingress. Поэтому forwarded headers,
+      # redirect и CORS здесь не участвуют; production validation остаётся включённой.
+      ReverseProxy__Enabled: "false"
+      Cors__Enabled: "false"
+      Cors__AllowCredentials: "false"
+      OpenApi__Enabled: "false"
+      OpenApi__AllowAnonymous: "false"
+      TransportSecurity__HttpsRedirectionEnabled: "false"
+      TransportSecurity__HstsEnabled: "false"
+      TransportSecurity__SecurityHeadersEnabled: "true"
+
+    depends_on:
+      recovery-postgres:
+        condition: service_healthy
+      recovery-rabbitmq:
+        condition: service_healthy
+    networks:
+      - default
+      - staging-identity
+
+networks:
+  staging-identity:
+    external: true
+    name: ${STAGING_NETWORK:-testapp-staging_default}
+
+volumes:
+  recovery-postgres:
+  recovery-rabbitmq:

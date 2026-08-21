@@ -50,8 +50,9 @@ if [[ "$*" == *" psql "* ]]; then
     fi
   fi
   case "$sql" in
-    *information_schema.tables*) printf '13\\n' ;;
-    *'__EFMigrationsHistory'*) printf '1\\n' ;;
+    *pg_database*datname*) printf '%s\\n' "\${FAKE_SOURCE_EXISTS:-0}" ;;
+    *information_schema.tables*) printf '%s\\n' "\${FAKE_TABLE_COUNT:-13}" ;;
+    *'__EFMigrationsHistory'*) printf '%s\\n' "\${FAKE_MIGRATION_COUNT:-1}" ;;
     *'ci.restore.marker'*) printf '%s\\n' "$FAKE_VERIFY_RESULT" ;;
   esac
 fi
@@ -74,6 +75,9 @@ function runRestore(paths, overrides = {}) {
         FAKE_DOCKER_LOG: paths.dockerLog,
         FAKE_DROP_COUNTER: paths.dropCounter,
         FAKE_VERIFY_RESULT: '1',
+        FAKE_SOURCE_EXISTS: '0',
+        FAKE_TABLE_COUNT: '13',
+        FAKE_MIGRATION_COUNT: '1',
         POSTGRES_ADMIN_PASSWORD: 'restore-test-password',
         POSTGRES_SOURCE_DATABASE: 'testapp',
         RESTORE_EVIDENCE_PATH: paths.evidencePath,
@@ -172,4 +176,87 @@ test('refuses to overwrite the backup with its evidence', async (t) => {
   assert.match(result.stderr, /evidence path must differ from backup and checksum paths/i);
   assert.equal(await readFile(paths.backupPath, 'utf8'), 'fixture custom-format archive\n');
   await assert.rejects(readFile(paths.dockerLog), { code: 'ENOENT' });
+});
+
+test('promotes a verified restore only inside a clean instance', async (t) => {
+  const paths = await fixture(t);
+
+  const result = runRestore(paths, {
+    RESTORE_PROMOTE_TARGET: '1',
+    RESTORE_EXPECTED_TABLE_COUNT: '13',
+    RESTORE_EXPECTED_MIGRATION_COUNT: '1',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const evidenceText = await readFile(paths.evidencePath, 'utf8');
+  const evidence = JSON.parse(evidenceText);
+  assert.deepEqual(
+    {
+      schemaVersion: evidence.schemaVersion,
+      status: evidence.status,
+      scope: evidence.scope,
+      sourceDatabase: evidence.sourceDatabase,
+      temporaryDatabase: evidence.temporaryDatabase,
+      restoredDatabase: evidence.restoredDatabase,
+      targetRetained: evidence.targetRetained,
+      tableCount: evidence.tableCount,
+      migrationCount: evidence.migrationCount,
+    },
+    {
+      schemaVersion: 2,
+      status: 'passed',
+      scope: 'database-restore-promoted',
+      sourceDatabase: 'testapp',
+      temporaryDatabase: 'testapp_restore_drill',
+      restoredDatabase: 'testapp',
+      targetRetained: true,
+      tableCount: 13,
+      migrationCount: 1,
+    },
+  );
+  assert.equal((await stat(paths.evidencePath)).mode & 0o777, 0o600);
+
+  const dockerLog = await readFile(paths.dockerLog, 'utf8');
+  assert.match(dockerLog, /ALTER DATABASE "testapp_restore_drill" RENAME TO "testapp"/);
+  assert.doesNotMatch(dockerLog, /DROP DATABASE IF EXISTS "testapp"/);
+});
+
+test('refuses promotion when the source database already exists', async (t) => {
+  const paths = await fixture(t);
+  const previousEvidence = '{"status":"previous-success"}\n';
+  await writeFile(paths.evidencePath, previousEvidence, 'utf8');
+
+  const result = runRestore(paths, {
+    FAKE_SOURCE_EXISTS: '1',
+    RESTORE_PROMOTE_TARGET: '1',
+    RESTORE_EXPECTED_TABLE_COUNT: '13',
+    RESTORE_EXPECTED_MIGRATION_COUNT: '1',
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /source database 'testapp' already exists/i);
+  assert.equal(await readFile(paths.evidencePath, 'utf8'), previousEvidence);
+  const dockerLog = await readFile(paths.dockerLog, 'utf8');
+  assert.doesNotMatch(dockerLog, /CREATE DATABASE/);
+  assert.doesNotMatch(dockerLog, /ALTER DATABASE/);
+});
+
+test('keeps previous evidence and drops the target when promoted restore verification fails', async (t) => {
+  const paths = await fixture(t);
+  const previousEvidence = '{"status":"previous-success"}\n';
+  await writeFile(paths.evidencePath, previousEvidence, 'utf8');
+
+  const result = runRestore(paths, {
+    FAKE_TABLE_COUNT: '12',
+    RESTORE_PROMOTE_TARGET: '1',
+    RESTORE_EXPECTED_TABLE_COUNT: '13',
+    RESTORE_EXPECTED_MIGRATION_COUNT: '1',
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /source tables=13 target tables=12/);
+  assert.equal(await readFile(paths.evidencePath, 'utf8'), previousEvidence);
+  const dockerLog = await readFile(paths.dockerLog, 'utf8');
+  assert.match(dockerLog, /DROP DATABASE IF EXISTS "testapp_restore_drill"/);
+  assert.doesNotMatch(dockerLog, /ALTER DATABASE/);
 });

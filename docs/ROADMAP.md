@@ -166,9 +166,13 @@ Legacy `/api/*` compatibility является управляемым lifecycle 
 - проверка схемы, количества таблиц и истории миграций EF;
 - проверка маркера прикладных данных;
 - учебное восстановление в CI;
+- fail-closed application recovery harness для staging: clean volumes, тот же immutable
+  image digest, readiness/business/idempotency/Outbox/audit/advisory-lock probes;
 - задокументированные базовые ожидания RPO/RTO.
 
-Logical backup является portability/recovery baseline; более жёсткий production RPO требует provider-native snapshot/WAL/PITR.
+Logical backup является portability/recovery baseline; более жёсткий production RPO требует
+provider-native snapshot/WAL/PITR. Repository-контракт D1 готов, но release gate `#18`
+закрывается только фактическим запуском harness на засеянном staging и приложенным evidence.
 
 ## D2. Сроки хранения и очистка — ГОТОВО
 

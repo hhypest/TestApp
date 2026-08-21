@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941}"
 # Сеть контейнера pg_dump/pg_restore. По умолчанию host — так работает CI, где PostgreSQL
@@ -19,10 +20,16 @@ if [[ ! "$POSTGRES_DATABASE" =~ ^[A-Za-z0-9_]+$ ]]; then
   exit 2
 fi
 
-mkdir -p "$BACKUP_DIR"
 output="${1:-$BACKUP_DIR/${POSTGRES_DATABASE}-$(date -u +%Y%m%dT%H%M%SZ).dump}"
+mkdir -p -- "$(dirname -- "$output")"
 tmp="${output}.tmp"
-trap 'rm -f "$tmp"' EXIT
+checksum="${output}.sha256"
+checksum_tmp="${checksum}.tmp"
+if [[ -e "$tmp" || -L "$tmp" || -e "$checksum_tmp" || -L "$checksum_tmp" ]]; then
+  echo "Refusing to reuse an existing backup temporary path." >&2
+  exit 2
+fi
+trap 'rm -f -- "$tmp" "$checksum_tmp"' EXIT
 
 echo "Creating logical backup for database '$POSTGRES_DATABASE'..."
 docker run --rm --network "$POSTGRES_DOCKER_NETWORK" \
@@ -42,8 +49,9 @@ docker run --rm --network "$POSTGRES_DOCKER_NETWORK" \
 
 docker run --rm -i "$POSTGRES_IMAGE" pg_restore --list < "$tmp" >/dev/null
 mv "$tmp" "$output"
-trap - EXIT
 
-sha256sum "$output" > "${output}.sha256"
+sha256sum "$output" > "$checksum_tmp"
+mv "$checksum_tmp" "$checksum"
+trap - EXIT
 echo "Backup created: $output"
-echo "Checksum: ${output}.sha256"
+echo "Checksum: $checksum"
